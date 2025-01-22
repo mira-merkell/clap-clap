@@ -74,7 +74,7 @@ mod entry {
             .expect("factory_id should be a properly formatted C string");
         let factory = <E as Entry>::get_factory(id);
 
-        &raw const factory as *const _
+        todo!()
     }
 
     pub const fn clap_entry<E: Entry + 'static>() -> clap_plugin_entry {
