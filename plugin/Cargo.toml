@@ -7,3 +7,4 @@ edition = "2024"
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
+clap = { path = "../clap" }
