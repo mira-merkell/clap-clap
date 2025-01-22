@@ -45,7 +45,7 @@ pub trait Entry {
 
     fn init(plugin_path: &str) -> Result<(), Error>;
     fn deinit();
-    fn get_factory() -> &'static Self::Factory;
+    fn get_factory(id: &str) -> &'static Self::Factory;
 }
 
 pub use entry::clap_entry;
@@ -68,11 +68,16 @@ mod entry {
         <E as Entry>::deinit()
     }
 
-    extern "C" fn get_factory<E: Entry>(_factory_id: *const c_char) -> *const c_void {
-        todo!()
+    extern "C" fn get_factory<E: Entry + 'static>(factory_id: *const c_char) -> *const c_void {
+        let id = unsafe { CStr::from_ptr(factory_id) }
+            .to_str()
+            .expect("factory_id should be a properly formatted C string");
+        let factory = <E as Entry>::get_factory(id);
+
+        &raw const factory as *const _
     }
 
-    pub const fn clap_entry<E: Entry>() -> clap_plugin_entry {
+    pub const fn clap_entry<E: Entry + 'static>() -> clap_plugin_entry {
         clap_plugin_entry {
             clap_version: clap_version {
                 major: <E as Entry>::CLAP_VERSION.0,

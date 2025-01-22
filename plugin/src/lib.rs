@@ -36,7 +36,7 @@ impl clap::Entry for Entry {
 
     fn deinit() {}
 
-    fn get_factory() -> &'static Self::Factory {
+    fn get_factory(_id: &str) -> &'static Self::Factory {
         &FACTORY
     }
 }
