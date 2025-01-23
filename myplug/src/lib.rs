@@ -1,4 +1,4 @@
-use clap::{Error, Plugin, Process};
+use clap::Plugin;
 
 #[derive(Default)]
 pub struct MyPlug;
