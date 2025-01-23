@@ -1,39 +1,17 @@
-use clap::Plugin;
+use clap::{Error, Plugin, Process};
 
 #[derive(Default)]
 pub struct MyPlug;
 
 impl Plugin for MyPlug {
-    const ID: &'static str = "";
-    const NAME: &'static str = "";
-    const VENDOR: &'static str = "";
+    const ID: &'static str = "com.plugggs.my_plug";
+    const NAME: &'static str = "MyPlug";
+}
 
-    fn init(&mut self) -> Result<(), clap::Error> {
-        todo!()
-    }
+#[derive(Default)]
+pub struct MyPlug2;
 
-    fn activate(
-        &mut self,
-        sample_rate: f64,
-        min_frames: u32,
-        max_frames: u32,
-    ) -> Result<(), clap::Error> {
-        todo!()
-    }
-
-    fn deactivate(&mut self) {
-        todo!()
-    }
-
-    fn start_processing(&mut self) -> Result<(), clap::Error> {
-        todo!()
-    }
-
-    fn stop_processing(&mut self) {
-        todo!()
-    }
-
-    fn reset(&mut self) {
-        todo!()
-    }
+impl Plugin for MyPlug2 {
+    const ID: &'static str = "com.plugggs.my_plug2";
+    const NAME: &'static str = "MyPlug2";
 }

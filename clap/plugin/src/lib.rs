@@ -8,24 +8,26 @@ mod plugin {
     use clap_sys::{clap_host, clap_plugin};
     use std::{marker::PhantomData, ptr::NonNull};
 
-    pub enum Error {}
-
     pub(crate) mod desc {
-
         use clap::Plugin;
         use clap_sys::{CLAP_VERSION, clap_plugin_descriptor};
-        use std::{
-            ffi::{CStr, CString},
-            marker::PhantomData,
-            ptr::null,
-            str::FromStr,
-        };
+        use std::ffi::c_char;
+        use std::{ffi::CString, marker::PhantomData, ptr::null, str::FromStr};
 
         pub(crate) struct Descriptor<P> {
             id: CString,
             name: CString,
             vendor: CString,
-            pub(crate) raw: clap_plugin_descriptor,
+            url: CString,
+            manual_url: CString,
+            support_url: CString,
+            version: CString,
+            description: CString,
+            features: Box<[CString]>,
+            raw_features: Box<[*const c_char]>,
+
+            pub(crate) raw_descriptor: clap_plugin_descriptor,
+
             _marker: PhantomData<P>,
         }
 
@@ -34,27 +36,47 @@ mod plugin {
                 let id = CString::from_str(P::ID).unwrap();
                 let name = CString::from_str(P::NAME).unwrap();
                 let vendor = CString::from_str(P::VENDOR).unwrap();
+                let url = CString::from_str(P::URL).unwrap();
+                let manual_url = CString::from_str(P::MANUAL_URL).unwrap();
+                let support_url = CString::from_str(P::SUPPORT_URL).unwrap();
+                let version = CString::from_str(P::VERSION).unwrap();
+                let description = CString::from_str(P::DESCRIPTION).unwrap();
+
+                let features: Vec<_> = String::from_str(P::FEATURES)
+                    .unwrap()
+                    .split_whitespace()
+                    .map(|s| CString::from_str(s).unwrap())
+                    .collect();
+                let mut features_raw: Vec<_> =
+                    features.iter().map(|f| f.as_c_str().as_ptr()).collect();
+                features_raw.push(null());
+                let features_raw = features_raw.into_boxed_slice();
 
                 let raw = clap_plugin_descriptor {
                     clap_version: CLAP_VERSION,
                     id: id.as_c_str().as_ptr(),
                     name: name.as_c_str().as_ptr(),
                     vendor: vendor.as_c_str().as_ptr(),
-                    url: null(),
-                    manual_url: null(),
-                    support_url: null(),
-                    version: null(),
-                    description: null(),
-                    features: null(),
+                    url: url.as_c_str().as_ptr(),
+                    manual_url: manual_url.as_c_str().as_ptr(),
+                    support_url: support_url.as_c_str().as_ptr(),
+                    version: version.as_c_str().as_ptr(),
+                    description: description.as_c_str().as_ptr(),
+                    features: features_raw.as_ptr(),
                 };
-
-                todo!();
 
                 Self {
                     id,
                     name,
                     vendor,
-                    raw,
+                    url,
+                    manual_url,
+                    support_url,
+                    version,
+                    description,
+                    features: features.into(),
+                    raw_features: features_raw,
+                    raw_descriptor: raw,
                     _marker: PhantomData,
                 }
             }
@@ -117,7 +139,7 @@ mod plugin {
 
             Self {
                 clap_plugin: Box::into_non_null(Box::new(clap_plugin {
-                    desc: &raw const unsafe { &*data }.desc.raw,
+                    desc: &raw const unsafe { &*data }.desc.raw_descriptor,
                     plugin_data: data as *mut _,
                     init: Some(ffi::init::<P>),
                     destroy: Some(ffi::destroy::<P>),
@@ -126,9 +148,9 @@ mod plugin {
                     start_processing: Some(ffi::start_processing::<P>),
                     stop_processing: Some(ffi::stop_processing::<P>),
                     reset: Some(ffi::reset::<P>),
-                    process: None,
-                    get_extension: None,
-                    on_main_thread: None,
+                    process: Some(ffi::process::<P>),
+                    get_extension: Some(ffi::get_extension::<P>),
+                    on_main_thread: Some(ffi::on_main_thread::<P>),
                 })),
                 _marker: PhantomData,
             }
@@ -145,7 +167,9 @@ mod plugin {
     mod ffi {
         use crate::{Plugin, plugin::Wrap};
         use clap_sys::clap_plugin;
-        use std::ptr::NonNull;
+        use clap_sys::ffi::{clap_process, clap_process_status};
+        use std::ffi::{c_char, c_void};
+        use std::ptr::{NonNull, null};
 
         const fn wrap_clap_ptr<P: Plugin>(plugin: *const clap_plugin) -> Wrap<P> {
             let plugin = plugin as *mut _;
@@ -197,24 +221,47 @@ mod plugin {
         pub(crate) extern "C" fn reset<P: Plugin>(plugin: *const clap_plugin) {
             wrap_clap_ptr::<P>(plugin).plugin_mut().reset()
         }
+
+        #[allow(warnings, unused)]
+        pub(crate) extern "C" fn process<P: Plugin>(
+            plugin: *const clap_plugin,
+            process: *const clap_process,
+        ) -> clap_process_status {
+            1
+        }
+
+        #[allow(warnings, unused)]
+        pub(crate) extern "C" fn get_extension<P: Plugin>(
+            plugin: *const clap_plugin,
+            id: *const c_char,
+        ) -> *const c_void {
+            null()
+        }
+
+        #[allow(warnings, unused)]
+        pub(crate) extern "C" fn on_main_thread<P: Plugin>(plugin: *const clap_plugin) {
+            wrap_clap_ptr::<P>(plugin).plugin_mut().on_main_thread()
+        }
     }
 }
 
 mod factory {
-    use crate::Plugin;
-    use crate::plugin::desc::Descriptor;
-    use crate::plugin::{ClapPluginData, Wrap};
+    use crate::{
+        Plugin,
+        plugin::desc::Descriptor,
+        plugin::{ClapPluginData, Wrap},
+    };
     use clap_sys::{clap_host, clap_plugin, clap_plugin_descriptor};
     use std::sync::OnceLock;
 
-    trait FactoryPluginDescriptor {
+    trait FactoryDescriptor {
         fn descriptor(&self) -> *const clap_plugin_descriptor;
         fn create(&self, host: Option<*const clap_host>) -> *const clap_plugin;
     }
 
-    impl<P: Plugin> FactoryPluginDescriptor for Descriptor<P> {
+    impl<P: Plugin> FactoryDescriptor for Descriptor<P> {
         fn descriptor(&self) -> *const clap_plugin_descriptor {
-            &raw const self.raw
+            &raw const self.raw_descriptor
         }
 
         fn create(&self, host: Option<*const clap_host>) -> *const clap_plugin {
@@ -223,18 +270,25 @@ mod factory {
         }
     }
 
+    struct Factory {
+        plugins: Vec<Box<dyn FactoryDescriptor>>,
+    }
+
+    impl Factory {
+        pub fn new(plugins: Vec<Box<dyn FactoryDescriptor>>) -> Self {
+            Self { plugins }
+        }
+    }
+
     fn plug_desc<P: Plugin>() -> Box<Descriptor<P>> {
         Box::new(Descriptor::new())
     }
 
-    struct Factory {
-        plugins: Vec<Box<dyn FactoryPluginDescriptor>>,
-    }
-
     fn factory_init() -> Factory {
-        Factory {
-            plugins: vec![plug_desc::<myplug::MyPlug>()],
-        }
+        Factory::new(vec![
+            plug_desc::<myplug::MyPlug>(),
+            plug_desc::<myplug::MyPlug2>(),
+        ])
     }
 
     unsafe impl Send for Factory {}
@@ -242,7 +296,9 @@ mod factory {
 
     static FACTORY: OnceLock<Factory> = OnceLock::new();
 
-    pub(crate) mod ffi {
+    pub use ffi::PLUGIN_FACTORY;
+
+    mod ffi {
         use crate::factory::{FACTORY, factory_init};
         use clap_sys::{clap_host, clap_plugin, clap_plugin_descriptor, clap_plugin_factory};
         use std::ffi::{CStr, c_char};
@@ -277,7 +333,7 @@ mod factory {
             null()
         }
 
-        pub(crate) static PLUGIN_FACTORY: clap_plugin_factory = clap_plugin_factory {
+        pub static PLUGIN_FACTORY: clap_plugin_factory = clap_plugin_factory {
             get_plugin_count: Some(get_plugin_count),
             get_plugin_descriptor: Some(get_plugin_descriptor),
             create_plugin: Some(create_plugin),
@@ -287,7 +343,7 @@ mod factory {
 
 mod entry {
     mod ffi {
-        use crate::factory::ffi::PLUGIN_FACTORY;
+        use crate::factory::PLUGIN_FACTORY;
         use clap_sys::{CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, clap_plugin_entry};
         use std::{
             ffi::{CStr, c_char, c_void},
@@ -295,14 +351,15 @@ mod entry {
         };
 
         extern "C" fn init(_plugin_path: *const c_char) -> bool {
+            //let _ = FACTORY.get_or_init(factory_init);
             true
         }
 
         extern "C" fn deinit() {}
 
-        extern "C" fn get_factory(_factory_id: *const c_char) -> *const c_void {
-            if _factory_id.is_null()
-                || unsafe { CStr::from_ptr(_factory_id) } == CLAP_PLUGIN_FACTORY_ID
+        extern "C" fn get_factory(factory_id: *const c_char) -> *const c_void {
+            if factory_id.is_null()
+                || unsafe { CStr::from_ptr(factory_id) } != CLAP_PLUGIN_FACTORY_ID
             {
                 return null();
             }

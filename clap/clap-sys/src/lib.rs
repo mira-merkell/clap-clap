@@ -20,9 +20,6 @@ macro_rules! pub_const_cstr {
 
 pub_const_cstr!(CLAP_PLUGIN_FACTORY_ID);
 
-unsafe impl Send for clap_plugin_descriptor {}
-unsafe impl Sync for clap_plugin_descriptor {}
-
 pub const CLAP_VERSION: clap_version = clap_version {
     major: CLAP_VERSION_MAJOR,
     minor: CLAP_VERSION_MINOR,
