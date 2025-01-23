@@ -1,9 +1,12 @@
+#![feature(box_vec_non_null)]
+
 mod plugin {
     use clap::Plugin;
     use clap_sys::{clap_host, clap_plugin};
     use std::{marker::PhantomData, ptr::NonNull};
 
     pub(crate) use crate::plugin::desc::Descriptor;
+    use crate::plugin::ffi::box_clap_plugin;
 
     mod desc {
         use clap::Plugin;
@@ -133,24 +136,8 @@ mod plugin {
         }
 
         pub(crate) fn wrap_data(data: ClapPluginData<P>) -> Self {
-            let data = Box::into_raw(Box::new(data));
-            let plug = Box::into_raw(Box::new(clap_plugin {
-                desc: &raw const unsafe { &*data }.desc.raw_descriptor,
-                plugin_data: data as *mut _,
-                init: Some(ffi::init::<P>),
-                destroy: Some(ffi::destroy::<P>),
-                activate: Some(ffi::activate::<P>),
-                deactivate: Some(ffi::deactivate::<P>),
-                start_processing: Some(ffi::start_processing::<P>),
-                stop_processing: Some(ffi::stop_processing::<P>),
-                reset: Some(ffi::reset::<P>),
-                process: Some(ffi::process::<P>),
-                get_extension: Some(ffi::get_extension::<P>),
-                on_main_thread: Some(ffi::on_main_thread::<P>),
-            }));
-
             Self {
-                clap_plugin: unsafe { NonNull::new_unchecked(plug) },
+                clap_plugin: Box::into_non_null(box_clap_plugin(data)),
                 _marker: PhantomData,
             }
         }
@@ -164,7 +151,7 @@ mod plugin {
     }
 
     mod ffi {
-        use crate::plugin::Wrap;
+        use crate::plugin::{ClapPluginData, Wrap};
         use clap::Plugin;
         use clap_sys::clap_plugin;
         use clap_sys::{clap_process, clap_process_status};
@@ -177,17 +164,17 @@ mod plugin {
         }
 
         #[allow(warnings, unused)]
-        pub(crate) extern "C" fn init<P: Plugin>(plugin: *const clap_plugin) -> bool {
+        extern "C" fn init<P: Plugin>(plugin: *const clap_plugin) -> bool {
             wrap_clap_ptr::<P>(plugin).plugin_mut().init().is_ok()
         }
 
         #[allow(warnings, unused)]
-        pub(crate) extern "C" fn destroy<P: Plugin>(plugin: *const clap_plugin) {
+        extern "C" fn destroy<P: Plugin>(plugin: *const clap_plugin) {
             wrap_clap_ptr::<P>(plugin).unwrap_data();
         }
 
         #[allow(warnings, unused)]
-        pub(crate) extern "C" fn activate<P: Plugin>(
+        extern "C" fn activate<P: Plugin>(
             plugin: *const clap_plugin,
             sample_rate: f64,
             min_frames_count: u32,
@@ -200,12 +187,12 @@ mod plugin {
         }
 
         #[allow(warnings, unused)]
-        pub(crate) extern "C" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
+        extern "C" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
             wrap_clap_ptr::<P>(plugin).plugin_mut().deactivate()
         }
 
         #[allow(warnings, unused)]
-        pub(crate) extern "C" fn start_processing<P: Plugin>(plugin: *const clap_plugin) -> bool {
+        extern "C" fn start_processing<P: Plugin>(plugin: *const clap_plugin) -> bool {
             wrap_clap_ptr::<P>(plugin)
                 .plugin_mut()
                 .start_processing()
@@ -213,17 +200,17 @@ mod plugin {
         }
 
         #[allow(warnings, unused)]
-        pub(crate) extern "C" fn stop_processing<P: Plugin>(plugin: *const clap_plugin) {
+        extern "C" fn stop_processing<P: Plugin>(plugin: *const clap_plugin) {
             wrap_clap_ptr::<P>(plugin).plugin_mut().stop_processing()
         }
 
         #[allow(warnings, unused)]
-        pub(crate) extern "C" fn reset<P: Plugin>(plugin: *const clap_plugin) {
+        extern "C" fn reset<P: Plugin>(plugin: *const clap_plugin) {
             wrap_clap_ptr::<P>(plugin).plugin_mut().reset()
         }
 
         #[allow(warnings, unused)]
-        pub(crate) extern "C" fn process<P: Plugin>(
+        extern "C" fn process<P: Plugin>(
             plugin: *const clap_plugin,
             process: *const clap_process,
         ) -> clap_process_status {
@@ -231,7 +218,7 @@ mod plugin {
         }
 
         #[allow(warnings, unused)]
-        pub(crate) extern "C" fn get_extension<P: Plugin>(
+        extern "C" fn get_extension<P: Plugin>(
             plugin: *const clap_plugin,
             id: *const c_char,
         ) -> *const c_void {
@@ -239,8 +226,30 @@ mod plugin {
         }
 
         #[allow(warnings, unused)]
-        pub(crate) extern "C" fn on_main_thread<P: Plugin>(plugin: *const clap_plugin) {
+        extern "C" fn on_main_thread<P: Plugin>(plugin: *const clap_plugin) {
             wrap_clap_ptr::<P>(plugin).plugin_mut().on_main_thread()
+        }
+
+        pub(crate) fn box_clap_plugin<P: Plugin>(data: ClapPluginData<P>) -> Box<clap_plugin> {
+            let data = Box::new(data);
+            let desc = &data.desc.raw_descriptor;
+            let desc = &raw const *desc;
+            let data = Box::into_raw(data);
+           
+            Box::new(clap_plugin {
+                desc,
+                plugin_data: data as *mut _,
+                init: Some(init::<P>),
+                destroy: Some(destroy::<P>),
+                activate: Some(activate::<P>),
+                deactivate: Some(deactivate::<P>),
+                start_processing: Some(start_processing::<P>),
+                stop_processing: Some(stop_processing::<P>),
+                reset: Some(reset::<P>),
+                process: Some(process::<P>),
+                get_extension: Some(get_extension::<P>),
+                on_main_thread: Some(on_main_thread::<P>),
+            })
         }
     }
 }
@@ -257,7 +266,7 @@ mod factory {
     /// # Safety
     ///
     /// Any returned pointer must be valid for the entire lifetime of self.
-    pub unsafe trait FactoryDescriptor {
+    unsafe trait FactoryDescriptor {
         fn descriptor(&self) -> *const clap_plugin_descriptor;
         fn create(&self, host: Option<*const clap_host>) -> *const clap_plugin;
     }
@@ -273,7 +282,7 @@ mod factory {
         }
     }
 
-    pub struct Factory {
+    struct Factory {
         plugins: Vec<Box<dyn FactoryDescriptor>>,
     }
 
@@ -283,7 +292,7 @@ mod factory {
         }
     }
 
-    pub(crate) fn factory_init() -> Factory {
+    fn factory_init() -> Factory {
         #[inline]
         fn desc<P: Plugin>() -> Box<Descriptor<P>> {
             Box::new(Descriptor::allocate())
@@ -295,7 +304,7 @@ mod factory {
     unsafe impl Send for Factory {}
     unsafe impl Sync for Factory {}
 
-    pub(crate) static FACTORY: OnceLock<Factory> = OnceLock::new();
+    static FACTORY: OnceLock<Factory> = OnceLock::new();
     pub(crate) use ffi::PLUGIN_FACTORY;
 
     mod ffi {
@@ -306,18 +315,18 @@ mod factory {
             ptr::null,
         };
 
-        pub(crate) extern "C" fn get_plugin_count(_: *const clap_plugin_factory) -> u32 {
+        extern "C" fn get_plugin_count(_: *const clap_plugin_factory) -> u32 {
             FACTORY.get_or_init(factory_init).plugins.len() as u32
         }
 
-        pub(crate) extern "C" fn get_plugin_descriptor(
+        extern "C" fn get_plugin_descriptor(
             _: *const clap_plugin_factory,
             index: u32,
         ) -> *const clap_plugin_descriptor {
             FACTORY.get_or_init(factory_init).plugins[index as usize].descriptor()
         }
 
-        pub(crate) extern "C" fn create_plugin(
+        extern "C" fn create_plugin(
             _: *const clap_plugin_factory,
             host: *const clap_host,
             plugin_id: *const c_char,
