@@ -1,3 +1,3 @@
 [submodule "clap/clap-sys/clap"]
-	path = plug/clap/clap
+	path = clap/clap-sys/clap
 	url = https://github.com/free-audio/clap.git

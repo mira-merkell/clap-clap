@@ -1,33 +1,19 @@
 #![feature(box_vec_non_null)]
 
-trait Plugin: Default {
-    const ID: &'static str;
-    const NAME: &'static str;
-    const VENDOR: &'static str;
-
-    fn init(&mut self) -> Result<(), plugin::Error>;
-    fn activate(
-        &mut self,
-        sample_rate: f64,
-        min_frames: u32,
-        max_frames: u32,
-    ) -> Result<(), plugin::Error>;
-    fn deactivate(&mut self);
-    fn start_processing(&mut self) -> Result<(), plugin::Error>;
-    fn stop_processing(&mut self);
-    fn reset(&mut self);
-}
+use clap::Plugin;
 
 mod plugin {
-    use crate::{Plugin, plugin::desc::Descriptor};
-    use clap::{clap_host, clap_plugin};
+    use crate::plugin::desc::Descriptor;
+    use clap::Plugin;
+    use clap_sys::{clap_host, clap_plugin};
     use std::{marker::PhantomData, ptr::NonNull};
 
     pub enum Error {}
 
     pub(crate) mod desc {
-        use crate::Plugin;
-        use clap::{CLAP_VERSION, clap_plugin_descriptor};
+
+        use clap::Plugin;
+        use clap_sys::{CLAP_VERSION, clap_plugin_descriptor};
         use std::{
             ffi::{CStr, CString},
             marker::PhantomData,
@@ -157,9 +143,8 @@ mod plugin {
     }
 
     mod ffi {
-        use crate::Plugin;
-        use crate::plugin::Wrap;
-        use clap::clap_plugin;
+        use crate::{Plugin, plugin::Wrap};
+        use clap_sys::clap_plugin;
         use std::ptr::NonNull;
 
         const fn wrap_clap_ptr<P: Plugin>(plugin: *const clap_plugin) -> Wrap<P> {
@@ -216,10 +201,10 @@ mod plugin {
 }
 
 mod factory {
+    use crate::Plugin;
     use crate::plugin::desc::Descriptor;
     use crate::plugin::{ClapPluginData, Wrap};
-    use crate::{MyPlug, Plugin};
-    use clap::{clap_host, clap_plugin, clap_plugin_descriptor};
+    use clap_sys::{clap_host, clap_plugin, clap_plugin_descriptor};
     use std::sync::OnceLock;
 
     trait FactoryPluginDescriptor {
@@ -248,7 +233,7 @@ mod factory {
 
     fn factory_init() -> Factory {
         Factory {
-            plugins: vec![plug_desc::<MyPlug>()],
+            plugins: vec![plug_desc::<myplug::MyPlug>()],
         }
     }
 
@@ -259,7 +244,7 @@ mod factory {
 
     pub(crate) mod ffi {
         use crate::factory::{FACTORY, factory_init};
-        use clap::{clap_host, clap_plugin, clap_plugin_descriptor, clap_plugin_factory};
+        use clap_sys::{clap_host, clap_plugin, clap_plugin_descriptor, clap_plugin_factory};
         use std::ffi::{CStr, c_char};
         use std::ptr::null;
 
@@ -303,7 +288,7 @@ mod factory {
 mod entry {
     mod ffi {
         use crate::factory::ffi::PLUGIN_FACTORY;
-        use clap::{CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, clap_plugin_entry};
+        use clap_sys::{CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, clap_plugin_entry};
         use std::{
             ffi::{CStr, c_char, c_void},
             ptr::null,
@@ -334,43 +319,5 @@ mod entry {
             deinit: Some(deinit),
             get_factory: Some(get_factory),
         };
-    }
-}
-
-#[derive(Default)]
-struct MyPlug;
-
-impl Plugin for MyPlug {
-    const ID: &'static str = "";
-    const NAME: &'static str = "";
-    const VENDOR: &'static str = "";
-
-    fn init(&mut self) -> Result<(), plugin::Error> {
-        todo!()
-    }
-
-    fn activate(
-        &mut self,
-        sample_rate: f64,
-        min_frames: u32,
-        max_frames: u32,
-    ) -> Result<(), plugin::Error> {
-        todo!()
-    }
-
-    fn deactivate(&mut self) {
-        todo!()
-    }
-
-    fn start_processing(&mut self) -> Result<(), plugin::Error> {
-        todo!()
-    }
-
-    fn stop_processing(&mut self) {
-        todo!()
-    }
-
-    fn reset(&mut self) {
-        todo!()
     }
 }
