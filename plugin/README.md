@@ -1,3 +1,0 @@
-# plugin
-
-The plugin definition.
