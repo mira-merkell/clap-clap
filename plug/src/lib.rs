@@ -19,22 +19,21 @@ trait Plugin: Default {
 }
 
 mod plugin {
-    use crate::Plugin;
+    use crate::{Plugin, plugin::desc::Descriptor};
     use clap::{clap_host, clap_plugin};
-
-    use crate::plugin::desc::Descriptor;
-    use std::marker::PhantomData;
-    use std::ptr::{NonNull, null};
+    use std::{marker::PhantomData, ptr::NonNull};
 
     pub enum Error {}
 
     pub(crate) mod desc {
         use crate::Plugin;
         use clap::{CLAP_VERSION, clap_plugin_descriptor};
-        use std::ffi::{CStr, CString};
-        use std::marker::PhantomData;
-        use std::ptr::null;
-        use std::str::FromStr;
+        use std::{
+            ffi::{CStr, CString},
+            marker::PhantomData,
+            ptr::null,
+            str::FromStr,
+        };
 
         pub(crate) struct Descriptor<P> {
             id: CString,
@@ -45,7 +44,7 @@ mod plugin {
         }
 
         impl<P: Plugin> Descriptor<P> {
-            pub fn new(plugin: &P) -> Self {
+            pub fn new() -> Self {
                 let id = CString::from_str(P::ID).unwrap();
                 let name = CString::from_str(P::NAME).unwrap();
                 let vendor = CString::from_str(P::VENDOR).unwrap();
@@ -76,23 +75,23 @@ mod plugin {
         }
     }
 
-    struct ClapPluginData<P> {
+    pub(crate) struct ClapPluginData<P> {
         pub(crate) desc: Descriptor<P>,
         plugin: P,
         clap_host: Option<*const clap_host>,
     }
 
     impl<P: Plugin> ClapPluginData<P> {
-        fn new(plugin: P, clap_host: Option<*const clap_host>) -> Self {
+        pub(crate) fn new(plugin: P, clap_host: Option<*const clap_host>) -> Self {
             Self {
-                desc: Descriptor::new(&plugin),
+                desc: Descriptor::new(),
                 plugin,
                 clap_host,
             }
         }
     }
 
-    struct Wrap<P> {
+    pub(crate) struct Wrap<P> {
         clap_plugin: NonNull<clap_plugin>,
         _marker: PhantomData<P>,
     }
@@ -105,7 +104,7 @@ mod plugin {
             }
         }
 
-        fn into_inner(self) -> *const clap_plugin {
+        pub(crate) fn into_inner(self) -> *const clap_plugin {
             self.clap_plugin.as_ptr()
         }
 
@@ -127,7 +126,7 @@ mod plugin {
             &mut self.plugin_data_mut().plugin
         }
 
-        fn wrap_data(data: ClapPluginData<P>) -> Self {
+        pub(crate) fn wrap_data(data: ClapPluginData<P>) -> Self {
             let data = Box::into_raw(Box::new(data));
 
             Self {
@@ -217,16 +216,86 @@ mod plugin {
 }
 
 mod factory {
+    use crate::plugin::desc::Descriptor;
+    use crate::plugin::{ClapPluginData, Wrap};
+    use crate::{MyPlug, Plugin};
+    use clap::{clap_host, clap_plugin, clap_plugin_descriptor};
+    use std::sync::OnceLock;
 
-    struct Factory;
+    trait FactoryPluginDescriptor {
+        fn descriptor(&self) -> *const clap_plugin_descriptor;
+        fn create(&self, host: Option<*const clap_host>) -> *const clap_plugin;
+    }
+
+    impl<P: Plugin> FactoryPluginDescriptor for Descriptor<P> {
+        fn descriptor(&self) -> *const clap_plugin_descriptor {
+            &raw const self.raw
+        }
+
+        fn create(&self, host: Option<*const clap_host>) -> *const clap_plugin {
+            let data = ClapPluginData::new(P::default(), host);
+            Wrap::wrap_data(data).into_inner()
+        }
+    }
+
+    fn plug_desc<P: Plugin>() -> Box<Descriptor<P>> {
+        Box::new(Descriptor::new())
+    }
+
+    struct Factory {
+        plugins: Vec<Box<dyn FactoryPluginDescriptor>>,
+    }
+
+    fn factory_init() -> Factory {
+        Factory {
+            plugins: vec![plug_desc::<MyPlug>()],
+        }
+    }
+
+    unsafe impl Send for Factory {}
+    unsafe impl Sync for Factory {}
+
+    static FACTORY: OnceLock<Factory> = OnceLock::new();
 
     pub(crate) mod ffi {
-        use clap::clap_plugin_factory;
+        use crate::factory::{FACTORY, factory_init};
+        use clap::{clap_host, clap_plugin, clap_plugin_descriptor, clap_plugin_factory};
+        use std::ffi::{CStr, c_char};
+        use std::ptr::null;
+
+        extern "C" fn get_plugin_count(_: *const clap_plugin_factory) -> u32 {
+            FACTORY.get_or_init(factory_init).plugins.len() as u32
+        }
+
+        extern "C" fn get_plugin_descriptor(
+            _: *const clap_plugin_factory,
+            index: u32,
+        ) -> *const clap_plugin_descriptor {
+            FACTORY.get_or_init(factory_init).plugins[index as usize].descriptor()
+        }
+
+        extern "C" fn create_plugin(
+            _: *const clap_plugin_factory,
+            host: *const clap_host,
+            plugin_id: *const c_char,
+        ) -> *const clap_plugin {
+            if !plugin_id.is_null() {
+                for plugin in &FACTORY.get_or_init(factory_init).plugins {
+                    let id = unsafe { CStr::from_ptr((*plugin.descriptor()).id) };
+                    if unsafe { CStr::from_ptr(plugin_id) } == id {
+                        let host = (!host.is_null()).then_some(host);
+                        return plugin.create(host);
+                    }
+                }
+            }
+
+            null()
+        }
 
         pub(crate) static PLUGIN_FACTORY: clap_plugin_factory = clap_plugin_factory {
-            get_plugin_count: None,
-            get_plugin_descriptor: None,
-            create_plugin: None,
+            get_plugin_count: Some(get_plugin_count),
+            get_plugin_descriptor: Some(get_plugin_descriptor),
+            create_plugin: Some(create_plugin),
         };
     }
 }
@@ -265,5 +334,43 @@ mod entry {
             deinit: Some(deinit),
             get_factory: Some(get_factory),
         };
+    }
+}
+
+#[derive(Default)]
+struct MyPlug;
+
+impl Plugin for MyPlug {
+    const ID: &'static str = "";
+    const NAME: &'static str = "";
+    const VENDOR: &'static str = "";
+
+    fn init(&mut self) -> Result<(), plugin::Error> {
+        todo!()
+    }
+
+    fn activate(
+        &mut self,
+        sample_rate: f64,
+        min_frames: u32,
+        max_frames: u32,
+    ) -> Result<(), plugin::Error> {
+        todo!()
+    }
+
+    fn deactivate(&mut self) {
+        todo!()
+    }
+
+    fn start_processing(&mut self) -> Result<(), plugin::Error> {
+        todo!()
+    }
+
+    fn stop_processing(&mut self) {
+        todo!()
+    }
+
+    fn reset(&mut self) {
+        todo!()
     }
 }
