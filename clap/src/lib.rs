@@ -1,9 +1,3 @@
-#![feature(box_vec_non_null)]
-
-#[doc(inline)]
-pub use clap_sys;
-
-
 use std::fmt::Display;
 
 #[derive(Debug, Clone)]
@@ -51,9 +45,7 @@ pub trait Plugin: Default + Sync + Send {
 
     fn stop_processing(&mut self) {}
 
-    fn process(&mut self, _process: &mut Process) -> Result<(), Error> {
-        Ok(())
-    }
+    fn process(&mut self, _process: &mut Process) -> Result<(), Error>;
 
     fn reset(&mut self) {}
 
@@ -77,120 +69,86 @@ mod host {
     }
 }
 
-pub mod plugin {
-    use super::Plugin;
+pub(crate) mod plugin {
+    use crate::Plugin;
     use crate::host::Host;
-    pub(crate) use crate::plugin::desc::Descriptor;
-    use clap_sys::clap_plugin;
-    use std::{marker::PhantomData, ptr::NonNull};
-    // use crate::plugin::ffi::box_clap_plugin;
+    use clap_sys::{CLAP_VERSION, clap_plugin, clap_plugin_descriptor};
 
-    #[inline]
-    pub fn allocate_descriptor<P: Plugin>() -> Box<Descriptor<P>> {
-        Box::new(Descriptor::generate())
+    use std::{
+        ffi::CString, ffi::c_char, marker::PhantomData, ptr::NonNull, ptr::null, str::FromStr,
+    };
+
+    #[allow(warnings, unused)]
+    pub struct ClapPluginDescriptor {
+        id: CString,
+        name: CString,
+        vendor: CString,
+        url: CString,
+        manual_url: CString,
+        support_url: CString,
+        version: CString,
+        description: CString,
+        features: Box<[CString]>,
+
+        raw_features: Box<[*const c_char]>,
+        raw_descriptor: clap_plugin_descriptor,
     }
 
-    mod desc {
-        use crate::Plugin;
-        use crate::factory::FactoryPluginDescriptor;
-        use crate::host::Host;
-        use crate::plugin::ClapPlugin;
-        use clap_sys::{CLAP_VERSION, clap_plugin, clap_plugin_descriptor};
-        use std::ffi::c_char;
-        use std::{ffi::CString, marker::PhantomData, ptr::null, str::FromStr};
+    impl ClapPluginDescriptor {
+        pub fn allocate<P: Plugin>() -> Self {
+            let id = CString::from_str(P::ID).unwrap();
+            let name = CString::from_str(P::NAME).unwrap();
+            let vendor = CString::from_str(P::VENDOR).unwrap();
+            let url = CString::from_str(P::URL).unwrap();
+            let manual_url = CString::from_str(P::MANUAL_URL).unwrap();
+            let support_url = CString::from_str(P::SUPPORT_URL).unwrap();
+            let version = CString::from_str(P::VERSION).unwrap();
+            let description = CString::from_str(P::DESCRIPTION).unwrap();
 
-        #[allow(warnings, unused)]
-        pub struct Descriptor<P> {
-            id: CString,
-            name: CString,
-            vendor: CString,
-            url: CString,
-            manual_url: CString,
-            support_url: CString,
-            version: CString,
-            description: CString,
-            features: Box<[CString]>,
+            let features: Vec<_> = String::from_str(P::FEATURES)
+                .unwrap()
+                .split_whitespace()
+                .map(|s| CString::from_str(s).unwrap())
+                .collect();
+            let mut features_raw: Vec<_> = features.iter().map(|f| f.as_c_str().as_ptr()).collect();
+            features_raw.push(null());
+            let features_raw = features_raw.into_boxed_slice();
 
-            raw_features: Box<[*const c_char]>,
-            pub(crate) raw_descriptor: clap_plugin_descriptor,
+            let raw = clap_plugin_descriptor {
+                clap_version: CLAP_VERSION,
+                id: id.as_c_str().as_ptr(),
+                name: name.as_c_str().as_ptr(),
+                vendor: vendor.as_c_str().as_ptr(),
+                url: url.as_c_str().as_ptr(),
+                manual_url: manual_url.as_c_str().as_ptr(),
+                support_url: support_url.as_c_str().as_ptr(),
+                version: version.as_c_str().as_ptr(),
+                description: description.as_c_str().as_ptr(),
+                features: features_raw.as_ptr(),
+            };
 
-            _marker: PhantomData<P>,
-        }
-
-        impl<P: Plugin> Descriptor<P> {
-            pub fn generate() -> Self {
-                let id = CString::from_str(P::ID).unwrap();
-                let name = CString::from_str(P::NAME).unwrap();
-                let vendor = CString::from_str(P::VENDOR).unwrap();
-                let url = CString::from_str(P::URL).unwrap();
-                let manual_url = CString::from_str(P::MANUAL_URL).unwrap();
-                let support_url = CString::from_str(P::SUPPORT_URL).unwrap();
-                let version = CString::from_str(P::VERSION).unwrap();
-                let description = CString::from_str(P::DESCRIPTION).unwrap();
-
-                let features: Vec<_> = String::from_str(P::FEATURES)
-                    .unwrap()
-                    .split_whitespace()
-                    .map(|s| CString::from_str(s).unwrap())
-                    .collect();
-                let mut features_raw: Vec<_> =
-                    features.iter().map(|f| f.as_c_str().as_ptr()).collect();
-                features_raw.push(null());
-                let features_raw = features_raw.into_boxed_slice();
-
-                let raw = clap_plugin_descriptor {
-                    clap_version: CLAP_VERSION,
-                    id: id.as_c_str().as_ptr(),
-                    name: name.as_c_str().as_ptr(),
-                    vendor: vendor.as_c_str().as_ptr(),
-                    url: url.as_c_str().as_ptr(),
-                    manual_url: manual_url.as_c_str().as_ptr(),
-                    support_url: support_url.as_c_str().as_ptr(),
-                    version: version.as_c_str().as_ptr(),
-                    description: description.as_c_str().as_ptr(),
-                    features: features_raw.as_ptr(),
-                };
-
-                Self {
-                    id,
-                    name,
-                    vendor,
-                    url,
-                    manual_url,
-                    support_url,
-                    version,
-                    description,
-                    features: features.into(),
-                    raw_features: features_raw,
-                    raw_descriptor: raw,
-                    _marker: PhantomData,
-                }
+            Self {
+                id,
+                name,
+                vendor,
+                url,
+                manual_url,
+                support_url,
+                version,
+                description,
+                features: features.into(),
+                raw_features: features_raw,
+                raw_descriptor: raw,
             }
         }
 
-        impl<P: Plugin> FactoryPluginDescriptor for Descriptor<P> {
-            fn clap_plugin_descriptor<'a>(&self) -> &'a clap_plugin_descriptor
-            where
-                Self: 'a,
-            {
-                let d = &raw const self.raw_descriptor;
-
-                // Safety:
-                //
-                // We promise that raw_descriptor stays constant for the entire lifetime of Self.
-                // Hence, we can create a shared reference to in for any lifetime 'a such that
-                // Self: 'a.
-                unsafe { &*d }
-            }
-
-            fn boxed_clap_plugin(&self, host: Host) -> Box<clap_plugin> {
-                ClapPlugin::generate(P::default(), host).boxed_clap_plugin()
-            }
+        pub(crate) fn raw_descriptor(&self) -> &clap_plugin_descriptor {
+            &self.raw_descriptor
         }
     }
 
     pub(crate) struct ClapPlugin<P> {
-        pub(crate) desc: Descriptor<P>,
+        desc: ClapPluginDescriptor,
         plugin: P,
         host: Host,
     }
@@ -198,7 +156,7 @@ pub mod plugin {
     impl<P: Plugin> ClapPlugin<P> {
         pub(crate) fn generate(plugin: P, host: Host) -> Self {
             Self {
-                desc: Descriptor::generate(),
+                desc: ClapPluginDescriptor::allocate::<P>(),
                 plugin,
                 host,
             }
@@ -206,6 +164,10 @@ pub mod plugin {
 
         pub(crate) fn boxed_clap_plugin(self) -> Box<clap_plugin> {
             ffi::box_clap_plugin(self)
+        }
+
+        pub(crate) fn raw_descriptor(&self) -> &clap_plugin_descriptor {
+            self.desc.raw_descriptor()
         }
     }
 
@@ -339,8 +301,7 @@ pub mod plugin {
 
         pub(crate) fn box_clap_plugin<P: Plugin>(data: ClapPlugin<P>) -> Box<clap_plugin> {
             let data = Box::new(data);
-            let desc = &data.desc.raw_descriptor;
-            let desc = &raw const *desc;
+            let desc = &raw const *data.raw_descriptor();
             let data = Box::into_raw(data);
 
             Box::new(clap_plugin {
@@ -362,41 +323,64 @@ pub mod plugin {
 }
 
 mod factory {
+    use crate::Plugin;
     use crate::host::Host;
+    use crate::plugin::{ClapPlugin, ClapPluginDescriptor};
     use clap_sys::{clap_plugin, clap_plugin_descriptor};
     use std::ffi::CStr;
+    use std::marker::PhantomData;
+    use std::pin::Pin;
 
-    pub trait FactoryPluginDescriptor {
-        fn clap_plugin_descriptor<'a>(&self) -> &'a clap_plugin_descriptor
-        where
-            Self: 'a;
+    pub struct PluginPrototype<P> {
+        descriptor: ClapPluginDescriptor,
+        _marker: PhantomData<P>,
+    }
+
+    impl<P: Plugin> PluginPrototype<P> {
+        pub fn allocate() -> Self {
+            Self {
+                descriptor: ClapPluginDescriptor::allocate::<P>(),
+                _marker: PhantomData,
+            }
+        }
+    }
+
+    pub trait FactoryPlugin {
+        fn clap_plugin_descriptor(&self) -> &clap_plugin_descriptor;
         fn boxed_clap_plugin(&self, host: Host) -> Box<clap_plugin>;
     }
 
+    impl<P: Plugin> FactoryPlugin for PluginPrototype<P> {
+        fn clap_plugin_descriptor(&self) -> &clap_plugin_descriptor {
+            self.descriptor.raw_descriptor()
+        }
+
+        fn boxed_clap_plugin(&self, host: Host) -> Box<clap_plugin> {
+            ClapPlugin::generate(P::default(), host).boxed_clap_plugin()
+        }
+    }
+
     pub struct Factory {
-        descriptors: Vec<Box<dyn FactoryPluginDescriptor>>,
+        plugins: Pin<Vec<Box<dyn FactoryPlugin>>>,
     }
 
     impl Factory {
-        pub fn new(plugins: Vec<Box<dyn FactoryPluginDescriptor>>) -> Self {
+        pub fn new(plugins: Vec<Box<dyn FactoryPlugin>>) -> Self {
             Self {
-                descriptors: plugins,
+                plugins: Pin::new(plugins),
             }
         }
 
-        pub fn descriptors(&self) -> &[Box<dyn FactoryPluginDescriptor>] {
-            &self.descriptors
+        pub fn plugins(&self) -> &[Box<dyn FactoryPlugin>] {
+            &self.plugins
         }
 
-        pub fn descriptor_at<'a>(&self, index: usize) -> &'a clap_plugin_descriptor
-        where
-            Self: 'a,
-        {
-            self.descriptors[index].clap_plugin_descriptor()
+        pub fn descriptor_at(&self, index: usize) -> &clap_plugin_descriptor {
+            self.plugins()[index].clap_plugin_descriptor()
         }
 
         pub fn boxed_clap_plugin(&self, plugin_id: &CStr, host: Host) -> Option<Box<clap_plugin>> {
-            for desc in self.descriptors() {
+            for desc in self.plugins() {
                 let id = unsafe { CStr::from_ptr(desc.clap_plugin_descriptor().id) };
                 if id == plugin_id {
                     return Some(desc.boxed_clap_plugin(host));
@@ -410,36 +394,39 @@ mod factory {
     unsafe impl Sync for Factory {}
 }
 
-pub use host::Host;
-pub use factory::Factory;
+pub mod entry {
+    use crate::Plugin;
 
-mod entry {
-    pub mod clap_entry_prelude {
-        
+    pub use clap_sys::{
+        CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, clap_host, clap_plugin, clap_plugin_descriptor,
+        clap_plugin_entry, clap_plugin_factory,
+    };
+    pub use std::ptr::NonNull;
+
+    pub use crate::factory::{Factory, PluginPrototype};
+    pub use crate::host::Host;
+
+    pub fn plugin_prototype<P: Plugin>() -> Box<PluginPrototype<P>> {
+        Box::new(PluginPrototype::allocate())
     }
 
     #[macro_export]
     macro_rules! entry {
         ($($plug:ty),*) => {
             mod _clap_entry {
-                use std::ptr::NonNull;
-                use $crate::clap_sys::{
-                    CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, 
-                    clap_host, clap_plugin, clap_plugin_descriptor,
-                    clap_plugin_entry, clap_plugin_factory,
-                };
-                use $crate::{Host, Factory, plugin::allocate_descriptor};
-                
+
+                use $crate::entry::*;
+
                 use super::*; // Access the types supplied as macro arguments.
 
                 fn factory_init() -> Factory {
-                    Factory::new(vec![$(allocate_descriptor::<$plug>(),)*])
+                    Factory::new(vec![$(plugin_prototype::<$plug>(),)*])
                 }
 
                 static FACTORY: std::sync::OnceLock<Factory> = std::sync::OnceLock::new();
 
                 extern "C" fn get_plugin_count(_: *const clap_plugin_factory) -> u32 {
-                    FACTORY.get_or_init(factory_init).descriptors().len() as u32
+                    FACTORY.get_or_init(factory_init).plugins().len() as u32
                 }
 
                 extern "C" fn get_plugin_descriptor(
@@ -447,9 +434,12 @@ mod entry {
                     index: u32,
                 ) -> *const clap_plugin_descriptor {
 
-                    // The factory descriptors are meant to be constant from the momemt they are
+                    // The factory descriptors are meant to stay unmoved from the momemt they are
                     // created until the host drops the entire library.  They are dynamically
                     // allocated at the begining, and hence cannot be given a `&'static` lifetime.
+                    // We use here the semantic of the Pin type:
+                    // Factory stores plugin prototypes as Pin<Vec<_>>.  One of the assumptions of
+                    // Pin is that the vector of plugin prototypes is not moved until Factory is dropped.
                     FACTORY.get_or_init(factory_init).descriptor_at(index as usize)
                 }
 
