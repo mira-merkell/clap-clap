@@ -1,5 +1,87 @@
 #![feature(box_vec_non_null)]
 
+#[macro_export]
+macro_rules! entry {
+    ($($plug:ty),*) => {
+        mod _clap_entry {
+            use clap::clap_sys::{
+                    clap_host, clap_plugin, clap_plugin_descriptor, clap_plugin_entry, clap_plugin_factory,
+                    CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION,
+                };
+            use clap::factory::{alloc_plugin_descriptor, Factory};
+            
+            use super::*;
+            
+            static FACTORY: std::sync::OnceLock<Factory> = std::sync::OnceLock::new();
+        
+            fn factory_init() -> Factory {
+                Factory::new(vec![$(alloc_plugin_descriptor::<$plug>(),)*])
+            }
+        
+            extern "C" fn get_plugin_count(_: *const clap_plugin_factory) -> u32 {
+                FACTORY.get_or_init(factory_init).plugins().len() as u32
+            }
+        
+            extern "C" fn get_plugin_descriptor(
+                _: *const clap_plugin_factory,
+                index: u32,
+            ) -> *const clap_plugin_descriptor {
+                FACTORY.get_or_init(factory_init).plugins()[index as usize].descriptor()
+            }
+        
+            extern "C" fn create_plugin(
+                _: *const clap_plugin_factory,
+                host: *const clap_host,
+                plugin_id: *const std::ffi::c_char,
+            ) -> *const clap_plugin {
+                let host = (!host.is_null()).then_some(host);
+                if !plugin_id.is_null() {
+                    let plugin_id = unsafe { std::ffi::CStr::from_ptr(plugin_id) };
+                    FACTORY
+                        .get_or_init(factory_init)
+                        .create_plugin(plugin_id, host)
+                } else {
+                    std::ptr::null()
+                }
+            }
+        
+            static CLAP_PLUGIN_FACTORY: clap_plugin_factory = clap_plugin_factory {
+                get_plugin_count: Some(get_plugin_count),
+                get_plugin_descriptor: Some(get_plugin_descriptor),
+                create_plugin: Some(create_plugin),
+            };
+        
+            extern "C" fn init(_plugin_path: *const std::ffi::c_char) -> bool {
+                true
+            }
+        
+            extern "C" fn deinit() {}
+        
+            extern "C" fn get_factory(factory_id: *const std::ffi::c_char) -> *const std::ffi::c_void {
+                if factory_id.is_null() {
+                    return std::ptr::null();
+                }
+                let id = unsafe { std::ffi::CStr::from_ptr(factory_id) };
+                if id != CLAP_PLUGIN_FACTORY_ID {
+                    return std::ptr::null();
+                }
+        
+                &raw const CLAP_PLUGIN_FACTORY as *const _
+            }
+        
+            #[allow(non_upper_case_globals)]
+            #[allow(warnings, unused)]
+            #[unsafe(no_mangle)]
+            static clap_entry: clap_plugin_entry = clap_plugin_entry {
+                clap_version: CLAP_VERSION,
+                init: Some(init),
+                deinit: Some(deinit),
+                get_factory: Some(get_factory),
+            };
+        }
+    };
+}
+
 mod plugin {
     use super::Plugin;
     use clap_sys::{clap_host, clap_plugin};
@@ -318,93 +400,6 @@ pub mod factory {
     pub fn alloc_plugin_descriptor<P: Plugin>() -> Box<Descriptor<P>> {
         Box::new(Descriptor::allocate())
     }
-}
-
-#[macro_export]
-macro_rules! entry {
-    ($($plug:ty),*) => {
-        mod _clap_entry {
-            use super::*;
-            
-            use $crate::factory::{alloc_plugin_descriptor, Factory};
-            use clap::clap_sys::{
-                clap_host, clap_plugin, clap_plugin_descriptor, clap_plugin_entry, clap_plugin_factory,
-                CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION,
-            };
-            use std::{
-                ffi::{c_char, c_void, CStr},
-                ptr::null,
-                sync::OnceLock,
-            };
-        
-            static FACTORY: OnceLock<Factory> = OnceLock::new();
-        
-            fn factory_init() -> Factory {
-                Factory::new(vec![$(alloc_plugin_descriptor::<$plug>(),)*])
-            }
-        
-            extern "C" fn get_plugin_count(_: *const clap_plugin_factory) -> u32 {
-                FACTORY.get_or_init(factory_init).plugins().len() as u32
-            }
-        
-            extern "C" fn get_plugin_descriptor(
-                _: *const clap_plugin_factory,
-                index: u32,
-            ) -> *const clap_plugin_descriptor {
-                FACTORY.get_or_init(factory_init).plugins()[index as usize].descriptor()
-            }
-        
-            extern "C" fn create_plugin(
-                _: *const clap_plugin_factory,
-                host: *const clap_host,
-                plugin_id: *const c_char,
-            ) -> *const clap_plugin {
-                let host = (!host.is_null()).then_some(host);
-                if !plugin_id.is_null() {
-                    let plugin_id = unsafe { CStr::from_ptr(plugin_id) };
-                    FACTORY
-                        .get_or_init(factory_init)
-                        .create_plugin(plugin_id, host)
-                } else {
-                    std::ptr::null()
-                }
-            }
-        
-            static CLAP_PLUGIN_FACTORY: clap_plugin_factory = clap_plugin_factory {
-                get_plugin_count: Some(get_plugin_count),
-                get_plugin_descriptor: Some(get_plugin_descriptor),
-                create_plugin: Some(create_plugin),
-            };
-        
-            extern "C" fn init(_plugin_path: *const c_char) -> bool {
-                true
-            }
-        
-            extern "C" fn deinit() {}
-        
-            extern "C" fn get_factory(factory_id: *const c_char) -> *const c_void {
-                if factory_id.is_null() {
-                    return null();
-                }
-                let id = unsafe { CStr::from_ptr(factory_id) };
-                if id != CLAP_PLUGIN_FACTORY_ID {
-                    return null();
-                }
-        
-                &raw const CLAP_PLUGIN_FACTORY as *const _
-            }
-        
-            #[allow(non_upper_case_globals)]
-            #[allow(warnings, unused)]
-            #[unsafe(no_mangle)]
-            static clap_entry: clap_plugin_entry = clap_plugin_entry {
-                clap_version: CLAP_VERSION,
-                init: Some(init),
-                deinit: Some(deinit),
-                get_factory: Some(get_factory),
-            };
-        }
-    };
 }
 
 
