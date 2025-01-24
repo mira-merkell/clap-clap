@@ -16,4 +16,4 @@ impl Plugin for MyPlug2 {
     const NAME: &'static str = "MyPlug2";
 }
 
-clap::entry!(MyPlug2, MyPlug, MyPlug2);
+clap::entry!(MyPlug, MyPlug2);

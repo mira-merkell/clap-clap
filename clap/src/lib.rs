@@ -1,8 +1,21 @@
 #![feature(box_vec_non_null)]
 
+#[doc(inline)]
 pub use clap_sys;
 
+
+use std::fmt::Display;
+
+#[derive(Debug, Clone)]
 pub enum Error {}
+
+impl Display for Error {
+    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        Ok(())
+    }
+}
+
+impl std::error::Error for Error {}
 
 pub trait Plugin: Default + Sync + Send {
     const ID: &'static str;
@@ -49,13 +62,28 @@ pub trait Plugin: Default + Sync + Send {
 
 pub struct Process;
 
-mod plugin {
-    use super::Plugin;
-    use clap_sys::{clap_host, clap_plugin};
-    use std::{marker::PhantomData, ptr::NonNull};
+mod host {
+    use clap_sys::clap_host;
+    use std::ptr::NonNull;
 
+    pub struct Host {
+        host: NonNull<clap_host>,
+    }
+
+    impl Host {
+        pub const fn new(host: NonNull<clap_host>) -> Self {
+            Self { host }
+        }
+    }
+}
+
+pub mod plugin {
+    use super::Plugin;
+    use crate::host::Host;
     pub(crate) use crate::plugin::desc::Descriptor;
-    use crate::plugin::ffi::box_clap_plugin;
+    use clap_sys::clap_plugin;
+    use std::{marker::PhantomData, ptr::NonNull};
+    // use crate::plugin::ffi::box_clap_plugin;
 
     #[inline]
     pub fn allocate_descriptor<P: Plugin>() -> Box<Descriptor<P>> {
@@ -63,10 +91,11 @@ mod plugin {
     }
 
     mod desc {
-        use crate::factory::FactoryPluginDescriptor;
-        use crate::plugin::ClapPlugin;
         use crate::Plugin;
-        use clap_sys::{clap_host, clap_plugin, clap_plugin_descriptor, CLAP_VERSION};
+        use crate::factory::FactoryPluginDescriptor;
+        use crate::host::Host;
+        use crate::plugin::ClapPlugin;
+        use clap_sys::{CLAP_VERSION, clap_plugin, clap_plugin_descriptor};
         use std::ffi::c_char;
         use std::{ffi::CString, marker::PhantomData, ptr::null, str::FromStr};
 
@@ -154,7 +183,7 @@ mod plugin {
                 unsafe { &*d }
             }
 
-            fn boxed_clap_plugin(&self, host: Option<*const clap_host>) -> Box<clap_plugin> {
+            fn boxed_clap_plugin(&self, host: Host) -> Box<clap_plugin> {
                 ClapPlugin::generate(P::default(), host).boxed_clap_plugin()
             }
         }
@@ -163,20 +192,20 @@ mod plugin {
     pub(crate) struct ClapPlugin<P> {
         pub(crate) desc: Descriptor<P>,
         plugin: P,
-        _clap_host: Option<*const clap_host>,
+        host: Host,
     }
 
     impl<P: Plugin> ClapPlugin<P> {
-        pub(crate) fn generate(plugin: P, clap_host: Option<*const clap_host>) -> Self {
+        pub(crate) fn generate(plugin: P, host: Host) -> Self {
             Self {
                 desc: Descriptor::generate(),
                 plugin,
-                _clap_host: clap_host,
+                host,
             }
         }
 
         pub(crate) fn boxed_clap_plugin(self) -> Box<clap_plugin> {
-            box_clap_plugin(self)
+            ffi::box_clap_plugin(self)
         }
     }
 
@@ -220,12 +249,12 @@ mod plugin {
     }
 
     mod ffi {
-        use crate::plugin::{ClapPlugin, Wrap};
         use crate::Plugin;
+        use crate::plugin::{ClapPlugin, Wrap};
         use clap_sys::clap_plugin;
         use clap_sys::{clap_process, clap_process_status};
         use std::ffi::{c_char, c_void};
-        use std::ptr::{null, NonNull};
+        use std::ptr::{NonNull, null};
 
         const fn wrap_clap_ptr_from_host<P: Plugin>(plugin: *const clap_plugin) -> Wrap<P> {
             let plugin = plugin as *mut _;
@@ -332,15 +361,16 @@ mod plugin {
     }
 }
 
-pub(crate) mod factory {
-    use clap_sys::{clap_host, clap_plugin, clap_plugin_descriptor};
+mod factory {
+    use crate::host::Host;
+    use clap_sys::{clap_plugin, clap_plugin_descriptor};
     use std::ffi::CStr;
 
     pub trait FactoryPluginDescriptor {
         fn clap_plugin_descriptor<'a>(&self) -> &'a clap_plugin_descriptor
         where
             Self: 'a;
-        fn boxed_clap_plugin(&self, host: Option<*const clap_host>) -> Box<clap_plugin>;
+        fn boxed_clap_plugin(&self, host: Host) -> Box<clap_plugin>;
     }
 
     pub struct Factory {
@@ -365,11 +395,7 @@ pub(crate) mod factory {
             self.descriptors[index].clap_plugin_descriptor()
         }
 
-        pub fn boxed_clap_plugin(
-            &self,
-            plugin_id: &CStr,
-            host: Option<*const clap_host>,
-        ) -> Option<Box<clap_plugin>> {
+        pub fn boxed_clap_plugin(&self, plugin_id: &CStr, host: Host) -> Option<Box<clap_plugin>> {
             for desc in self.descriptors() {
                 let id = unsafe { CStr::from_ptr(desc.clap_plugin_descriptor().id) };
                 if id == plugin_id {
@@ -384,99 +410,106 @@ pub(crate) mod factory {
     unsafe impl Sync for Factory {}
 }
 
-pub mod clap_entry_prelude {
-    pub use crate::clap_sys::{
-        clap_host, clap_plugin, clap_plugin_descriptor, clap_plugin_entry, clap_plugin_factory,
-        CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION,
-    };
-    pub use crate::factory::Factory;
-    pub use crate::plugin::allocate_descriptor;
-}
+pub use host::Host;
+pub use factory::Factory;
 
-#[macro_export]
-macro_rules! entry {
-    ($($plug:ty),*) => {
-        mod _clap_entry {
-            use $crate::clap_entry_prelude::*;
+mod entry {
+    pub mod clap_entry_prelude {
+        
+    }
 
-            use super::*; // Access the types supplied as macro arguments.
+    #[macro_export]
+    macro_rules! entry {
+        ($($plug:ty),*) => {
+            mod _clap_entry {
+                use std::ptr::NonNull;
+                use $crate::clap_sys::{
+                    CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, 
+                    clap_host, clap_plugin, clap_plugin_descriptor,
+                    clap_plugin_entry, clap_plugin_factory,
+                };
+                use $crate::{Host, Factory, plugin::allocate_descriptor};
+                
+                use super::*; // Access the types supplied as macro arguments.
 
-            fn factory_init() -> Factory {
-                Factory::new(vec![$(allocate_descriptor::<$plug>(),)*])
-            }
+                fn factory_init() -> Factory {
+                    Factory::new(vec![$(allocate_descriptor::<$plug>(),)*])
+                }
 
-            static FACTORY: std::sync::OnceLock<Factory> = std::sync::OnceLock::new();
+                static FACTORY: std::sync::OnceLock<Factory> = std::sync::OnceLock::new();
 
-            extern "C" fn get_plugin_count(_: *const clap_plugin_factory) -> u32 {
-                FACTORY.get_or_init(factory_init).descriptors().len() as u32
-            }
+                extern "C" fn get_plugin_count(_: *const clap_plugin_factory) -> u32 {
+                    FACTORY.get_or_init(factory_init).descriptors().len() as u32
+                }
 
-            extern "C" fn get_plugin_descriptor(
-                _: *const clap_plugin_factory,
-                index: u32,
-            ) -> *const clap_plugin_descriptor {
+                extern "C" fn get_plugin_descriptor(
+                    _: *const clap_plugin_factory,
+                    index: u32,
+                ) -> *const clap_plugin_descriptor {
 
-                // The factory descriptors are meant to be constant from the momemt they are
-                // created until the host drops the entire library.  They are dynamically
-                // allocated at the begining, and hence cannot be given a `&'static` lifetime.
-                FACTORY.get_or_init(factory_init).descriptor_at(index as usize)
-            }
+                    // The factory descriptors are meant to be constant from the momemt they are
+                    // created until the host drops the entire library.  They are dynamically
+                    // allocated at the begining, and hence cannot be given a `&'static` lifetime.
+                    FACTORY.get_or_init(factory_init).descriptor_at(index as usize)
+                }
 
-            extern "C" fn create_plugin(
-                _: *const clap_plugin_factory,
-                host: *const clap_host,
-                plugin_id: *const std::ffi::c_char,
-            ) -> *const clap_plugin {
-                let host = (!host.is_null()).then_some(host);
+                extern "C" fn create_plugin(
+                    _: *const clap_plugin_factory,
+                    host: *const clap_host,
+                    plugin_id: *const std::ffi::c_char,
+                ) -> *const clap_plugin {
+                    let host = host as *mut _;
+                    let host = Host::new(NonNull::new(host).expect("host pointer should be non-null"));
 
-                if !plugin_id.is_null() {
-                    let plugin_id = unsafe { std::ffi::CStr::from_ptr(plugin_id) };
-                    if let Some(plugin) = FACTORY
-                        .get_or_init(factory_init)
-                        .boxed_clap_plugin(plugin_id, host) {
-                            // Pass the plugin to the host.  The plugin will be dropped later,
-                            // when the host calls plugin->destroy(plugin).
-                            return Box::into_raw(plugin)
+                    if !plugin_id.is_null() {
+                        let plugin_id = unsafe { std::ffi::CStr::from_ptr(plugin_id) };
+                        if let Some(plugin) = FACTORY
+                            .get_or_init(factory_init)
+                            .boxed_clap_plugin(plugin_id, host) {
+                                // Pass the plugin to the host.  The plugin will be dropped later,
+                                // when the host calls plugin->destroy(plugin).
+                                return Box::into_raw(plugin)
+                        }
                     }
+
+                    std::ptr::null()
                 }
 
-                std::ptr::null()
-            }
+                static CLAP_PLUGIN_FACTORY: clap_plugin_factory = clap_plugin_factory {
+                    get_plugin_count: Some(get_plugin_count),
+                    get_plugin_descriptor: Some(get_plugin_descriptor),
+                    create_plugin: Some(create_plugin),
+                };
 
-            static CLAP_PLUGIN_FACTORY: clap_plugin_factory = clap_plugin_factory {
-                get_plugin_count: Some(get_plugin_count),
-                get_plugin_descriptor: Some(get_plugin_descriptor),
-                create_plugin: Some(create_plugin),
-            };
-
-            extern "C" fn init(_plugin_path: *const std::ffi::c_char) -> bool {
-                true
-            }
-
-            extern "C" fn deinit() {}
-
-            extern "C" fn get_factory(factory_id: *const std::ffi::c_char) -> *const std::ffi::c_void {
-                if factory_id.is_null() {
-                    return std::ptr::null();
+                extern "C" fn init(_plugin_path: *const std::ffi::c_char) -> bool {
+                    true
                 }
 
-                let id = unsafe { std::ffi::CStr::from_ptr(factory_id) };
-                if id != CLAP_PLUGIN_FACTORY_ID {
-                    return std::ptr::null();
+                extern "C" fn deinit() {}
+
+                extern "C" fn get_factory(factory_id: *const std::ffi::c_char) -> *const std::ffi::c_void {
+                    if factory_id.is_null() {
+                        return std::ptr::null();
+                    }
+
+                    let id = unsafe { std::ffi::CStr::from_ptr(factory_id) };
+                    if id != CLAP_PLUGIN_FACTORY_ID {
+                        return std::ptr::null();
+                    }
+
+                    &raw const CLAP_PLUGIN_FACTORY as *const _
                 }
 
-                &raw const CLAP_PLUGIN_FACTORY as *const _
+                #[allow(non_upper_case_globals)]
+                #[allow(warnings, unused)]
+                #[unsafe(no_mangle)]
+                static clap_entry: clap_plugin_entry = clap_plugin_entry {
+                    clap_version: CLAP_VERSION,
+                    init: Some(init),
+                    deinit: Some(deinit),
+                    get_factory: Some(get_factory),
+                };
             }
-
-            #[allow(non_upper_case_globals)]
-            #[allow(warnings, unused)]
-            #[unsafe(no_mangle)]
-            static clap_entry: clap_plugin_entry = clap_plugin_entry {
-                clap_version: CLAP_VERSION,
-                init: Some(init),
-                deinit: Some(deinit),
-                get_factory: Some(get_factory),
-            };
-        }
-    };
+        };
+    }
 }
