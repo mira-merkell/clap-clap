@@ -15,3 +15,5 @@ impl Plugin for MyPlug2 {
     const ID: &'static str = "com.plugggs.my_plug2";
     const NAME: &'static str = "MyPlug2";
 }
+
+clap::entry!(MyPlug, MyPlug2);

@@ -3,6 +3,5 @@ resolver = "3"
 members = [
     "clap",
     "clap/clap-sys",
-    "clap/plugin",
     "myplug"
 ]
