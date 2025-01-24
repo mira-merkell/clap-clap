@@ -1,3 +1,5 @@
+pub use clap_sys;
+
 pub enum Error {}
 
 pub trait Plugin: Default + Sync + Send {
