@@ -24,10 +24,6 @@ pub trait Plugin: Default + Sync + Send {
     /// For example: `"fx stereo distortion"`.
     const FEATURES: &'static str = "";
 
-    fn init(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
-
     fn activate(
         &mut self,
         _sample_rate: f64,
@@ -69,7 +65,7 @@ mod host {
     }
 }
 
-pub(crate) mod plugin {
+pub(crate) mod clap_plugin {
     use crate::Plugin;
     use crate::host::Host;
     use clap_sys::{CLAP_VERSION, clap_plugin, clap_plugin_descriptor};
@@ -149,8 +145,8 @@ pub(crate) mod plugin {
 
     pub(crate) struct ClapPlugin<P> {
         desc: ClapPluginDescriptor,
-        plugin: P,
         host: Host,
+        plugin: P,
     }
 
     impl<P: Plugin> ClapPlugin<P> {
@@ -171,12 +167,12 @@ pub(crate) mod plugin {
         }
     }
 
-    pub(crate) struct Wrap<P> {
+    pub(crate) struct ClapPluginWrapper<P> {
         clap_plugin: NonNull<clap_plugin>,
         _marker: PhantomData<P>,
     }
 
-    impl<P: Plugin> Wrap<P> {
+    impl<P: Plugin> ClapPluginWrapper<P> {
         const unsafe fn new(clap_plugin: NonNull<clap_plugin>) -> Self {
             Self {
                 clap_plugin,
@@ -203,32 +199,35 @@ pub(crate) mod plugin {
         }
 
         unsafe fn take(self) -> ClapPlugin<P> {
-            let data = unsafe { self.clap_plugin.as_ref() }.plugin_data;
-            let data: *mut ClapPlugin<P> = data as *mut _;
-            let data = unsafe { Box::from_raw(data) };
-            *data
+            let clap_plugin = unsafe { Box::from_raw(self.clap_plugin.as_ptr()) };
+            let data: *mut ClapPlugin<P> = clap_plugin.plugin_data as *mut _;
+
+            *unsafe { Box::from_raw(data) }
         }
     }
 
     mod ffi {
         use crate::Plugin;
-        use crate::plugin::{ClapPlugin, Wrap};
+        use crate::clap_plugin::{ClapPlugin, ClapPluginWrapper};
         use clap_sys::clap_plugin;
         use clap_sys::{clap_process, clap_process_status};
         use std::ffi::{c_char, c_void};
         use std::ptr::{NonNull, null};
 
-        const fn wrap_clap_ptr_from_host<P: Plugin>(plugin: *const clap_plugin) -> Wrap<P> {
+        const fn wrap_clap_ptr_from_host<P: Plugin>(
+            plugin: *const clap_plugin,
+        ) -> ClapPluginWrapper<P> {
             let plugin = plugin as *mut _;
-            unsafe { Wrap::<P>::new(NonNull::new(plugin).expect("plugin should be non-null")) }
+            unsafe {
+                ClapPluginWrapper::<P>::new(
+                    NonNull::new(plugin).expect("plugin should be non-null"),
+                )
+            }
         }
 
         #[allow(warnings, unused)]
         extern "C" fn init<P: Plugin>(plugin: *const clap_plugin) -> bool {
-            wrap_clap_ptr_from_host::<P>(plugin)
-                .plugin_mut()
-                .init()
-                .is_ok()
+            true
         }
 
         #[allow(warnings, unused)]
@@ -324,8 +323,8 @@ pub(crate) mod plugin {
 
 mod factory {
     use crate::Plugin;
+    use crate::clap_plugin::{ClapPlugin, ClapPluginDescriptor};
     use crate::host::Host;
-    use crate::plugin::{ClapPlugin, ClapPluginDescriptor};
     use clap_sys::{clap_plugin, clap_plugin_descriptor};
     use std::ffi::CStr;
     use std::marker::PhantomData;
