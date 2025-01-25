@@ -76,6 +76,16 @@ impl Plugin for PingPong {
 clap::entry!(PingPong);
 ```
 
+[ping-pong delay]: ./examples/ping-pong/
+
+## Compile the source code
+
+Install *nightly* Rust (for the 2024 edition) and clone this repository together with its submodules:
+
+```bash
+git clone --recurse-submodules https://github.com/mira-merkell/clap-clap
+```
+
 Build the plugin with:
 
 ```bash
@@ -86,5 +96,3 @@ and look for the compiled dynamical library in `./target/release/`.
 
 The name of the library is OS-specific. For example, on Linux it should be: `libping_pong.so`.
 Copy the file to where your DAW can find it and rename it to: `ping_pong.clap`.
-
-[ping-pong delay]: ./examples/ping-pong/
