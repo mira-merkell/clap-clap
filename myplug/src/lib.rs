@@ -1,4 +1,4 @@
-use clap::{Error, Plugin, Process};
+use clap::{Error, Plugin, Extensions, Process};
 
 #[derive(Default)]
 pub struct MyPlug;
@@ -6,22 +6,14 @@ pub struct MyPlug;
 impl Plugin for MyPlug {
     const ID: &'static str = "com.plugggs.my_plug";
     const NAME: &'static str = "MyPlug";
+    type Extensions = ();
 
-    fn process(&mut self, _process: &mut Process) -> Result<(), Error> {
-        Ok(())
+    fn process(
+        &mut self,
+        _process: &mut Process,
+    ) -> Result<clap::process::Status, clap::process::Error> {
+        Ok(clap::process::Status::Continue)
     }
 }
 
-#[derive(Default)]
-pub struct MyPlug2;
-
-impl Plugin for MyPlug2 {
-    const ID: &'static str = "com.plugggs.my_plug2";
-    const NAME: &'static str = "MyPlug2";
-
-    fn process(&mut self, _process: &mut Process) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-clap::entry!(MyPlug, MyPlug2);
+clap::entry!(MyPlug, MyPlug);

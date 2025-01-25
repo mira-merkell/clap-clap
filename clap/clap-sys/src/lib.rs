@@ -1,3 +1,5 @@
+use std::ffi::CStr;
+
 mod ffi {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]
@@ -7,12 +9,33 @@ mod ffi {
 }
 
 pub use crate::ffi::{
-    clap_host, clap_plugin, clap_plugin_descriptor, clap_plugin_entry, clap_plugin_factory,
-    clap_process, clap_process_status, clap_version, CLAP_VERSION_MAJOR,
-    CLAP_VERSION_MINOR, CLAP_VERSION_REVISION,
+    CLAP_VERSION_MAJOR, CLAP_VERSION_MINOR, CLAP_VERSION_REVISION, clap_audio_buffer,
+    clap_audio_port_info, clap_host, clap_plugin, clap_plugin_audio_ports, clap_plugin_descriptor,
+    clap_plugin_entry, clap_plugin_factory, clap_process, clap_process_status, clap_version,
 };
 
-use std::ffi::CStr;
+pub const CLAP_VERSION: clap_version = clap_version {
+    major: CLAP_VERSION_MAJOR,
+    minor: CLAP_VERSION_MINOR,
+    revision: CLAP_VERSION_REVISION,
+};
+
+macro_rules! clap_process_status_const {
+    ($($name:ident),*) => {
+        $(
+            pub const $name: clap_process_status =
+                    ffi::$name as clap_process_status;
+        )*
+    };
+}
+
+clap_process_status_const!(
+    CLAP_PROCESS_ERROR,
+    CLAP_PROCESS_CONTINUE,
+    CLAP_PROCESS_CONTINUE_IF_NOT_QUIET,
+    CLAP_PROCESS_TAIL,
+    CLAP_PROCESS_SLEEP
+);
 
 macro_rules! export_cstr_from_bytes {
     ($($name_id:ident),*) => {$(
@@ -71,9 +94,3 @@ export_cstr_from_bytes!(
     CLAP_PLUGIN_FEATURE_SURROUND,
     CLAP_PLUGIN_FEATURE_AMBISONIC
 );
-
-pub const CLAP_VERSION: clap_version = clap_version {
-    major: CLAP_VERSION_MAJOR,
-    minor: CLAP_VERSION_MINOR,
-    revision: CLAP_VERSION_REVISION,
-};
