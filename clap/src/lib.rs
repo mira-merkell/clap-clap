@@ -27,13 +27,13 @@ pub trait Plugin: Default + Sync + Send {
     /// For example: `"fx stereo distortion"`.
     const FEATURES: &'static str = "";
 
-    type E: Extensions<Self>;
+    type Extensions: Extensions<Self>;
 
     fn activate(
         &mut self,
         _sample_rate: f64,
-        _min_frames: u32,
-        _max_frames: u32,
+        _min_frames: usize,
+        _max_frames: usize,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -59,8 +59,8 @@ pub trait Extensions<P: Plugin> {
     }
 }
 
-pub mod ext {
-    use crate::ext::audio_ports::AudioPortInfo;
+pub mod extensions {
+    use crate::extensions::audio_ports::AudioPortInfo;
     use crate::{Extensions, Plugin};
 
     impl<P: Plugin> Extensions<P> for () {}
@@ -77,10 +77,10 @@ pub mod ext {
     }
 
     pub mod audio_ports {
-        use crate::ext::audio_ports::ffi::clap_plugin_audio_ports;
-        use crate::ext::AudioPorts;
         use crate::Plugin;
-        use clap_sys::{clap_plugin_audio_ports, CLAP_AUDIO_PORT_IS_MAIN};
+        use crate::extensions::AudioPorts;
+        use crate::extensions::audio_ports::ffi::clap_plugin_audio_ports;
+        use clap_sys::{CLAP_AUDIO_PORT_IS_MAIN, clap_plugin_audio_ports};
         use std::marker::PhantomData;
 
         pub struct AudioPortInfo {
@@ -118,9 +118,9 @@ pub mod ext {
         }
 
         /// Single static stereo port, in and aut.
-        pub struct StereoPort;
+        pub struct StereoPorts;
 
-        impl<P: Plugin> AudioPorts<P> for StereoPort {
+        impl<P: Plugin> AudioPorts<P> for StereoPorts {
             fn inputs(_: &P) -> usize {
                 1
             }
@@ -167,12 +167,12 @@ pub mod ext {
         }
 
         mod ffi {
-            use crate::ext::audio_ports::AudioPortType;
-            use crate::ext::AudioPorts;
-            use crate::{wrap_clap_plugin_from_host, Plugin};
+            use crate::extensions::AudioPorts;
+            use crate::extensions::audio_ports::AudioPortType;
+            use crate::{Plugin, wrap_clap_plugin_from_host};
             use clap_sys::{
-                clap_audio_port_info, clap_plugin, clap_plugin_audio_ports, CLAP_INVALID_ID,
-                CLAP_PORT_AMBISONIC, CLAP_PORT_MONO, CLAP_PORT_STEREO, CLAP_PORT_SURROUND,
+                CLAP_INVALID_ID, CLAP_PORT_AMBISONIC, CLAP_PORT_MONO, CLAP_PORT_STEREO,
+                CLAP_PORT_SURROUND, clap_audio_port_info, clap_plugin, clap_plugin_audio_ports,
             };
             use std::ffi::CString;
             use std::ptr::null;
@@ -254,13 +254,13 @@ pub mod ext {
 }
 
 use crate::clap_plugin::ClapPluginWrapper;
-use crate::ext::AudioPorts;
+use crate::extensions::AudioPorts;
 pub use process::Process;
 
 pub mod process {
     use clap_sys::{
-        clap_audio_buffer, clap_process, clap_process_status,
-        CLAP_PROCESS_CONTINUE, CLAP_PROCESS_CONTINUE_IF_NOT_QUIET, CLAP_PROCESS_SLEEP, CLAP_PROCESS_TAIL,
+        CLAP_PROCESS_CONTINUE, CLAP_PROCESS_CONTINUE_IF_NOT_QUIET, CLAP_PROCESS_SLEEP,
+        CLAP_PROCESS_TAIL, clap_audio_buffer, clap_process, clap_process_status,
     };
     use std::ptr::{slice_from_raw_parts, slice_from_raw_parts_mut};
 
@@ -309,6 +309,25 @@ pub mod process {
         pub fn audio_output(&mut self, n: usize) -> Option<Output<'_>> {
             (n < self.0.audio_outputs_count as usize)
                 .then_some(unsafe { self.audio_output_unchecked(n) })
+        }
+
+        pub unsafe fn link_ports_unchecked(&mut self, port_in: usize, port_out: usize) -> Link<'_> {
+            let channel_count = unsafe { self.audio_input_unchecked(port_in).channel_count() };
+            let port_in = unsafe { &*self.0.audio_inputs.add(port_in) };
+            let port_out = unsafe { &mut *self.0.audio_outputs.add(port_out) };
+
+            unsafe { Link::new_unchecked(port_in, port_out, channel_count, self.frames_count()) }
+        }
+
+        pub fn link_ports(&mut self, port_in: usize, port_out: usize) -> Result<Link<'_>, Error> {
+            let port_in = ((port_in as u32) < self.0.audio_inputs_count)
+                .then_some(unsafe { &*self.0.audio_inputs.add(port_in) })
+                .ok_or(Error::Link)?;
+            let port_out = ((port_out as u32) < self.0.audio_outputs_count)
+                .then_some(unsafe { &mut *self.0.audio_outputs.add(port_out) })
+                .ok_or(Error::Link)?;
+
+            Link::new(port_in, port_out, self.frames_count()).ok_or(Error::Link)
         }
     }
 
@@ -372,6 +391,61 @@ pub mod process {
         }
     }
 
+    /// Up to 8 channel ports.
+    pub struct Link<'a> {
+        port_in: &'a clap_audio_buffer,
+        port_out: &'a mut clap_audio_buffer,
+        channel_count: usize,
+        frames_count: usize,
+        frame: [f32; 8],
+    }
+
+    impl<'a> Link<'a> {
+        unsafe fn new_unchecked(
+            port_in: &'a clap_audio_buffer,
+            port_out: &'a mut clap_audio_buffer,
+            channel_count: usize,
+            frames_count: usize,
+        ) -> Self {
+            Self {
+                port_in,
+                port_out,
+                channel_count,
+                frames_count,
+                frame: [0.0; 8],
+            }
+        }
+
+        fn new(
+            port_in: &'a clap_audio_buffer,
+            port_out: &'a mut clap_audio_buffer,
+            frames_count: usize,
+        ) -> Option<Self> {
+            let channel_count = usize::try_from(port_in.channel_count).ok()?;
+            (channel_count <= 8 && port_in.channel_count == port_out.channel_count).then_some(
+                unsafe { Self::new_unchecked(port_in, port_out, channel_count, frames_count) },
+            )
+        }
+
+        pub fn with_op(&mut self, op: impl FnMut(&mut [f32])) {
+            let mut op = op;
+
+            for i in 0..self.frames_count {
+                for k in 0..self.channel_count {
+                    let sample = unsafe { *(*self.port_in.data32.add(k)).add(i) };
+                    self.frame[k] = sample;
+                }
+
+                op(&mut self.frame[0..self.channel_count]);
+
+                for k in 0..self.channel_count {
+                    let sample = unsafe { &mut *(*self.port_out.data32.add(k)).add(i) };
+                    *sample = self.frame[k];
+                }
+            }
+        }
+    }
+
     pub enum Status {
         Continue,
         ContinueIfNotQuiet,
@@ -393,7 +467,7 @@ pub mod process {
 
     pub enum Error {
         Init,
-        Process,
+        Link,
     }
 }
 
@@ -422,12 +496,12 @@ const unsafe fn wrap_clap_plugin_from_host<P: Plugin>(
 pub(crate) mod clap_plugin {
     use crate::host::ClapHost;
     use crate::{Extensions, Plugin};
-    use clap_sys::{clap_plugin, clap_plugin_descriptor, CLAP_VERSION};
+    use clap_sys::{CLAP_VERSION, clap_plugin, clap_plugin_descriptor};
 
-    use crate::ext::audio_ports::ClapPluginAudioPorts;
+    use crate::extensions::audio_ports::ClapPluginAudioPorts;
     use std::ffi::CStr;
     use std::{
-        ffi::c_char, ffi::CString, marker::PhantomData, ptr::null, ptr::NonNull, str::FromStr,
+        ffi::CString, ffi::c_char, marker::PhantomData, ptr::NonNull, ptr::null, str::FromStr,
     };
 
     #[allow(warnings, unused)]
@@ -512,7 +586,7 @@ pub(crate) mod clap_plugin {
 
     impl<P: Plugin> ClapPlugin<P> {
         pub(crate) fn generate(plugin: P, host: ClapHost) -> Self {
-            let audio_ports = P::E::audio_ports().map(|ap| ClapPluginAudioPorts::new(ap));
+            let audio_ports = P::Extensions::audio_ports().map(|ap| ClapPluginAudioPorts::new(ap));
 
             Self {
                 desc: ClapPluginDescriptor::allocate::<P>(),
@@ -572,10 +646,10 @@ pub(crate) mod clap_plugin {
 
     mod ffi {
         use crate::clap_plugin::ClapPlugin;
-        use crate::{wrap_clap_plugin_from_host, Plugin, Process};
-        use clap_sys::{clap_plugin, CLAP_EXT_AUDIO_PORTS, CLAP_PROCESS_ERROR};
+        use crate::{Plugin, Process, wrap_clap_plugin_from_host};
+        use clap_sys::{CLAP_EXT_AUDIO_PORTS, CLAP_PROCESS_ERROR, clap_plugin};
         use clap_sys::{clap_process, clap_process_status};
-        use std::ffi::{c_char, c_void, CStr};
+        use std::ffi::{CStr, c_char, c_void};
         use std::ptr::null;
 
         #[allow(warnings, unused)]
@@ -595,7 +669,11 @@ pub(crate) mod clap_plugin {
         ) -> bool {
             unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
                 .plugin_mut()
-                .activate(sample_rate, min_frames_count, max_frames_count)
+                .activate(
+                    sample_rate,
+                    min_frames_count as usize,
+                    max_frames_count as usize,
+                )
                 .is_ok()
         }
 
@@ -690,9 +768,9 @@ pub(crate) mod clap_plugin {
 }
 
 pub mod factory {
+    use crate::Plugin;
     use crate::clap_plugin::{ClapPlugin, ClapPluginDescriptor};
     use crate::host::ClapHost;
-    use crate::Plugin;
     use clap_sys::{clap_plugin, clap_plugin_descriptor};
     use std::collections::HashMap;
     use std::ffi::{CStr, CString};
@@ -749,12 +827,13 @@ pub mod factory {
             }
         }
 
-        pub fn plugins_count(&self) -> usize {
-            self.plugins.len()
+        pub fn plugins_count(&self) -> u32 {
+            u32::try_from(self.plugins.len()).expect("plugins_count should fit into u32")
         }
 
-        pub fn descriptor(&self, index: usize) -> &clap_plugin_descriptor {
-            self.plugins[index].clap_plugin_descriptor()
+        pub fn descriptor(&self, index: u32) -> &clap_plugin_descriptor {
+            self.plugins[usize::try_from(index).expect("index should fit into usize")]
+                .clap_plugin_descriptor()
         }
 
         pub fn boxed_clap_plugin(
@@ -776,18 +855,22 @@ pub mod entry {
     use crate::Plugin;
 
     pub use clap_sys::{
-        clap_host, clap_plugin, clap_plugin_descriptor, clap_plugin_entry, clap_plugin_factory,
-        CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION,
+        CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, clap_host, clap_plugin, clap_plugin_descriptor,
+        clap_plugin_entry, clap_plugin_factory,
     };
     pub use std::ptr::NonNull;
 
     pub use crate::factory::{Factory, PluginPrototype};
+    pub use crate::host::ClapHost;
+
+    pub fn plugin_prototype<P: Plugin>() -> Box<PluginPrototype<P>> {
+        Box::new(PluginPrototype::allocate())
+    }
 
     #[macro_export]
     macro_rules! entry {
         ($($plug:ty),*) => {
             mod _clap_entry {
-
                 use $crate::entry::*;
 
                 use super::*; // Access the types supplied as macro arguments.
@@ -799,14 +882,14 @@ pub mod entry {
                 }
 
                 extern "C" fn get_plugin_count(_: *const clap_plugin_factory) -> u32 {
-                    factory_init_once().plugins_count() as u32
+                    factory_init_once().plugins_count()
                 }
 
                 extern "C" fn get_plugin_descriptor(
                     _: *const clap_plugin_factory,
                     index: u32,
                 ) -> *const clap_plugin_descriptor {
-                    factory_init_once().descriptor(index as usize)
+                    factory_init_once().descriptor(index)
                 }
 
                 extern "C" fn create_plugin(
@@ -817,9 +900,12 @@ pub mod entry {
                     if plugin_id.is_null() || host.is_null() {
                         return std::ptr::null();
                     }
-                    let host = ClapHost::new(unsafe{ NonNull::new_unchecked(host as *mut _)});
-                    let plugin_id = unsafe { std::ffi::CStr::from_ptr(plugin_id) };
 
+                    // Safety: We just checked that host is non-null.
+                    let host = ClapHost::new(unsafe{ NonNull::new_unchecked(host as *mut _)});
+                    // Safety: We checked if plug_id is non-null.
+                    // The host guarantees that this is a valid C string now.
+                    let plugin_id = unsafe { std::ffi::CStr::from_ptr(plugin_id) };
                     factory_init_once()
                             .boxed_clap_plugin(plugin_id, host)
                             .map(Box::into_raw).unwrap_or(std::ptr::null_mut())
@@ -841,12 +927,12 @@ pub mod entry {
                     if factory_id.is_null() {
                         return std::ptr::null();
                     }
+                    // Safety: we cheched if factory_id is non-null.
+                    // The host guarantees that this is a valid C string.
                     let id = unsafe { std::ffi::CStr::from_ptr(factory_id) };
-                    if id != CLAP_PLUGIN_FACTORY_ID {
-                        return std::ptr::null();
-                    }
-
-                    &raw const CLAP_PLUGIN_FACTORY as *const _
+                    if id == CLAP_PLUGIN_FACTORY_ID {
+                        &raw const CLAP_PLUGIN_FACTORY as *const _
+                    } else { std::ptr::null() }
                 }
 
                 #[allow(non_upper_case_globals)]
@@ -860,11 +946,5 @@ pub mod entry {
                 };
             }
         };
-    }
-
-    pub use crate::host::ClapHost;
-
-    pub fn plugin_prototype<P: Plugin>() -> Box<PluginPrototype<P>> {
-        Box::new(PluginPrototype::allocate())
     }
 }
