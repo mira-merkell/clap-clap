@@ -1,4 +1,4 @@
-# clap-clap-v0.1.0
+# clap-clap
 
 Another [CLAP] framework. Very much WIP. 🚧
 
@@ -82,9 +82,9 @@ Build the plugin with:
 cargo build -r
 ```
 
-and look for the compiled dynamical library in `./target/release/`. The name
-of the library is OS-specific. For example, on Linux it should be
-`libping_pong.so`. Copy the file to where your DAW can find it and rename it to
-`ping_pong.clap`.
+and look for the compiled dynamical library in `./target/release/`.
 
-[ping-pong delay]: ./examples/ping-pong/src/lib.rs
+The name of the library is OS-specific. For example, on Linux it should be: `libping_pong.so`.
+Copy the file to where your DAW can find it and rename it to: `ping_pong.clap`.
+
+[ping-pong delay]: ./examples/ping-pong/
