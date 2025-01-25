@@ -9,9 +9,11 @@ mod ffi {
 }
 
 pub use crate::ffi::{
+    CLAP_AUDIO_PORT_IS_MAIN, CLAP_AUDIO_PORT_PREFERS_64BITS,
+    CLAP_AUDIO_PORT_REQUIRES_COMMON_SAMPLE_SIZE, CLAP_AUDIO_PORT_SUPPORTS_64BITS,
     CLAP_VERSION_MAJOR, CLAP_VERSION_MINOR, CLAP_VERSION_REVISION, clap_audio_buffer,
     clap_audio_port_info, clap_host, clap_plugin, clap_plugin_audio_ports, clap_plugin_descriptor,
-    clap_plugin_entry, clap_plugin_factory, clap_process, clap_process_status, clap_version,
+    clap_plugin_entry, clap_plugin_factory, clap_process, clap_process_status, clap_version, CLAP_INVALID_ID,
 };
 
 pub const CLAP_VERSION: clap_version = clap_version {
