@@ -11,7 +11,7 @@ struct PingPong {
 }
 
 impl Extensions<Self> for PingPong {
-    // Provide CLAP "audio ports" extension:
+    // Provide CLAP "audio ports" extension: for example,
     // a pair of static stereo ports: one in and one out.
     fn audio_ports() -> Option<impl AudioPorts<PingPong>> {
         Some(StereoPorts)
@@ -23,10 +23,10 @@ impl Plugin for PingPong {
     const NAME: &'static str = "Ping-Pong";
     type Extensions = Self;
 
-    /// Allocate resources: a stereo delay line, 1/8-second long.
+    /// Allocate resources: a stereo delay line, 200ms long.
     fn activate(&mut self, sample_rate: f64, _: usize, _: usize) -> Result<(), clap::Error> {
         let one_second = sample_rate as usize;
-        self.del = vec![[0.0; 2]; one_second / 8];
+        self.del = vec![[0.0; 2]; one_second / 5];
 
         Ok(())
     }
