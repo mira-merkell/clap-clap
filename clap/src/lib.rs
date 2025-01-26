@@ -1,7 +1,4 @@
 use std::fmt::Display;
-use std::ptr::NonNull;
-
-pub use clap_sys::CLAP_AUDIO_PORT_IS_MAIN;
 
 #[derive(Debug, Clone)]
 pub enum Error {}
@@ -29,11 +26,12 @@ pub trait Plugin: Default + Sync + Send {
 
     type Extensions: Extensions<Self>;
 
+    #[allow(unused_variables)]
     fn activate(
         &mut self,
-        _sample_rate: f64,
-        _min_frames: usize,
-        _max_frames: usize,
+        sample_rate: f64,
+        min_frames: usize,
+        max_frames: usize,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -80,18 +78,148 @@ pub mod extensions {
         use crate::Plugin;
         use crate::extensions::AudioPorts;
         use crate::extensions::audio_ports::ffi::clap_plugin_audio_ports;
-        use clap_sys::{CLAP_AUDIO_PORT_IS_MAIN, clap_plugin_audio_ports};
+        use clap_sys::{
+            CLAP_AUDIO_PORT_IS_MAIN, CLAP_AUDIO_PORT_PREFERS_64BITS,
+            CLAP_AUDIO_PORT_REQUIRES_COMMON_SAMPLE_SIZE, CLAP_AUDIO_PORT_SUPPORTS_64BITS,
+        };
+        use clap_sys::{
+            CLAP_INVALID_ID, CLAP_PORT_AMBISONIC, CLAP_PORT_MONO, CLAP_PORT_STEREO,
+            CLAP_PORT_SURROUND, clap_audio_port_info, clap_plugin_audio_ports,
+        };
+        use std::fmt::{Display, Formatter};
         use std::marker::PhantomData;
+        use std::ptr::null;
 
-        pub struct AudioPortInfo {
-            pub id: usize,
-            pub name: String,
-            pub flags: Option<u32>,
-            pub channel_count: u32,
-            pub port_type: Option<AudioPortType>,
-            pub in_place_pair: Option<usize>,
+        #[derive(Debug, Copy, Clone)]
+        pub enum Error {
+            ChannelCount,
         }
 
+        impl Display for Error {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    Error::ChannelCount => {
+                        write!(f, "Channel count should fit into u32")
+                    }
+                }
+            }
+        }
+
+        impl std::error::Error for Error {}
+
+        #[derive(Debug, Default, Clone)]
+        pub struct AudioPortInfo {
+            id: u32,
+            name: Option<String>,
+            flags: u32,
+            channel_count: Option<Result<u32, usize>>,
+            port_type: Option<AudioPortType>,
+            in_place_pair: Option<u32>,
+        }
+
+        impl AudioPortInfo {
+            pub fn builder() -> AudioPortInfoBuilder {
+                AudioPortInfoBuilder::new(Self::default())
+            }
+
+            fn fill_clap_audio_port_info(&self, info: &mut clap_audio_port_info) {
+                info.id = self.id;
+
+                if let Some(name) = &self.name {
+                    let n = name.len().min(info.name.len());
+                    unsafe {
+                        std::ptr::copy_nonoverlapping(
+                            name.as_ptr(),
+                            info.name.as_mut_ptr() as *mut _,
+                            n,
+                        )
+                    }
+                    info.name[n] = b'\0' as _;
+                } else {
+                    info.name[0] = b'\0' as _;
+                };
+
+                info.flags = self.flags;
+
+                // AudioPortInfoBuilder makes sure this will never panic.
+                info.channel_count = self.channel_count.unwrap_or(Ok(0)).unwrap();
+
+                info.port_type = match self.port_type {
+                    Some(AudioPortType::Mono) => CLAP_PORT_MONO.as_ptr(),
+                    Some(AudioPortType::Stereo) => CLAP_PORT_STEREO.as_ptr(),
+                    Some(AudioPortType::Surround) => CLAP_PORT_SURROUND.as_ptr(),
+                    Some(AudioPortType::Ambisonic) => CLAP_PORT_AMBISONIC.as_ptr(),
+                    None => null(),
+                };
+
+                info.in_place_pair = self.in_place_pair.unwrap_or(CLAP_INVALID_ID);
+            }
+        }
+
+        pub struct AudioPortInfoBuilder {
+            info: AudioPortInfo,
+        }
+
+        impl AudioPortInfoBuilder {
+            fn new(info: AudioPortInfo) -> Self {
+                Self { info }
+            }
+
+            pub fn id(&mut self, id: u32) -> &mut Self {
+                self.info.id = id;
+                self
+            }
+
+            pub fn name(&mut self, name: &str) -> &mut Self {
+                self.info.name = Some(name.to_string());
+                self
+            }
+
+            pub fn port_is_main(&mut self) -> &mut Self {
+                self.info.flags |= CLAP_AUDIO_PORT_IS_MAIN;
+                self
+            }
+
+            pub fn prefers_64_bits(&mut self) -> &mut Self {
+                self.info.flags |= CLAP_AUDIO_PORT_PREFERS_64BITS;
+                self
+            }
+
+            pub fn supports_64_bits(&mut self) -> &mut Self {
+                self.info.flags |= CLAP_AUDIO_PORT_SUPPORTS_64BITS;
+                self
+            }
+
+            pub fn requires_common_sample_size(&mut self) -> &mut Self {
+                self.info.flags |= CLAP_AUDIO_PORT_REQUIRES_COMMON_SAMPLE_SIZE;
+                self
+            }
+
+            pub fn channel_count(&mut self, n: usize) -> &mut Self {
+                self.info.channel_count = Some(u32::try_from(n).map_err(|_| n));
+                self
+            }
+
+            pub fn port_type(&mut self, port_type: AudioPortType) -> &mut Self {
+                self.info.port_type = Some(port_type);
+                self
+            }
+
+            pub fn in_place_pair(&mut self, id: u32) -> &mut Self {
+                self.info.in_place_pair = Some(id);
+                self
+            }
+
+            pub fn build(&self) -> Result<AudioPortInfo, Error> {
+                if let Some(Err(_)) = self.info.channel_count {
+                    Err(Error::ChannelCount)
+                } else {
+                    Ok(self.info.clone())
+                }
+            }
+        }
+
+        #[derive(Debug, Copy, Clone)]
         pub enum AudioPortType {
             Mono,
             Stereo,
@@ -118,6 +246,7 @@ pub mod extensions {
         }
 
         /// Single static stereo port, in and aut.
+        #[derive(Debug, Copy, Clone)]
         pub struct StereoPorts;
 
         impl<P: Plugin> AudioPorts<P> for StereoPorts {
@@ -130,25 +259,33 @@ pub mod extensions {
             }
 
             fn input_info(_: &P, index: usize) -> Option<AudioPortInfo> {
-                (index == 0).then_some(AudioPortInfo {
-                    id: 0,
-                    name: "Main In".to_string(),
-                    flags: Some(CLAP_AUDIO_PORT_IS_MAIN.try_into().unwrap()),
-                    channel_count: 2,
-                    port_type: Some(AudioPortType::Stereo),
-                    in_place_pair: None,
-                })
+                (index == 0)
+                    .then(|| {
+                        AudioPortInfo::builder()
+                            .id(index as u32)
+                            .name("Main In")
+                            .port_is_main()
+                            .channel_count(2)
+                            .port_type(AudioPortType::Stereo)
+                            .build()
+                            .ok()
+                    })
+                    .flatten()
             }
 
             fn output_info(_: &P, index: usize) -> Option<AudioPortInfo> {
-                (index == 0).then_some(AudioPortInfo {
-                    id: 1,
-                    name: "Main Out".to_string(),
-                    flags: Some(CLAP_AUDIO_PORT_IS_MAIN.try_into().unwrap()),
-                    channel_count: 2,
-                    port_type: Some(AudioPortType::Stereo),
-                    in_place_pair: None,
-                })
+                (index == 0)
+                    .then(|| {
+                        AudioPortInfo::builder()
+                            .id(index as u32)
+                            .name("Main Out")
+                            .port_is_main()
+                            .channel_count(2)
+                            .port_type(AudioPortType::Stereo)
+                            .build()
+                            .ok()
+                    })
+                    .flatten()
             }
         }
 
@@ -168,13 +305,8 @@ pub mod extensions {
 
         mod ffi {
             use crate::extensions::AudioPorts;
-            use crate::extensions::audio_ports::AudioPortType;
             use crate::{Plugin, wrap_clap_plugin_from_host};
-            use clap_sys::{
-                CLAP_INVALID_ID, CLAP_PORT_AMBISONIC, CLAP_PORT_MONO, CLAP_PORT_STEREO,
-                CLAP_PORT_SURROUND, clap_audio_port_info, clap_plugin, clap_plugin_audio_ports,
-            };
-            use std::ptr::null;
+            use clap_sys::{clap_audio_port_info, clap_plugin, clap_plugin_audio_ports};
 
             extern "C" fn count<A, P>(plugin: *const clap_plugin, is_input: bool) -> u32
             where
@@ -202,41 +334,15 @@ pub mod extensions {
             {
                 let wrapper = unsafe { wrap_clap_plugin_from_host::<P>(plugin) };
                 let plugin = &wrapper.clap_plugin().plugin;
-                let index = usize::try_from(index).expect("index must fit into usize");
-                let Some(query) = (if is_input {
-                    A::input_info(plugin, index)
-                } else {
-                    A::output_info(plugin, index)
-                }) else {
-                    return false;
-                };
+                let index = index.try_into().expect("index must fit into usize");
                 let info = unsafe { &mut *info };
-                info.id = query.id.try_into().expect("id must fit into u32");
 
-                let n = query.name.len().min(info.name.len());
-                unsafe {
-                    std::ptr::copy_nonoverlapping(
-                        query.name.as_ptr(),
-                        info.name.as_mut_ptr() as *mut _,
-                        n,
-                    )
-                }
-                info.name[n] = b'\0' as _;
-
-                info.flags = query.flags.unwrap_or(0);
-                info.channel_count = query.channel_count;
-                info.port_type = match query.port_type {
-                    Some(AudioPortType::Mono) => CLAP_PORT_MONO.as_ptr(),
-                    Some(AudioPortType::Stereo) => CLAP_PORT_STEREO.as_ptr(),
-                    Some(AudioPortType::Surround) => CLAP_PORT_SURROUND.as_ptr(),
-                    Some(AudioPortType::Ambisonic) => CLAP_PORT_AMBISONIC.as_ptr(),
-                    None => null(),
-                };
-                info.in_place_pair = query
-                    .in_place_pair
-                    .map(|x| x.try_into().expect("port index should fit into u32"))
-                    .unwrap_or(CLAP_INVALID_ID);
-                true
+                is_input
+                    .then(|| A::input_info(plugin, index))
+                    .flatten()
+                    .or_else(|| A::output_info(plugin, index))
+                    .map(|q| q.fill_clap_audio_port_info(info))
+                    .is_some()
             }
 
             pub(crate) const fn clap_plugin_audio_ports<A, P>() -> clap_plugin_audio_ports
@@ -505,7 +611,7 @@ const unsafe fn wrap_clap_plugin_from_host<P: Plugin>(
     plugin: *const clap_sys::clap_plugin,
 ) -> ClapPluginWrapper<P> {
     let plugin = plugin as *mut _;
-    unsafe { ClapPluginWrapper::<P>::new(NonNull::new_unchecked(plugin)) }
+    unsafe { ClapPluginWrapper::<P>::new(std::ptr::NonNull::new_unchecked(plugin)) }
 }
 
 pub mod plugin {

@@ -25,6 +25,25 @@ macro_rules! cast_const_as_usize {
     )*};
 }
 
+macro_rules! cast_flags_as_u32 {
+    ($($flag:ident),*) => {
+        $(
+            pub const $flag: u32 = ffi::$flag as u32;
+
+            #[allow(non_snake_case)]
+            #[cfg(test)]
+            mod $flag {
+                use super::ffi;
+
+                #[test]
+                fn cast_as_u32() {
+                    u32::try_from(ffi::$flag).expect("should fit into u32");
+                }
+            }
+        )*
+    };
+}
+
 // Export raw, null-terminated byte strings as CStr.
 //
 // Safety:
@@ -123,11 +142,15 @@ clap_process_status_const!(
 export_cstr_from_bytes!(CLAP_PLUGIN_FACTORY_ID);
 
 // CLAP plugin extension: audio_ports
-pub use ffi::{
-    CLAP_AUDIO_PORT_IS_MAIN, CLAP_AUDIO_PORT_PREFERS_64BITS,
-    CLAP_AUDIO_PORT_REQUIRES_COMMON_SAMPLE_SIZE, CLAP_AUDIO_PORT_SUPPORTS_64BITS,
-    clap_audio_port_info, clap_plugin_audio_ports,
-};
+pub use ffi::{clap_audio_port_info, clap_plugin_audio_ports};
+
+cast_flags_as_u32!(
+    CLAP_AUDIO_PORT_IS_MAIN,
+    CLAP_AUDIO_PORT_PREFERS_64BITS,
+    CLAP_AUDIO_PORT_REQUIRES_COMMON_SAMPLE_SIZE,
+    CLAP_AUDIO_PORT_SUPPORTS_64BITS
+);
+
 export_cstr_from_bytes!(
     CLAP_EXT_AUDIO_PORTS,
     CLAP_PORT_MONO,
