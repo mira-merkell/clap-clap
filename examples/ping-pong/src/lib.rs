@@ -1,8 +1,7 @@
 use clap::{
     Extensions, Plugin, Process,
     extensions::{AudioPorts, audio_ports::StereoPorts},
-    process,
-    process::Status::Continue,
+    process, process::Status::Continue,
 };
 
 #[derive(Default)]
@@ -11,7 +10,7 @@ struct PingPong {
     cur: usize,         // cursor (and sample counter)
 }
 
-impl Extensions<PingPong> for PingPong {
+impl Extensions<Self> for PingPong {
     // Provide CLAP "audio ports" extension:
     // a pair of static stereo ports: one in and one out.
     fn audio_ports() -> Option<impl AudioPorts<PingPong>> {

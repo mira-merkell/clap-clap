@@ -133,7 +133,7 @@ pub mod extensions {
                 (index == 0).then_some(AudioPortInfo {
                     id: 0,
                     name: "Main In".to_string(),
-                    flags: Some(CLAP_AUDIO_PORT_IS_MAIN),
+                    flags: Some(CLAP_AUDIO_PORT_IS_MAIN.try_into().unwrap()),
                     channel_count: 2,
                     port_type: Some(AudioPortType::Stereo),
                     in_place_pair: None,
@@ -144,7 +144,7 @@ pub mod extensions {
                 (index == 0).then_some(AudioPortInfo {
                     id: 1,
                     name: "Main Out".to_string(),
-                    flags: Some(CLAP_AUDIO_PORT_IS_MAIN),
+                    flags: Some(CLAP_AUDIO_PORT_IS_MAIN.try_into().unwrap()),
                     channel_count: 2,
                     port_type: Some(AudioPortType::Stereo),
                     in_place_pair: None,

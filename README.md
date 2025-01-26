@@ -2,18 +2,18 @@
 
 Another [CLAP] framework. Very much WIP. 🚧
 
-## Goals:
+## Goals
 
 * Safe Rust interface to CLAP [C API].
 * Follow CLAP module structure and terminology.
 * Ergonomic and dynamical.
-* Provide extensive testing and debugging support for plugin authors.
+* Provide extensive testing and debugging platform for plugin authors.
 
 [CLAP]: https://cleveraudio.org
 
 [C API]: https://github.com/free-audio/clap/tree/main/include/clap
 
-## Example:
+## Example
 
 Implement a [ping-pong delay]:
 
@@ -30,9 +30,9 @@ struct PingPong {
     cur: usize,         // cursor (and sample counter)
 }
 
-impl Extensions<PingPong> for PingPong {
+impl Extensions<Self> for PingPong {
     // Provide CLAP "audio ports" extension:
-    // a built-in static pair of stereo ports: one in and one out.
+    // a pair of static stereo ports: one in and one out.
     fn audio_ports() -> Option<impl AudioPorts<PingPong>> {
         Some(StereoPorts)
     }
@@ -53,7 +53,7 @@ impl Plugin for PingPong {
 
     /// Process audio: Feedback delay with ping-pong effect.
     fn process(&mut self, pc: &mut Process) -> Result<process::Status, process::Error> {
-        // Link audio ports: in[0] and out[0] with a closure that processes
+        // Link audio ports in[0] and out[0] with a closure that processes
         // one frame (two channels) of samples at a time.
         pc.link_ports(0, 0)?.with_op(|frame: &mut [f32]| {
             let n = self.del.len();
@@ -92,7 +92,7 @@ Build the plugin with:
 cargo build -r
 ```
 
-and look for the compiled dynamical library in `./target/release/`.
+and look for the compiled dynamical library in `target/release/`.
 
 The name of the library is OS-specific. For example, on Linux it should be: `libping_pong.so`.
 Copy the file to where your DAW can find it and rename it to: `ping_pong.clap`.
