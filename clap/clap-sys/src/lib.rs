@@ -8,13 +8,71 @@ mod ffi {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
-pub use crate::ffi::{
-    CLAP_AUDIO_PORT_IS_MAIN, CLAP_AUDIO_PORT_PREFERS_64BITS,
-    CLAP_AUDIO_PORT_REQUIRES_COMMON_SAMPLE_SIZE, CLAP_AUDIO_PORT_SUPPORTS_64BITS,
-    CLAP_VERSION_MAJOR, CLAP_VERSION_MINOR, CLAP_VERSION_REVISION, clap_audio_buffer,
-    clap_audio_port_info, clap_host, clap_plugin, clap_plugin_audio_ports, clap_plugin_descriptor,
-    clap_plugin_entry, clap_plugin_factory, clap_process, clap_process_status, clap_version, CLAP_INVALID_ID,
-};
+macro_rules! cast_const_as_usize {
+    ($($name:ident),*) => {$(
+        pub const $name: usize = ffi::$name as usize;
+
+        #[allow(non_snake_case)]
+        #[cfg(test)]
+        mod $name {
+            use super::ffi;
+
+            #[test]
+            fn cast_as_usize() {
+                usize::try_from(ffi::$name).expect("should fit into usize");
+            }
+        }
+    )*};
+}
+
+// Export raw, null-terminated byte strings as CStr.
+//
+// Safety:
+// The symbols exported must be static, null-terminated byte strings from ffi.
+macro_rules! export_cstr_from_bytes {
+    ($($name_id:ident),*) => { $(
+        pub const $name_id: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(ffi::$name_id) };
+
+        #[allow(non_snake_case)]
+        #[cfg(test)]
+        mod $name_id {
+            use std::ffi::CStr;
+            use super::{ffi, CLAP_NAME_SIZE, $name_id};
+
+            #[test]
+            fn export_cstr_from_bytes () {
+                let _ = CStr::from_bytes_with_nul(ffi::$name_id).expect("should be a valid CStr");
+            }
+
+            #[test]
+            fn is_static() {
+                const fn borrow_static() -> &'static [u8] {
+                    ffi::$name_id
+                }
+
+                let _ = borrow_static();
+            }
+
+            #[test]
+            fn is_valid_rust_string() {
+                let _ = $name_id.to_str().expect("should be valid Rust string");
+            }
+
+            #[test]
+            fn len_is_less_than_clap_name_size() {
+                assert!($name_id.to_str().unwrap().len() < CLAP_NAME_SIZE);
+            }
+        }
+    )* }
+}
+
+cast_const_as_usize!(CLAP_NAME_SIZE, CLAP_PATH_SIZE);
+
+// CLAP id
+pub use crate::ffi::{CLAP_INVALID_ID, clap_id};
+
+// CLAP version
+pub use crate::ffi::{CLAP_VERSION_MAJOR, CLAP_VERSION_MINOR, CLAP_VERSION_REVISION, clap_version};
 
 pub const CLAP_VERSION: clap_version = clap_version {
     major: CLAP_VERSION_MAJOR,
@@ -22,11 +80,33 @@ pub const CLAP_VERSION: clap_version = clap_version {
     revision: CLAP_VERSION_REVISION,
 };
 
+// CLAP entry
+pub use crate::ffi::{
+    clap_host, clap_plugin, clap_plugin_descriptor, clap_plugin_entry, clap_plugin_factory,
+};
+
+// CLAP process
+pub use crate::ffi::{clap_audio_buffer, clap_process, clap_process_status};
+
+// Export CLAP_PROCESS_* enum as clap_process_status
 macro_rules! clap_process_status_const {
     ($($name:ident),*) => {
         $(
             pub const $name: clap_process_status =
                     ffi::$name as clap_process_status;
+
+
+            #[allow(non_snake_case)]
+            #[cfg(test)]
+            mod $name {
+                use super::{$name, clap_process_status};
+
+                #[test]
+                fn cast_as_clap_process_status() {
+                    let _ : clap_process_status = $name.try_into()
+                        .expect("should fit into clap_process_status");
+                }
+            }
         )*
     };
 }
@@ -39,14 +119,15 @@ clap_process_status_const!(
     CLAP_PROCESS_SLEEP
 );
 
-macro_rules! export_cstr_from_bytes {
-    ($($name_id:ident),*) => {$(
-        pub const $name_id: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(ffi::$name_id) };
-    )*}
-}
-
+// CLAP plugin factory
 export_cstr_from_bytes!(CLAP_PLUGIN_FACTORY_ID);
 
+// CLAP plugin extension: audio_ports
+pub use ffi::{
+    CLAP_AUDIO_PORT_IS_MAIN, CLAP_AUDIO_PORT_PREFERS_64BITS,
+    CLAP_AUDIO_PORT_REQUIRES_COMMON_SAMPLE_SIZE, CLAP_AUDIO_PORT_SUPPORTS_64BITS,
+    clap_audio_port_info, clap_plugin_audio_ports,
+};
 export_cstr_from_bytes!(
     CLAP_EXT_AUDIO_PORTS,
     CLAP_PORT_MONO,
@@ -55,6 +136,7 @@ export_cstr_from_bytes!(
     CLAP_PORT_AMBISONIC
 );
 
+// CLAP_PLUGIN_FEATURE_*
 export_cstr_from_bytes!(
     CLAP_PLUGIN_FEATURE_INSTRUMENT,
     CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,

@@ -585,11 +585,15 @@ pub mod plugin {
         }
     }
 
+    pub(crate) struct ClapPluginExtensions<P> {
+        pub(crate) audio_ports: Option<ClapPluginAudioPorts<P>>,
+    }
+
     pub(crate) struct ClapPlugin<P> {
         pub(crate) descriptor: PluginDescriptor<P>,
         pub(crate) _host: ClapHost,
         pub(crate) plugin: P,
-        pub(crate) audio_ports: Option<ClapPluginAudioPorts<P>>,
+        pub(crate) plugin_extensions: ClapPluginExtensions<P>,
     }
 
     impl<P: Plugin> ClapPlugin<P> {
@@ -600,7 +604,7 @@ pub mod plugin {
                 descriptor: PluginDescriptor::allocate(),
                 plugin,
                 _host: host,
-                audio_ports,
+                plugin_extensions: ClapPluginExtensions { audio_ports },
             }
         }
 
@@ -726,13 +730,15 @@ pub mod plugin {
             plugin: *const clap_plugin,
             id: *const c_char,
         ) -> *const c_void {
-            let plugin = unsafe { wrap_clap_plugin_from_host::<P>(plugin) };
+            let wrap = unsafe { wrap_clap_plugin_from_host::<P>(plugin) };
             if id.is_null() {
                 return null();
             }
             let id = unsafe { CStr::from_ptr(id) };
-            if id == CLAP_EXT_AUDIO_PORTS && plugin.clap_plugin().audio_ports.is_some() {
-                if let Some(audio_ports) = &plugin.clap_plugin().audio_ports {
+            if id == CLAP_EXT_AUDIO_PORTS
+                && wrap.clap_plugin().plugin_extensions.audio_ports.is_some()
+            {
+                if let Some(audio_ports) = &wrap.clap_plugin().plugin_extensions.audio_ports {
                     return &raw const audio_ports.raw as *const _;
                 }
             }
