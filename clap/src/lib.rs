@@ -86,33 +86,15 @@ pub mod extensions {
             CLAP_INVALID_ID, CLAP_PORT_AMBISONIC, CLAP_PORT_MONO, CLAP_PORT_STEREO,
             CLAP_PORT_SURROUND, clap_audio_port_info, clap_plugin_audio_ports,
         };
-        use std::fmt::{Display, Formatter};
         use std::marker::PhantomData;
         use std::ptr::null;
-
-        #[derive(Debug, Copy, Clone)]
-        pub enum Error {
-            ChannelCount,
-        }
-
-        impl Display for Error {
-            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-                match self {
-                    Error::ChannelCount => {
-                        write!(f, "Channel count should fit into u32")
-                    }
-                }
-            }
-        }
-
-        impl std::error::Error for Error {}
 
         #[derive(Debug, Default, Clone)]
         pub struct AudioPortInfo {
             id: u32,
             name: Option<String>,
             flags: u32,
-            channel_count: Option<Result<u32, usize>>,
+            channel_count: Option<u32>,
             port_type: Option<AudioPortType>,
             in_place_pair: Option<u32>,
         }
@@ -141,8 +123,7 @@ pub mod extensions {
 
                 info.flags = self.flags;
 
-                // AudioPortInfoBuilder makes sure this will never panic.
-                info.channel_count = self.channel_count.unwrap_or(Ok(0)).unwrap();
+                info.channel_count = self.channel_count.unwrap_or(0);
 
                 info.port_type = match self.port_type {
                     Some(AudioPortType::Mono) => CLAP_PORT_MONO.as_ptr(),
@@ -195,9 +176,11 @@ pub mod extensions {
                 self
             }
 
-            pub fn channel_count(&mut self, n: usize) -> &mut Self {
-                self.info.channel_count = Some(u32::try_from(n).map_err(|_| n));
-                self
+            pub fn channel_count(&mut self, n: usize) -> Option<&mut Self> {
+                u32::try_from(n).ok().map(|n| {
+                    self.info.channel_count = Some(n);
+                    self
+                })
             }
 
             pub fn port_type(&mut self, port_type: AudioPortType) -> &mut Self {
@@ -210,12 +193,8 @@ pub mod extensions {
                 self
             }
 
-            pub fn build(&self) -> Result<AudioPortInfo, Error> {
-                if let Some(Err(_)) = self.info.channel_count {
-                    Err(Error::ChannelCount)
-                } else {
-                    Ok(self.info.clone())
-                }
+            pub fn build(&self) -> AudioPortInfo {
+                self.info.clone()
             }
         }
 
@@ -259,33 +238,27 @@ pub mod extensions {
             }
 
             fn input_info(_: &P, index: usize) -> Option<AudioPortInfo> {
-                (index == 0)
-                    .then(|| {
-                        AudioPortInfo::builder()
-                            .id(index as u32)
-                            .name("Main In")
-                            .port_is_main()
-                            .channel_count(2)
-                            .port_type(AudioPortType::Stereo)
-                            .build()
-                            .ok()
-                    })
-                    .flatten()
+                (index == 0).then_some(
+                    AudioPortInfo::builder()
+                        .id(index as u32)
+                        .name("Main In")
+                        .port_is_main()
+                        .channel_count(2)?
+                        .port_type(AudioPortType::Stereo)
+                        .build(),
+                )
             }
 
             fn output_info(_: &P, index: usize) -> Option<AudioPortInfo> {
-                (index == 0)
-                    .then(|| {
-                        AudioPortInfo::builder()
-                            .id(index as u32)
-                            .name("Main Out")
-                            .port_is_main()
-                            .channel_count(2)
-                            .port_type(AudioPortType::Stereo)
-                            .build()
-                            .ok()
-                    })
-                    .flatten()
+                (index == 0).then_some(
+                    AudioPortInfo::builder()
+                        .id(index as u32)
+                        .name("Main Out")
+                        .port_is_main()
+                        .channel_count(2)?
+                        .port_type(AudioPortType::Stereo)
+                        .build(),
+                )
             }
         }
 
