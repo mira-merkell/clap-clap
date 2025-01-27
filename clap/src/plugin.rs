@@ -2,8 +2,9 @@ use crate::ext::Extensions;
 use crate::host::Host;
 use crate::process::Process;
 use crate::{ext::audio_ports::ClapPluginAudioPorts, factory::FactoryHost, plugin, process};
-use clap_sys::{CLAP_VERSION, clap_plugin, clap_plugin_descriptor};
+use clap_sys::{CLAP_VERSION, clap_host, clap_plugin, clap_plugin_descriptor};
 use std::fmt::Display;
+use std::sync::Arc;
 use std::{ffi::CString, ffi::c_char, marker::PhantomData, ptr::NonNull, ptr::null, str::FromStr};
 
 #[derive(Debug, Copy, Clone)]
@@ -33,17 +34,17 @@ pub trait Plugin: Default + Sync + Send {
     type Extensions: Extensions<Self>;
 
     #[allow(unused_variables)]
-    fn init(&mut self, host: &Host) -> Result<(), plugin::Error> {
+    fn init(&mut self, host: Arc<Host>) -> Result<(), Error> {
         Ok(())
     }
-    
+
     #[allow(unused_variables)]
     fn activate(
         &mut self,
         sample_rate: f64,
         min_frames: usize,
         max_frames: usize,
-    ) -> Result<(), plugin::Error> {
+    ) -> Result<(), Error> {
         Ok(())
     }
 
@@ -135,9 +136,9 @@ pub(crate) struct ClapPluginExtensions<P> {
 
 pub(crate) struct ClapPluginData<P> {
     pub(crate) descriptor: PluginDescriptor<P>,
-    pub(crate) host: FactoryHost,
     pub(crate) plugin: P,
     pub(crate) plugin_extensions: ClapPluginExtensions<P>,
+    pub(crate) host: Arc<Host>,
 }
 
 impl<P: Plugin> ClapPluginData<P> {
@@ -147,7 +148,7 @@ impl<P: Plugin> ClapPluginData<P> {
         Self {
             descriptor: PluginDescriptor::allocate(),
             plugin,
-            host: host,
+            host: Arc::new(Host::new(host.into_inner())),
             plugin_extensions: ClapPluginExtensions { audio_ports },
         }
     }

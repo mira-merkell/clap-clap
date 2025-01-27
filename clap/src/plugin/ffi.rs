@@ -1,4 +1,3 @@
-use crate::host::Host;
 use crate::plugin::{ClapPluginData, Plugin, wrap_clap_plugin_from_host};
 use crate::process::Process;
 use clap_sys::{CLAP_EXT_AUDIO_PORTS, CLAP_PROCESS_ERROR, clap_plugin};
@@ -10,8 +9,8 @@ use std::ptr::null;
 extern "C" fn init<P: Plugin>(plugin: *const clap_plugin) -> bool {
     let mut wrapper = unsafe { wrap_clap_plugin_from_host::<P>(plugin) };
     let plugin_data = wrapper.plugin_data_mut();
-    let host = Host::new(&plugin_data.host);
-    plugin_data.plugin.init(&host).is_ok()
+    let host = plugin_data.host.clone();
+    plugin_data.plugin.init(host).is_ok()
 }
 
 extern "C" fn destroy<P: Plugin>(plugin: *const clap_plugin) {

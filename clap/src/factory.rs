@@ -6,12 +6,16 @@ use std::ptr::NonNull;
 
 /// This type exists only be visible from within `clap::entry!` macro.
 pub struct FactoryHost {
-    _host: NonNull<clap_host>,
+    host: NonNull<clap_host>,
 }
 
 impl FactoryHost {
     pub const fn new(host: NonNull<clap_host>) -> Self {
-        Self { _host: host }
+        Self { host }
+    }
+
+    pub(crate) fn into_inner(self) -> NonNull<clap_host> {
+        self.host
     }
 }
 /// This type exists only be visible from within `clap::entry!` macro.
