@@ -1,15 +1,12 @@
+pub use crate::factory::{Factory, FactoryHost, FactoryPluginDescriptor};
 use crate::plugin::Plugin;
-pub use crate::{
-    factory::{Factory, FactoryHost},
-    plugin::PluginDescriptor,
-};
 pub use clap_sys::{
-    CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, clap_host, clap_plugin, clap_plugin_descriptor,
-    clap_plugin_entry, clap_plugin_factory,
+    clap_host, clap_plugin, clap_plugin_descriptor, clap_plugin_entry, clap_plugin_factory,
+    CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION,
 };
 
-pub fn plugin_prototype<P: Plugin>() -> Box<PluginDescriptor<P>> {
-    Box::new(PluginDescriptor::allocate())
+pub fn plugin_prototype<P: Plugin>() -> Box<FactoryPluginDescriptor<P>> {
+    Box::new(FactoryPluginDescriptor::allocate())
 }
 
 #[macro_export]

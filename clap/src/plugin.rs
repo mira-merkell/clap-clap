@@ -62,8 +62,8 @@ pub trait Plugin: Default + Sync + Send {
     fn on_main_thread(&self) {}
 }
 
-#[allow(warnings, unused)]
-pub struct PluginDescriptor<P> {
+#[allow(dead_code)]
+pub(crate) struct PluginDescriptor<P> {
     pub(crate) id: CString,
     name: CString,
     vendor: CString,

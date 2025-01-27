@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::ptr::NonNull;
 
-/// This type is public to make it be visible from within clap::entry! macro.
+/// This type exists only be visible from within `clap::entry!` macro.
 pub struct FactoryHost {
     _host: NonNull<clap_host>,
 }
@@ -14,7 +14,14 @@ impl FactoryHost {
         Self { _host: host }
     }
 }
+/// This type exists only be visible from within `clap::entry!` macro.
+pub struct FactoryPluginDescriptor<P>(PluginDescriptor<P>);
 
+impl<P: Plugin> FactoryPluginDescriptor<P> {
+    pub fn allocate() -> Self {
+        Self(PluginDescriptor::allocate())
+    }
+}
 
 pub trait FactoryPlugin {
     fn plugin_id(&self) -> &CStr;
@@ -22,13 +29,13 @@ pub trait FactoryPlugin {
     fn boxed_clap_plugin(&self, host: FactoryHost) -> Box<clap_plugin>;
 }
 
-impl<P: Plugin> FactoryPlugin for PluginDescriptor<P> {
+impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
     fn plugin_id(&self) -> &CStr {
-        &self.id
+        &self.0.id
     }
 
     fn clap_plugin_descriptor(&self) -> &clap_plugin_descriptor {
-        &self.raw_descriptor
+        &self.0.raw_descriptor
     }
 
     fn boxed_clap_plugin(&self, host: FactoryHost) -> Box<clap_plugin> {
