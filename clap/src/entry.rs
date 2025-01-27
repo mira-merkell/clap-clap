@@ -1,19 +1,19 @@
-pub use crate::factory::{Factory, FactoryHost, FactoryPluginDescriptor};
-use crate::plugin::Plugin;
 pub use clap_sys::{
-    clap_host, clap_plugin, clap_plugin_descriptor, clap_plugin_entry, clap_plugin_factory,
-    CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION,
+    CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, clap_host, clap_plugin, clap_plugin_descriptor,
+    clap_plugin_entry, clap_plugin_factory,
 };
-
-pub fn plugin_prototype<P: Plugin>() -> Box<FactoryPluginDescriptor<P>> {
-    Box::new(FactoryPluginDescriptor::allocate())
-}
 
 #[macro_export]
 macro_rules! entry {
     ($($plug:ty),*) => {
         mod _clap_entry {
             use $crate::entry::*;
+            use $crate::factory::{Factory, FactoryHost, FactoryPluginDescriptor};
+            use $crate::plugin::Plugin;
+
+            pub fn plugin_prototype<P: Plugin>() -> Box<FactoryPluginDescriptor<P>> {
+                Box::new(FactoryPluginDescriptor::allocate())
+            }
 
             use super::*; // Access the types supplied as macro arguments.
 
