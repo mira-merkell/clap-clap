@@ -1,5 +1,5 @@
 use clap::{
-    ext::{audio_ports::StereoPorts, AudioPorts, Extensions},
+    ext::{AudioPorts, Extensions, audio_ports::StereoPorts},
     plugin::{self, Plugin},
     process::{self, Process, Status::Continue},
 };
@@ -46,7 +46,7 @@ impl Plugin for PingPong {
             let (front_l, front_r) = (delay[front][0], delay[front][1]);
 
             // Write from the in port into the back of the delay line.
-            // Swap stereo channels, feed the signal back with 0.66 damping.
+            // Feed the signal back with 0.66 damping, swap left/right channels.
             delay[back][0] = frame[1] + 0.66 * front_r;
             delay[back][1] = frame[0] + 0.66 * front_l;
 

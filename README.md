@@ -68,7 +68,7 @@ impl Plugin for PingPong {
             let (front_l, front_r) = (delay[front][0], delay[front][1]);
 
             // Write from the in port into the back of the delay line.
-            // Swap stereo channels, feed the signal back with 0.66 damping.
+            // Feed the signal back with 0.66 damping, swap left/right channels.
             delay[back][0] = frame[1] + 0.66 * front_r;
             delay[back][1] = frame[0] + 0.66 * front_l;
 
@@ -94,8 +94,8 @@ clap::entry!(PingPong);
 
 ## Compile the source code
 
-Install *nightly* Rust (for the 2024 edition) and clone this repository together
-with its submodules:
+Install Rust >=1.85.0 (for the 2024 edition, available on *nightly* and *beta*
+channels) and clone this repository together with its submodules:
 
 ```bash
 git clone --recurse-submodules https://github.com/mira-merkell/clap-clap
@@ -110,5 +110,5 @@ cargo build -p ping-pong --release
 and look for the compiled dynamical library in `target/release/`.
 
 The name of the library is OS-specific. For example, on Linux it should be:
-`libping_pong.so`, whereas on Windows it's `ping_pong.dll`.Copy the file to
+`libping_pong.so`, whereas on Windows it's `ping_pong.dll`. Copy the file to
 where your DAW can find it and rename it to: `ping_pong.clap`.
