@@ -182,11 +182,18 @@ impl<P: Plugin> ClapPlugin<P> {
     }
 }
 
-mod ffi;
-
+/// Safety:
+///
+/// 1. The user must assure the pointer to plugin is non-null.
+/// 2. The pointer must point to a valid clap_plugin structure tied to the plugin
+///    type P, and living in the host.
+///
+/// Typically, a valid pointer comes from the host calling the plugin's methods.
 pub(crate) const unsafe fn wrap_clap_plugin_from_host<P: Plugin>(
     plugin: *const clap_sys::clap_plugin,
 ) -> ClapPlugin<P> {
     let plugin = plugin as *mut _;
     unsafe { ClapPlugin::<P>::new(std::ptr::NonNull::new_unchecked(plugin)) }
 }
+
+mod ffi;
