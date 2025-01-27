@@ -8,7 +8,7 @@ Another [CLAP] framework. Very much WIP. 🚧
 
 * Provide a safe-Rust interface to the [CLAP API].
 * Follow CLAP framework and terminology of extension modules.
-* Let plugins interact dynamically CLAP hosts.
+* Let plugins interact dynamically with CLAP hosts.
 * Build extensive testing and debugging platform for plugin authors.
 
 [CLAP]: https://cleveraudio.org
@@ -101,10 +101,10 @@ with its submodules:
 git clone --recurse-submodules https://github.com/mira-merkell/clap-clap
 ```
 
-Build the plugin with:
+Build the example plugin with:
 
 ```bash
-cargo build -r
+cargo build -p ping-pong --release
 ```
 
 and look for the compiled dynamical library in `target/release/`.
