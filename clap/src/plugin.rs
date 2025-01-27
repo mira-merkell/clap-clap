@@ -1,4 +1,5 @@
 use crate::ext::Extensions;
+use crate::host::Host;
 use crate::process::Process;
 use crate::{ext::audio_ports::ClapPluginAudioPorts, factory::FactoryHost, plugin, process};
 use clap_sys::{CLAP_VERSION, clap_plugin, clap_plugin_descriptor};
@@ -31,6 +32,11 @@ pub trait Plugin: Default + Sync + Send {
 
     type Extensions: Extensions<Self>;
 
+    #[allow(unused_variables)]
+    fn init(&mut self, host: &Host) -> Result<(), plugin::Error> {
+        Ok(())
+    }
+    
     #[allow(unused_variables)]
     fn activate(
         &mut self,
@@ -129,7 +135,7 @@ pub(crate) struct ClapPluginExtensions<P> {
 
 pub(crate) struct ClapPluginData<P> {
     pub(crate) descriptor: PluginDescriptor<P>,
-    pub(crate) _host: FactoryHost,
+    pub(crate) host: FactoryHost,
     pub(crate) plugin: P,
     pub(crate) plugin_extensions: ClapPluginExtensions<P>,
 }
@@ -141,7 +147,7 @@ impl<P: Plugin> ClapPluginData<P> {
         Self {
             descriptor: PluginDescriptor::allocate(),
             plugin,
-            _host: host,
+            host: host,
             plugin_extensions: ClapPluginExtensions { audio_ports },
         }
     }
@@ -164,12 +170,12 @@ impl<P: Plugin> ClapPlugin<P> {
         }
     }
 
-    pub(crate) fn clap_plugin(&self) -> &ClapPluginData<P> {
+    pub(crate) fn plugin_data(&self) -> &ClapPluginData<P> {
         let data = unsafe { self.clap_plugin.as_ref() }.plugin_data;
         unsafe { &*(data as *const _) }
     }
 
-    pub(crate) fn clap_plugin_mut(&mut self) -> &mut ClapPluginData<P> {
+    pub(crate) fn plugin_data_mut(&mut self) -> &mut ClapPluginData<P> {
         let data = unsafe { self.clap_plugin.as_ref() }.plugin_data;
         unsafe { &mut *(data as *mut _) }
     }

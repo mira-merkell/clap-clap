@@ -8,7 +8,7 @@ where
     A: AudioPorts<P>,
 {
     let wrapper = unsafe { wrap_clap_plugin_from_host::<P>(plugin) };
-    let plugin = &wrapper.clap_plugin().plugin;
+    let plugin = &wrapper.plugin_data().plugin;
     if is_input {
         A::inputs(plugin) as u32
     } else {
@@ -27,7 +27,7 @@ where
     A: AudioPorts<P>,
 {
     let wrapper = unsafe { wrap_clap_plugin_from_host::<P>(plugin) };
-    let plugin = &wrapper.clap_plugin().plugin;
+    let plugin = &wrapper.plugin_data().plugin;
     let index = index.try_into().expect("index must fit into usize");
     let info = unsafe { &mut *info };
 

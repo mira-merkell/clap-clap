@@ -1,4 +1,5 @@
-use crate::plugin::{ClapPluginData, wrap_clap_plugin_from_host, Plugin};
+use crate::host::Host;
+use crate::plugin::{ClapPluginData, Plugin, wrap_clap_plugin_from_host};
 use crate::process::Process;
 use clap_sys::{CLAP_EXT_AUDIO_PORTS, CLAP_PROCESS_ERROR, clap_plugin};
 use clap_sys::{clap_process, clap_process_status};
@@ -7,7 +8,10 @@ use std::ptr::null;
 
 #[allow(warnings, unused)]
 extern "C" fn init<P: Plugin>(plugin: *const clap_plugin) -> bool {
-    true
+    let mut wrapper = unsafe { wrap_clap_plugin_from_host::<P>(plugin) };
+    let plugin_data = wrapper.plugin_data_mut();
+    let host = Host::new(&plugin_data.host);
+    plugin_data.plugin.init(&host).is_ok()
 }
 
 extern "C" fn destroy<P: Plugin>(plugin: *const clap_plugin) {
@@ -21,7 +25,7 @@ extern "C" fn activate<P: Plugin>(
     max_frames_count: u32,
 ) -> bool {
     unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
-        .clap_plugin_mut()
+        .plugin_data_mut()
         .plugin
         .activate(
             sample_rate,
@@ -33,14 +37,14 @@ extern "C" fn activate<P: Plugin>(
 
 extern "C" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
     unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
-        .clap_plugin_mut()
+        .plugin_data_mut()
         .plugin
         .deactivate()
 }
 
 extern "C" fn start_processing<P: Plugin>(plugin: *const clap_plugin) -> bool {
     unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
-        .clap_plugin_mut()
+        .plugin_data_mut()
         .plugin
         .start_processing()
         .is_ok()
@@ -48,14 +52,14 @@ extern "C" fn start_processing<P: Plugin>(plugin: *const clap_plugin) -> bool {
 
 extern "C" fn stop_processing<P: Plugin>(plugin: *const clap_plugin) {
     unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
-        .clap_plugin_mut()
+        .plugin_data_mut()
         .plugin
         .stop_processing()
 }
 
 extern "C" fn reset<P: Plugin>(plugin: *const clap_plugin) {
     unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
-        .clap_plugin_mut()
+        .plugin_data_mut()
         .plugin
         .reset()
 }
@@ -71,7 +75,7 @@ extern "C" fn process<P: Plugin>(
 
     let mut process = Process(unsafe { *process });
     unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
-        .clap_plugin_mut()
+        .plugin_data_mut()
         .plugin
         .process(&mut process)
         .map(Into::into)
@@ -88,8 +92,8 @@ extern "C" fn get_extension<P: Plugin>(
         return null();
     }
     let id = unsafe { CStr::from_ptr(id) };
-    if id == CLAP_EXT_AUDIO_PORTS && wrap.clap_plugin().plugin_extensions.audio_ports.is_some() {
-        if let Some(audio_ports) = &wrap.clap_plugin().plugin_extensions.audio_ports {
+    if id == CLAP_EXT_AUDIO_PORTS && wrap.plugin_data().plugin_extensions.audio_ports.is_some() {
+        if let Some(audio_ports) = &wrap.plugin_data().plugin_extensions.audio_ports {
             return &raw const audio_ports.raw as *const _;
         }
     }
@@ -99,7 +103,7 @@ extern "C" fn get_extension<P: Plugin>(
 
 extern "C" fn on_main_thread<P: Plugin>(plugin: *const clap_plugin) {
     unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
-        .clap_plugin()
+        .plugin_data()
         .plugin
         .on_main_thread()
 }
