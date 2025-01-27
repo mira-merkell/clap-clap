@@ -1,5 +1,7 @@
 # clap-clap
 
+[![CI](https://github.com/mira-merkell/clap-clap/actions/workflows/CI.yml/badge.svg)](https://github.com/mira-merkell/clap-clap/actions/workflows/CI.yml)
+
 Another [CLAP] framework. Very much WIP. 🚧
 
 ## Goals
