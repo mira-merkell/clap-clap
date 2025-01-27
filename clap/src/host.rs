@@ -1,17 +1,11 @@
-use clap_sys::clap_host;
-use std::ptr::NonNull;
-
-/// This type is public to make it be visible from within clap::entry! macro.
-pub struct ClapHost {
-    _host: NonNull<clap_host>,
-}
-
-impl ClapHost {
-    pub const fn new(host: NonNull<clap_host>) -> Self {
-        Self { _host: host }
-    }
-}
+use crate::factory::FactoryHost;
 
 pub struct Host<'a> {
-    host: &'a ClapHost,
+    _clap_host: &'a FactoryHost,
+}
+
+impl<'a> Host<'a> {
+    pub(crate) fn new(clap_host: &'a FactoryHost) -> Self {
+        Self { _clap_host: clap_host }
+    }
 }

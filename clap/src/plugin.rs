@@ -1,6 +1,6 @@
 use crate::ext::Extensions;
 use crate::process::Process;
-use crate::{ext::audio_ports::ClapPluginAudioPorts, host::ClapHost, plugin, process};
+use crate::{ext::audio_ports::ClapPluginAudioPorts, factory::FactoryHost, plugin, process};
 use clap_sys::{CLAP_VERSION, clap_plugin, clap_plugin_descriptor};
 use std::fmt::Display;
 use std::{ffi::CString, ffi::c_char, marker::PhantomData, ptr::NonNull, ptr::null, str::FromStr};
@@ -129,13 +129,13 @@ pub(crate) struct ClapPluginExtensions<P> {
 
 pub(crate) struct ClapPluginData<P> {
     pub(crate) descriptor: PluginDescriptor<P>,
-    pub(crate) _host: ClapHost,
+    pub(crate) _host: FactoryHost,
     pub(crate) plugin: P,
     pub(crate) plugin_extensions: ClapPluginExtensions<P>,
 }
 
 impl<P: Plugin> ClapPluginData<P> {
-    pub(crate) fn generate(plugin: P, host: ClapHost) -> Self {
+    pub(crate) fn generate(plugin: P, host: FactoryHost) -> Self {
         let audio_ports = P::Extensions::audio_ports().map(|ap| ClapPluginAudioPorts::new(ap));
 
         Self {

@@ -1,5 +1,8 @@
 use crate::plugin::Plugin;
-pub use crate::{factory::Factory, host::ClapHost, plugin::PluginDescriptor};
+pub use crate::{
+    factory::{Factory, FactoryHost},
+    plugin::PluginDescriptor,
+};
 pub use clap_sys::{
     CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, clap_host, clap_plugin, clap_plugin_descriptor,
     clap_plugin_entry, clap_plugin_factory,
@@ -24,11 +27,11 @@ macro_rules! entry {
             }
 
             /// Safety:
-            /// 
+            ///
             /// CLAP requires this method to be thread safe.
             /// The function factory_init_once() is thread-safe and
             /// plugins_count() takes a shared reference to Factory.
-            /// Together, they are thread-safe. 
+            /// Together, they are thread-safe.
             extern "C" fn get_plugin_count(_: *const clap_plugin_factory) -> u32 {
                 factory_init_once().plugins_count()
             }
@@ -38,7 +41,7 @@ macro_rules! entry {
             /// CLAP requires this method to be thread safe.
             /// The function factory_init_once() is thread-safe and
             /// descriptor() takes a shared reference to Factory.
-            /// Together, they are thread-safe. 
+            /// Together, they are thread-safe.
             extern "C" fn get_plugin_descriptor(
                 _: *const clap_plugin_factory,
                 index: u32,
@@ -51,7 +54,7 @@ macro_rules! entry {
             /// CLAP requires this method to be thread safe.
             /// The function factory_init_once() is thread-safe and
             /// boxed_clap_plugin() takes a shared reference to Factory.
-            /// Together, they are thread-safe. 
+            /// Together, they are thread-safe.
             extern "C" fn create_plugin(
                 _: *const clap_plugin_factory,
                 host: *const clap_host,
@@ -62,7 +65,7 @@ macro_rules! entry {
                 }
 
                 // Safety: We just checked that host is non-null.
-                let host = ClapHost::new(unsafe{ std::ptr::NonNull::new_unchecked(host as *mut _)});
+                let host = FactoryHost::new(unsafe{ std::ptr::NonNull::new_unchecked(host as *mut _)});
                 // Safety: We checked if plug_id is non-null.
                 // The host guarantees that this is a valid C string now.
                 let plugin_id = unsafe { std::ffi::CStr::from_ptr(plugin_id) };

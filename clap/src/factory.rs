@@ -1,13 +1,25 @@
-use crate::host::ClapHost;
 use crate::plugin::{ClapPluginData, Plugin, PluginDescriptor};
-use clap_sys::{clap_plugin, clap_plugin_descriptor};
+use clap_sys::{clap_host, clap_plugin, clap_plugin_descriptor};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
+use std::ptr::NonNull;
+
+/// This type is public to make it be visible from within clap::entry! macro.
+pub struct FactoryHost {
+    _host: NonNull<clap_host>,
+}
+
+impl FactoryHost {
+    pub const fn new(host: NonNull<clap_host>) -> Self {
+        Self { _host: host }
+    }
+}
+
 
 pub trait FactoryPlugin {
     fn plugin_id(&self) -> &CStr;
     fn clap_plugin_descriptor(&self) -> &clap_plugin_descriptor;
-    fn boxed_clap_plugin(&self, host: ClapHost) -> Box<clap_plugin>;
+    fn boxed_clap_plugin(&self, host: FactoryHost) -> Box<clap_plugin>;
 }
 
 impl<P: Plugin> FactoryPlugin for PluginDescriptor<P> {
@@ -19,7 +31,7 @@ impl<P: Plugin> FactoryPlugin for PluginDescriptor<P> {
         &self.raw_descriptor
     }
 
-    fn boxed_clap_plugin(&self, host: ClapHost) -> Box<clap_plugin> {
+    fn boxed_clap_plugin(&self, host: FactoryHost) -> Box<clap_plugin> {
         ClapPluginData::generate(P::default(), host).boxed_clap_plugin()
     }
 }
@@ -56,7 +68,7 @@ impl Factory {
     pub fn boxed_clap_plugin(
         &self,
         plugin_id: &CStr,
-        host: ClapHost,
+        host: FactoryHost,
     ) -> Option<Box<clap_plugin>> {
         self.id_map
             .get(plugin_id)
