@@ -13,12 +13,14 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        toolchain:
+          - nightly
     steps:
-    - uses: actions/checkout@v4
-      with:
+      - uses: actions/checkout@v4
+        with:
           submodules: recursive
-    - name: Build
-      run: cargo build --verbose --workspace
-    - name: Run tests
-      run: cargo test --verbose --workspace
+      - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+      - run: cargo build --verbose --workspace
+      - run: cargo test --verbose --workspace
