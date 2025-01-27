@@ -1,6 +1,5 @@
-
 use crate::host::ClapHost;
-use crate::plugin::{ClapPlugin, Plugin, PluginDescriptor};
+use crate::plugin::{ClapPluginData, Plugin, PluginDescriptor};
 use clap_sys::{clap_plugin, clap_plugin_descriptor};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
@@ -21,7 +20,7 @@ impl<P: Plugin> FactoryPlugin for PluginDescriptor<P> {
     }
 
     fn boxed_clap_plugin(&self, host: ClapHost) -> Box<clap_plugin> {
-        ClapPlugin::generate(P::default(), host).boxed_clap_plugin()
+        ClapPluginData::generate(P::default(), host).boxed_clap_plugin()
     }
 }
 

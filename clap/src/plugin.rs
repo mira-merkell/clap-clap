@@ -1,12 +1,9 @@
-use crate::process::Process;
-use crate::{
-    ext::audio_ports::ClapPluginAudioPorts, host::ClapHost, plugin,
-    process,
-};
-use clap_sys::{clap_plugin, clap_plugin_descriptor, CLAP_VERSION};
-use std::fmt::Display;
-use std::{ffi::c_char, ffi::CString, marker::PhantomData, ptr::null, ptr::NonNull, str::FromStr};
 use crate::ext::Extensions;
+use crate::process::Process;
+use crate::{ext::audio_ports::ClapPluginAudioPorts, host::ClapHost, plugin, process};
+use clap_sys::{CLAP_VERSION, clap_plugin, clap_plugin_descriptor};
+use std::fmt::Display;
+use std::{ffi::CString, ffi::c_char, marker::PhantomData, ptr::NonNull, ptr::null, str::FromStr};
 
 #[derive(Debug, Copy, Clone)]
 pub enum Error {}
@@ -130,14 +127,14 @@ pub(crate) struct ClapPluginExtensions<P> {
     pub(crate) audio_ports: Option<ClapPluginAudioPorts<P>>,
 }
 
-pub(crate) struct ClapPlugin<P> {
+pub(crate) struct ClapPluginData<P> {
     pub(crate) descriptor: PluginDescriptor<P>,
     pub(crate) _host: ClapHost,
     pub(crate) plugin: P,
     pub(crate) plugin_extensions: ClapPluginExtensions<P>,
 }
 
-impl<P: Plugin> ClapPlugin<P> {
+impl<P: Plugin> ClapPluginData<P> {
     pub(crate) fn generate(plugin: P, host: ClapHost) -> Self {
         let audio_ports = P::Extensions::audio_ports().map(|ap| ClapPluginAudioPorts::new(ap));
 
@@ -154,12 +151,12 @@ impl<P: Plugin> ClapPlugin<P> {
     }
 }
 
-pub(crate) struct ClapPluginWrapper<P> {
+pub(crate) struct ClapPlugin<P> {
     clap_plugin: NonNull<clap_plugin>,
     _marker: PhantomData<P>,
 }
 
-impl<P: Plugin> ClapPluginWrapper<P> {
+impl<P: Plugin> ClapPlugin<P> {
     pub(crate) const unsafe fn new(clap_plugin: NonNull<clap_plugin>) -> Self {
         Self {
             clap_plugin,
@@ -167,19 +164,19 @@ impl<P: Plugin> ClapPluginWrapper<P> {
         }
     }
 
-    pub(crate) fn clap_plugin(&self) -> &ClapPlugin<P> {
+    pub(crate) fn clap_plugin(&self) -> &ClapPluginData<P> {
         let data = unsafe { self.clap_plugin.as_ref() }.plugin_data;
         unsafe { &*(data as *const _) }
     }
 
-    pub(crate) fn clap_plugin_mut(&mut self) -> &mut ClapPlugin<P> {
+    pub(crate) fn clap_plugin_mut(&mut self) -> &mut ClapPluginData<P> {
         let data = unsafe { self.clap_plugin.as_ref() }.plugin_data;
         unsafe { &mut *(data as *mut _) }
     }
 
-    unsafe fn take(self) -> ClapPlugin<P> {
+    unsafe fn take(self) -> ClapPluginData<P> {
         let clap_plugin = unsafe { Box::from_raw(self.clap_plugin.as_ptr()) };
-        let data: *mut ClapPlugin<P> = clap_plugin.plugin_data as *mut _;
+        let data: *mut ClapPluginData<P> = clap_plugin.plugin_data as *mut _;
 
         *unsafe { Box::from_raw(data) }
     }
@@ -189,7 +186,7 @@ mod ffi;
 
 pub(crate) const unsafe fn wrap_clap_plugin_from_host<P: Plugin>(
     plugin: *const clap_sys::clap_plugin,
-) -> ClapPluginWrapper<P> {
+) -> ClapPlugin<P> {
     let plugin = plugin as *mut _;
-    unsafe { ClapPluginWrapper::<P>::new(std::ptr::NonNull::new_unchecked(plugin)) }
+    unsafe { ClapPlugin::<P>::new(std::ptr::NonNull::new_unchecked(plugin)) }
 }

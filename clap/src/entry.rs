@@ -1,10 +1,9 @@
-
+use crate::plugin::Plugin;
 pub use crate::{factory::Factory, host::ClapHost, plugin::PluginDescriptor};
 pub use clap_sys::{
     CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, clap_host, clap_plugin, clap_plugin_descriptor,
     clap_plugin_entry, clap_plugin_factory,
 };
-use crate::plugin::Plugin;
 
 pub fn plugin_prototype<P: Plugin>() -> Box<PluginDescriptor<P>> {
     Box::new(PluginDescriptor::allocate())
