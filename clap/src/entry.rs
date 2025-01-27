@@ -23,10 +23,22 @@ macro_rules! entry {
                 FACTORY.get_or_init(|| Factory::new(vec![$(plugin_prototype::<$plug>(),)*]))
             }
 
+            /// Safety:
+            /// 
+            /// CLAP requires this method to be thread safe.
+            /// The function factory_init_once() is thread-safe and
+            /// plugins_count() takes a shared reference to Factory.
+            /// Together, they are thread-safe. 
             extern "C" fn get_plugin_count(_: *const clap_plugin_factory) -> u32 {
                 factory_init_once().plugins_count()
             }
 
+            /// Safety:
+            ///
+            /// CLAP requires this method to be thread safe.
+            /// The function factory_init_once() is thread-safe and
+            /// descriptor() takes a shared reference to Factory.
+            /// Together, they are thread-safe. 
             extern "C" fn get_plugin_descriptor(
                 _: *const clap_plugin_factory,
                 index: u32,
@@ -34,6 +46,12 @@ macro_rules! entry {
                 factory_init_once().descriptor(index)
             }
 
+            /// Safety:
+            ///
+            /// CLAP requires this method to be thread safe.
+            /// The function factory_init_once() is thread-safe and
+            /// boxed_clap_plugin() takes a shared reference to Factory.
+            /// Together, they are thread-safe. 
             extern "C" fn create_plugin(
                 _: *const clap_plugin_factory,
                 host: *const clap_host,
@@ -65,6 +83,9 @@ macro_rules! entry {
 
             extern "C" fn deinit() {}
 
+            /// Safety:
+            ///
+            /// CLAP requires this method to be thread safe.
             extern "C" fn get_factory(factory_id: *const std::ffi::c_char) -> *const std::ffi::c_void {
                 if factory_id.is_null() {
                     return std::ptr::null();
