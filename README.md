@@ -20,14 +20,12 @@ Another [CLAP] framework. Very much WIP. 🚧
 Implement a [ping-pong delay]:
 
 ```rust
-use clap::plugin::AudioThread;
-use clap::process::Status;
 use clap::{
-    Error,
-    ext::{AudioPorts, Extensions, audio_ports::StereoPorts},
+    ext::{audio_ports::StereoPorts, AudioPorts, Extensions},
     host::Host,
-    plugin::Plugin,
-    process::{Process, Status::Continue},
+    plugin::{AudioThread, Plugin},
+    process::{Process, Status, Status::Continue},
+    Error,
 };
 use std::sync::Arc;
 
