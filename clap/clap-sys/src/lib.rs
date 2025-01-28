@@ -202,7 +202,11 @@ export_cstr_from_bytes!(
     CLAP_PLUGIN_FEATURE_AMBISONIC
 );
 
-// clap_host_log
 
+// clap_log
+
+pub use ffi::CLAP_LOG_INFO;
 pub use ffi::clap_host_log;
+pub use ffi::clap_log_severity;
+
 export_cstr_from_bytes!(CLAP_EXT_LOG);

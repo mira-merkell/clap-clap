@@ -20,3 +20,10 @@ pub mod version {
         revision: clap_sys::CLAP_VERSION_REVISION,
     };
 }
+
+#[derive(Debug, Clone)]
+pub enum Error {
+    Plugin(plugin::Error),
+    Host(host::Error),
+    Process(process::Error),
+}

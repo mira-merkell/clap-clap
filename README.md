@@ -22,9 +22,12 @@ Implement a [ping-pong delay]:
 ```rust
 use clap::{
     ext::{audio_ports::StereoPorts, AudioPorts, Extensions},
-    plugin::{self, Plugin},
+    host::Host,
+    plugin::Plugin,
     process::{self, Process, Status::Continue},
+    Error,
 };
+use std::sync::Arc;
 
 #[derive(Default)]
 struct PingPong {
@@ -49,15 +52,21 @@ impl Plugin for PingPong {
     const NAME: &'static str = "Ping-Pong";
     type Extensions = Self;
 
+    /// Let's say hi to the host!
+    fn init(&mut self, host: Arc<Host>) -> Result<(), Error> {
+        host.get_extension().log()?.info("hello, sonic world!")?;
+        Ok(())
+    }
+
     /// Allocate resources: a stereo delay line, 125ms.
-    fn activate(&mut self, sample_rate: f64, _: usize, _: usize) -> Result<(), plugin::Error> {
+    fn activate(&mut self, sample_rate: f64, _: usize, _: usize) -> Result<(), Error> {
         let one_second = sample_rate as usize;
         self.delay = Some(vec![[0.0; 2]; one_second / 8]);
         Ok(())
     }
 
     /// Process audio: Feedback delay with ping-pong effect.
-    fn process(&mut self, pc: &mut Process) -> Result<process::Status, process::Error> {
+    fn process(&mut self, pc: &mut Process) -> Result<process::Status, Error> {
         let delay = self.delay.as_mut().ok_or(process::Error::Plugin)?;
         let n = delay.len();
 
@@ -90,7 +99,7 @@ impl Plugin for PingPong {
 clap::entry!(PingPong);
 ```
 
-[ping-pong delay]: ./examples/ping-pong/
+[ping-pong delay]: https://en.wikipedia.org/wiki/Delay_(audio_effect)#Ping-pong_delay
 
 ## Compile the source code
 

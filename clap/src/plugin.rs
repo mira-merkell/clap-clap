@@ -1,13 +1,13 @@
 use crate::ext::Extensions;
 use crate::host::Host;
 use crate::process::Process;
-use crate::{ext::audio_ports::ClapPluginAudioPorts, factory::FactoryHost, plugin, process};
-use clap_sys::{CLAP_VERSION, clap_host, clap_plugin, clap_plugin_descriptor};
+use crate::{ext::audio_ports::ClapPluginAudioPorts, factory::FactoryHost, process};
+use clap_sys::{clap_plugin, clap_plugin_descriptor, CLAP_VERSION};
 use std::fmt::Display;
 use std::sync::Arc;
-use std::{ffi::CString, ffi::c_char, marker::PhantomData, ptr::NonNull, ptr::null, str::FromStr};
+use std::{ffi::c_char, ffi::CString, marker::PhantomData, ptr::null, ptr::NonNull, str::FromStr};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum Error {}
 
 impl Display for Error {
@@ -17,6 +17,12 @@ impl Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+impl From<Error> for crate::Error {
+    fn from(value: Error) -> Self {
+        Self::Plugin(value)
+    }
+}
 
 pub trait Plugin: Default + Sync + Send {
     const ID: &'static str;
@@ -34,7 +40,7 @@ pub trait Plugin: Default + Sync + Send {
     type Extensions: Extensions<Self>;
 
     #[allow(unused_variables)]
-    fn init(&mut self, host: Arc<Host>) -> Result<(), Error> {
+    fn init(&mut self, host: Arc<Host>) -> Result<(), crate::Error> {
         Ok(())
     }
 
@@ -44,19 +50,19 @@ pub trait Plugin: Default + Sync + Send {
         sample_rate: f64,
         min_frames: usize,
         max_frames: usize,
-    ) -> Result<(), Error> {
+    ) -> Result<(), crate::Error> {
         Ok(())
     }
 
     fn deactivate(&mut self) {}
 
-    fn start_processing(&mut self) -> Result<(), process::Error> {
+    fn start_processing(&mut self) -> Result<(), crate::Error> {
         Ok(())
     }
 
     fn stop_processing(&mut self) {}
 
-    fn process(&mut self, process: &mut Process) -> Result<process::Status, process::Error>;
+    fn process(&mut self, process: &mut Process) -> Result<process::Status, crate::Error>;
 
     fn reset(&mut self) {}
 

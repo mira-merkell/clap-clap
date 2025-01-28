@@ -1,7 +1,20 @@
+use crate::host::log::Log;
 use crate::version::ClapVersion;
 use clap_sys::{CLAP_EXT_LOG, clap_host, clap_host_log};
 use std::ffi::CStr;
 use std::ptr::NonNull;
+
+#[derive(Debug, Clone)]
+pub enum Error {
+    GetExtensions,
+    Log(log::Error),
+}
+
+impl From<Error> for crate::Error {
+    fn from(value: Error) -> Self {
+        Self::Host(value)
+    }
+}
 
 pub struct Host {
     clap_host: NonNull<clap_host>,
@@ -60,11 +73,11 @@ impl Host {
         }
     }
 
-    pub fn get_extension(&self) -> Option<HostExtensions> {
+    pub fn get_extension(&self) -> HostExtensions {
         let clap_host = unsafe { &*self.clap_host.as_ptr() };
         clap_host
-            .get_extension
-            .map(|_| HostExtensions::new(clap_host))
+            .try_into()
+            .expect("host.get_extension() should be non-null")
     }
 }
 
@@ -73,37 +86,26 @@ pub struct HostExtensions<'a> {
 }
 
 impl<'a> HostExtensions<'a> {
-    fn new(clap_host: &'a clap_host) -> Self {
-        Self { clap_host }
-    }
-
-    pub fn log(self) -> Option<Log<'a>> {
+    pub fn log(self) -> Result<Log<'a>, Error> {
         let query = self.clap_host.get_extension.unwrap();
         let clap_host_log = unsafe {
             query(&raw const *self.clap_host, CLAP_EXT_LOG.as_ptr()) as *const clap_host_log
         };
-        (!clap_host_log.is_null()).then_some(Log::new(unsafe { &*clap_host_log }))
+        (!clap_host_log.is_null())
+            .then_some(Log::new(self.clap_host, unsafe { &*clap_host_log }))
+            .ok_or(Error::GetExtensions)
     }
 }
 
-pub struct Log<'a> {
-    clap_host_log: &'a clap_host_log,
-}
+impl<'a> TryFrom<&'a clap_host> for HostExtensions<'a> {
+    type Error = Error;
 
-impl<'a> Log<'a> {
-    fn new(clap_host_log: &'a clap_host_log) -> Self {
-        Self { clap_host_log }
-    }
-
-    fn log(&self, severity: Severity, msg: &str) -> Result<(), Error> {
-        todo!()
+    fn try_from(clap_host: &'a clap_host) -> Result<Self, Self::Error> {
+        clap_host
+            .get_extension
+            .map(|_| Self { clap_host })
+            .ok_or(Error::GetExtensions)
     }
 }
 
-pub enum Severity {
-    Info,
-}
-
-pub enum Error {
-    Log,
-}
+pub mod log;

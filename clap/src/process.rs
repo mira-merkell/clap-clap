@@ -226,3 +226,9 @@ pub enum Error {
     Link,
     Plugin,
 }
+
+impl From<Error> for crate::Error {
+    fn from(value: Error) -> Self {
+        Self::Process(value)
+    }
+}
