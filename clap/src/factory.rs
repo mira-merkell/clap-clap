@@ -1,8 +1,10 @@
-use crate::plugin::{ClapPluginData, Plugin, PluginDescriptor};
+use crate::host::Host;
+use crate::plugin::{Plugin, PluginDescriptor, Runtime};
 use clap_sys::{clap_host, clap_plugin, clap_plugin_descriptor};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::ptr::NonNull;
+use std::sync::Arc;
 
 /// This type exists only be visible from within `clap::entry!` macro.
 pub struct FactoryHost {
@@ -43,7 +45,8 @@ impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
     }
 
     fn boxed_clap_plugin(&self, host: FactoryHost) -> Box<clap_plugin> {
-        ClapPluginData::generate(P::default(), host).boxed_clap_plugin()
+        let host = Arc::new(Host::new(host.into_inner()));
+        Runtime::<P>::generate(host).boxed_clap_plugin()
     }
 }
 

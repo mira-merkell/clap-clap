@@ -2,14 +2,13 @@
 
 [![CI](https://github.com/mira-merkell/clap-clap/actions/workflows/CI.yml/badge.svg)](https://github.com/mira-merkell/clap-clap/actions/workflows/CI.yml)
 
-Another [CLAP] framework. Very much WIP. 🚧
+A [CLAP] plugin runtime. Very much WIP. 🚧
 
 ## Goals
 
-* Provide a safe-Rust interface to the [CLAP API].
-* Follow CLAP framework and terminology of extension modules.
-* Let plugins interact dynamically with CLAP hosts.
-* Build extensive testing and debugging platform for plugin authors.
+* Provide a safe-Rust, dynamical interface to the [CLAP API].
+* Follow CLAP terminology and the framework of extension modules.
+* Build a testing and debugging platform for plugin authors.
 
 [CLAP]: https://cleveraudio.org
 

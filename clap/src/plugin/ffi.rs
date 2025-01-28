@@ -1,4 +1,4 @@
-use crate::plugin::{AudioThread, ClapPluginData, Plugin, wrap_clap_plugin_from_host};
+use crate::plugin::{AudioThread, Runtime, Plugin, wrap_clap_plugin_from_host};
 use crate::process::Process;
 use clap_sys::{CLAP_EXT_AUDIO_PORTS, CLAP_PROCESS_ERROR, clap_plugin};
 use clap_sys::{clap_process, clap_process_status};
@@ -112,7 +112,7 @@ extern "C" fn get_extension<P: Plugin>(
 
 extern "C" fn on_main_thread<P: Plugin>(_: *const clap_plugin) {}
 
-pub(crate) fn box_clap_plugin<P: Plugin>(data: ClapPluginData<P>) -> Box<clap_plugin> {
+pub(crate) fn box_clap_plugin<P: Plugin>(data: Runtime<P>) -> Box<clap_plugin> {
     let data = Box::new(data);
     let desc = &raw const data.descriptor.raw_descriptor;
     let data = Box::into_raw(data);
