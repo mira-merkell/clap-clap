@@ -32,47 +32,6 @@ impl Host {
         unsafe { &*self.clap_host.as_ptr() }.clap_version
     }
 
-    pub fn name(&self) -> Result<&str, std::str::Utf8Error> {
-        let clap_host = unsafe { &*self.clap_host.as_ptr() };
-        unsafe { CStr::from_ptr(clap_host.name) }.to_str()
-    }
-
-    pub fn vendor(&self) -> Result<&str, std::str::Utf8Error> {
-        let clap_host = unsafe { &*self.clap_host.as_ptr() };
-        unsafe { CStr::from_ptr(clap_host.vendor) }.to_str()
-    }
-
-    pub fn url(&self) -> Result<&str, std::str::Utf8Error> {
-        let clap_host = unsafe { &*self.clap_host.as_ptr() };
-        unsafe { CStr::from_ptr(clap_host.url) }.to_str()
-    }
-
-    pub fn version(&self) -> Result<&str, std::str::Utf8Error> {
-        let clap_host = unsafe { &*self.clap_host.as_ptr() };
-        unsafe { CStr::from_ptr(clap_host.version) }.to_str()
-    }
-
-    pub fn request_restart(&self) {
-        let clap_host = unsafe { &*self.clap_host.as_ptr() };
-        if let Some(callback) = clap_host.request_restart {
-            unsafe { callback(self.clap_host.as_ptr()) }
-        }
-    }
-
-    pub fn request_process(&self) {
-        let clap_host = unsafe { &*self.clap_host.as_ptr() };
-        if let Some(callback) = clap_host.request_process {
-            unsafe { callback(self.clap_host.as_ptr()) }
-        }
-    }
-
-    pub fn request_callback(&self) {
-        let clap_host = unsafe { &*self.clap_host.as_ptr() };
-        if let Some(callback) = clap_host.request_callback {
-            unsafe { callback(self.clap_host.as_ptr()) }
-        }
-    }
-
     pub fn get_extension(&self) -> HostExtensions {
         let clap_host = unsafe { &*self.clap_host.as_ptr() };
         clap_host
@@ -80,6 +39,37 @@ impl Host {
             .expect("host.get_extension() should be non-null")
     }
 }
+
+macro_rules! impl_host_get_str {
+    ($($method:tt),*) => {
+        impl Host {
+            $(
+                pub fn $method(&self) -> Result<&str, std::str::Utf8Error> {
+                   let clap_host = unsafe { &*self.clap_host.as_ptr() };
+                   unsafe { CStr::from_ptr(clap_host.$method) }.to_str()
+                }
+            )*
+        }
+    };
+}
+
+macro_rules! impl_host_request {
+    ($($method:tt),*) => {
+        impl Host {
+            $(
+                pub fn $method(&self) {
+                    let clap_host = unsafe { &*self.clap_host.as_ptr() };
+                    if let Some(callback) = clap_host.$method {
+                        unsafe { callback(self.clap_host.as_ptr()) }
+                    }
+                }
+            )*
+        }
+    };
+}
+
+impl_host_get_str!(name, vendor, url, version);
+impl_host_request!(request_process, request_restart, request_callback);
 
 pub struct HostExtensions<'a> {
     clap_host: &'a clap_host,
