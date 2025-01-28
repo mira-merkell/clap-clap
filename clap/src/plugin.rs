@@ -2,10 +2,10 @@ use crate::ext::Extensions;
 use crate::host::Host;
 use crate::process::Process;
 use crate::{ext::audio_ports::ClapPluginAudioPorts, factory::FactoryHost, process};
-use clap_sys::{clap_plugin, clap_plugin_descriptor, CLAP_VERSION};
+use clap_sys::{CLAP_VERSION, clap_plugin, clap_plugin_descriptor};
 use std::fmt::Display;
 use std::sync::Arc;
-use std::{ffi::c_char, ffi::CString, marker::PhantomData, ptr::null, ptr::NonNull, str::FromStr};
+use std::{ffi::CString, ffi::c_char, marker::PhantomData, ptr::NonNull, ptr::null, str::FromStr};
 
 #[derive(Debug, Clone)]
 pub enum Error {}
@@ -24,7 +24,7 @@ impl From<Error> for crate::Error {
     }
 }
 
-pub trait Plugin: Default + Sync + Send {
+pub trait Plugin: Default {
     const ID: &'static str;
     const NAME: &'static str = "";
     const VENDOR: &'static str = "";
@@ -37,6 +37,7 @@ pub trait Plugin: Default + Sync + Send {
     /// For example: `"fx stereo distortion"`.
     const FEATURES: &'static str = "";
 
+    type AudioThread: AudioThread<Self>;
     type Extensions: Extensions<Self>;
 
     #[allow(unused_variables)]
@@ -44,18 +45,17 @@ pub trait Plugin: Default + Sync + Send {
         Ok(())
     }
 
-    #[allow(unused_variables)]
     fn activate(
         &mut self,
         sample_rate: f64,
         min_frames: usize,
         max_frames: usize,
-    ) -> Result<(), crate::Error> {
-        Ok(())
-    }
+    ) -> Result<Self::AudioThread, crate::Error>;
 
-    fn deactivate(&mut self) {}
+    fn on_main_thread(&mut self) {}
+}
 
+pub trait AudioThread<P: Plugin>: Send + Sync + Sized {
     fn start_processing(&mut self) -> Result<(), crate::Error> {
         Ok(())
     }
@@ -66,7 +66,8 @@ pub trait Plugin: Default + Sync + Send {
 
     fn reset(&mut self) {}
 
-    fn on_main_thread(&self) {}
+    #[allow(unused_variables)]
+    fn deactivate(self, plugin: &mut P) {}
 }
 
 #[allow(dead_code)]
@@ -140,9 +141,10 @@ pub(crate) struct ClapPluginExtensions<P> {
     pub(crate) audio_ports: Option<ClapPluginAudioPorts<P>>,
 }
 
-pub(crate) struct ClapPluginData<P> {
+pub(crate) struct ClapPluginData<P: Plugin> {
     pub(crate) descriptor: PluginDescriptor<P>,
     pub(crate) plugin: P,
+    pub(crate) audio_thread: Option<P::AudioThread>,
     pub(crate) plugin_extensions: ClapPluginExtensions<P>,
     pub(crate) host: Arc<Host>,
 }
@@ -154,6 +156,7 @@ impl<P: Plugin> ClapPluginData<P> {
         Self {
             descriptor: PluginDescriptor::allocate(),
             plugin,
+            audio_thread: None,
             host: Arc::new(Host::new(host.into_inner())),
             plugin_extensions: ClapPluginExtensions { audio_ports },
         }

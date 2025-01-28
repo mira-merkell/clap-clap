@@ -1,4 +1,4 @@
-use crate::plugin::{ClapPluginData, Plugin, wrap_clap_plugin_from_host};
+use crate::plugin::{AudioThread, ClapPluginData, Plugin, wrap_clap_plugin_from_host};
 use crate::process::Process;
 use clap_sys::{CLAP_EXT_AUDIO_PORTS, CLAP_PROCESS_ERROR, clap_plugin};
 use clap_sys::{clap_process, clap_process_status};
@@ -23,7 +23,9 @@ extern "C" fn activate<P: Plugin>(
     min_frames_count: u32,
     max_frames_count: u32,
 ) -> bool {
-    unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
+    let mut wrapper = unsafe { wrap_clap_plugin_from_host::<P>(plugin) };
+    let plugin_data = wrapper.plugin_data_mut();
+    plugin_data.audio_thread = unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
         .plugin_data_mut()
         .plugin
         .activate(
@@ -31,36 +33,41 @@ extern "C" fn activate<P: Plugin>(
             min_frames_count as usize,
             max_frames_count as usize,
         )
-        .is_ok()
+        .ok();
+    plugin_data.audio_thread.is_some()
 }
 
 extern "C" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
-    unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
-        .plugin_data_mut()
-        .plugin
-        .deactivate()
+    let mut wrapper = unsafe { wrap_clap_plugin_from_host::<P>(plugin) };
+    let plugin_data = wrapper.plugin_data_mut();
+    if let Some(audio_thread) = plugin_data.audio_thread.take() {
+        audio_thread.deactivate(&mut plugin_data.plugin)
+    }
 }
 
 extern "C" fn start_processing<P: Plugin>(plugin: *const clap_plugin) -> bool {
     unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
         .plugin_data_mut()
-        .plugin
-        .start_processing()
-        .is_ok()
+        .audio_thread
+        .as_mut()
+        .and_then(|audio| audio.start_processing().ok())
+        .is_some()
 }
 
 extern "C" fn stop_processing<P: Plugin>(plugin: *const clap_plugin) {
-    unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
+    let _ = unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
         .plugin_data_mut()
-        .plugin
-        .stop_processing()
+        .audio_thread
+        .as_mut()
+        .and_then(|audio| Some(audio.stop_processing()));
 }
 
 extern "C" fn reset<P: Plugin>(plugin: *const clap_plugin) {
-    unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
+    let _ = unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
         .plugin_data_mut()
-        .plugin
-        .reset()
+        .audio_thread
+        .as_mut()
+        .and_then(|audio| Some(audio.reset()));
 }
 
 #[allow(warnings, unused)]
@@ -72,11 +79,14 @@ extern "C" fn process<P: Plugin>(
         return CLAP_PROCESS_ERROR;
     }
 
-    let mut process = Process(unsafe { *process });
-    unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
-        .plugin_data_mut()
-        .plugin
-        .process(&mut process)
+    let process = &mut Process(unsafe { *process });
+    let mut wrapper = unsafe { wrap_clap_plugin_from_host::<P>(plugin) };
+    let Some(audio_thread) = wrapper.plugin_data_mut().audio_thread.as_mut() else {
+        return CLAP_PROCESS_ERROR;
+    };
+
+    audio_thread
+        .process(process)
         .map(Into::into)
         .unwrap_or(CLAP_PROCESS_ERROR)
 }
@@ -100,12 +110,7 @@ extern "C" fn get_extension<P: Plugin>(
     null()
 }
 
-extern "C" fn on_main_thread<P: Plugin>(plugin: *const clap_plugin) {
-    unsafe { wrap_clap_plugin_from_host::<P>(plugin) }
-        .plugin_data()
-        .plugin
-        .on_main_thread()
-}
+extern "C" fn on_main_thread<P: Plugin>(_: *const clap_plugin) {}
 
 pub(crate) fn box_clap_plugin<P: Plugin>(data: ClapPluginData<P>) -> Box<clap_plugin> {
     let data = Box::new(data);

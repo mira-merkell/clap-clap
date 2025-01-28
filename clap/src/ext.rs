@@ -16,7 +16,7 @@ where
 
 pub mod audio_ports;
 
-pub trait Extensions<P: Plugin> {
+pub trait Extensions<P: Plugin>: Send + Sync {
     fn audio_ports() -> Option<impl AudioPorts<P>> {
         None::<()>
     }
