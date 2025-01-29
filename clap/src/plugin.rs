@@ -4,8 +4,7 @@ use crate::process::Process;
 use crate::{ext::audio_ports::ClapPluginAudioPorts, process};
 use clap_sys::clap_plugin;
 use std::fmt::Display;
-use std::sync::Arc;
-use std::{marker::PhantomData, ptr::NonNull};
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone)]
 pub enum Error {}
@@ -74,75 +73,47 @@ pub(crate) struct ClapPluginExtensions<P> {
     pub(crate) audio_ports: Option<ClapPluginAudioPorts<P>>,
 }
 
+impl<P: Plugin> ClapPluginExtensions<P> {
+    fn new() -> Self {
+        Self {
+            audio_ports: P::Extensions::audio_ports().map(ClapPluginAudioPorts::new),
+        }
+    }
+}
+
 pub(crate) struct Runtime<P: Plugin> {
     pub(crate) audio_thread: Option<P::AudioThread>,
     pub(crate) descriptor: PluginDescriptor<P>,
     pub(crate) host: Arc<Host>,
     pub(crate) plugin: P,
-    pub(crate) plugin_extensions: ClapPluginExtensions<P>,
+    pub(crate) plugin_extensions: Mutex<ClapPluginExtensions<P>>,
 }
 
 impl<P: Plugin> Runtime<P> {
-    pub(crate) fn generate(host: Arc<Host>) -> Self {
+    pub(crate) fn initialize(host: Arc<Host>) -> Self {
         Self {
             descriptor: PluginDescriptor::allocate(),
             plugin: P::default(),
             audio_thread: None,
             host: host.clone(),
-            plugin_extensions: ClapPluginExtensions {
-                audio_ports: P::Extensions::audio_ports().map(|ext| ClapPluginAudioPorts::new(ext)),
-            },
+            plugin_extensions: Mutex::new(ClapPluginExtensions::new()),
         }
     }
 
     pub(crate) fn boxed_clap_plugin(self) -> Box<clap_plugin> {
         ffi::box_clap_plugin(self)
     }
-}
 
-pub(crate) struct ClapPlugin<P> {
-    clap_plugin: NonNull<clap_plugin>,
-    _marker: PhantomData<P>,
-}
-
-impl<P: Plugin> ClapPlugin<P> {
-    pub(crate) const unsafe fn new(clap_plugin: NonNull<clap_plugin>) -> Self {
-        Self {
-            clap_plugin,
-            _marker: PhantomData,
-        }
+    /// Safety:
+    ///
+    /// 1. The user must assure the pointer to plugin is non-null.
+    /// 2. The pointer must point to a valid clap_plugin structure tied to the plugin
+    ///    type P, and living in the host.
+    ///
+    /// Typically, a valid pointer comes from the host calling the plugin's methods.
+    pub(crate) const unsafe fn from_host_ptr(clap_plugin: *const clap_plugin) -> *mut Self {
+        unsafe { (*clap_plugin).plugin_data as *mut _ }
     }
-
-    pub(crate) fn plugin_data(&self) -> &Runtime<P> {
-        let data = unsafe { self.clap_plugin.as_ref() }.plugin_data;
-        unsafe { &*(data as *const _) }
-    }
-
-    pub(crate) fn plugin_data_mut(&mut self) -> &mut Runtime<P> {
-        let data = unsafe { self.clap_plugin.as_ref() }.plugin_data;
-        unsafe { &mut *(data as *mut _) }
-    }
-
-    unsafe fn take(self) -> Runtime<P> {
-        let clap_plugin = unsafe { Box::from_raw(self.clap_plugin.as_ptr()) };
-        let data: *mut Runtime<P> = clap_plugin.plugin_data as *mut _;
-
-        *unsafe { Box::from_raw(data) }
-    }
-}
-
-/// Safety:
-///
-/// 1. The user must assure the pointer to plugin is non-null.
-/// 2. The pointer must point to a valid clap_plugin structure tied to the plugin
-///    type P, and living in the host.
-///
-/// Typically, a valid pointer comes from the host calling the plugin's methods.
-pub(crate) const unsafe fn wrap_clap_plugin_from_host<P: Plugin>(
-    plugin: *const clap_sys::clap_plugin,
-) -> ClapPlugin<P> {
-    let plugin = plugin as *mut _;
-    unsafe { ClapPlugin::<P>::new(NonNull::new_unchecked(plugin)) }
 }
 
 pub(crate) use desc::PluginDescriptor;

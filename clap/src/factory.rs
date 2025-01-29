@@ -46,7 +46,7 @@ impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
 
     fn boxed_clap_plugin(&self, host: FactoryHost) -> Box<clap_plugin> {
         let host = Arc::new(Host::new(host.into_inner()));
-        Runtime::<P>::generate(host).boxed_clap_plugin()
+        Runtime::<P>::initialize(host).boxed_clap_plugin()
     }
 }
 

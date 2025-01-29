@@ -251,14 +251,14 @@ where
 }
 
 pub(crate) struct ClapPluginAudioPorts<P> {
-    pub(crate) raw: clap_plugin_audio_ports,
+    _raw: clap_plugin_audio_ports,
     _marker: PhantomData<P>,
 }
 
 impl<P: Plugin> ClapPluginAudioPorts<P> {
-    pub(crate) fn new<A: AudioPorts<P>>(_ports: A) -> Self {
+    pub(crate) fn new<A: AudioPorts<P>>(_: A) -> Self {
         Self {
-            raw: clap_plugin_audio_ports::<A, P>(),
+            _raw: clap_plugin_audio_ports::<A, P>(),
             _marker: PhantomData,
         }
     }

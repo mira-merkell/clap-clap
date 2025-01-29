@@ -1,6 +1,12 @@
 use crate::ext::audio_ports::AudioPortInfo;
 use crate::plugin::Plugin;
 
+pub trait Extensions<P: Plugin> {
+    fn audio_ports() -> Option<impl AudioPorts<P>> {
+        None::<()>
+    }
+}
+
 impl<P: Plugin> Extensions<P> for () {}
 
 pub trait AudioPorts<P>
@@ -15,9 +21,3 @@ where
 }
 
 pub mod audio_ports;
-
-pub trait Extensions<P: Plugin>: Send + Sync {
-    fn audio_ports() -> Option<impl AudioPorts<P>> {
-        None::<()>
-    }
-}
