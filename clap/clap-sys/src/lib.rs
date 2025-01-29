@@ -1,5 +1,3 @@
-use std::ffi::CStr;
-
 mod ffi {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]
@@ -7,49 +5,6 @@ mod ffi {
     #![allow(warnings, unused)]
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
-
-// Export raw, null-terminated byte strings as CStr.
-//
-// Safety:
-// The symbols exported must be static, null-terminated byte strings from ffi.
-macro_rules! export_cstr_from_bytes {
-    ($($name_id:ident),*) => { $(
-        pub const $name_id: &CStr = unsafe { CStr::from_ptr(ffi::$name_id.as_ptr() as *const _) };
-
-        #[allow(non_snake_case)]
-        #[cfg(test)]
-        mod $name_id {
-            use std::ffi::CStr;
-            use super::{ffi, CLAP_NAME_SIZE, $name_id};
-
-            #[test]
-            fn export_cstr_from_bytes () {
-                let bytes: Vec<u8> = ffi::$name_id.iter().map(|&b| b as u8).collect();
-                let _ = CStr::from_bytes_with_nul(&bytes).expect("should be a valid CStr");
-            }
-
-            #[test]
-            fn is_static() {
-                const fn borrow_static() -> &'static [u8] {
-                    ffi::$name_id
-                }
-
-                let _ = borrow_static();
-            }
-
-            #[test]
-            fn is_valid_rust_string() {
-                let _ = $name_id.to_str().expect("should be valid Rust string");
-            }
-
-            #[test]
-            fn len_is_less_than_clap_name_size() {
-                assert!($name_id.to_str().unwrap().len() < CLAP_NAME_SIZE);
-            }
-        }
-    )* }
-}
-
 
 macro_rules! cast_const_as_usize {
     ($($name:ident),*) => {$(
@@ -67,7 +22,6 @@ macro_rules! cast_const_as_usize {
         }
     )*};
 }
-
 
 cast_const_as_usize!(CLAP_NAME_SIZE, CLAP_PATH_SIZE);
 
@@ -123,7 +77,7 @@ clap_process_status_const!(
 );
 
 // CLAP plugin factory
-export_cstr_from_bytes!(CLAP_PLUGIN_FACTORY_ID);
+pub use ffi::CLAP_PLUGIN_FACTORY_ID;
 
 // CLAP plugin extension: audio_ports
 pub use ffi::{clap_audio_port_info, clap_plugin_audio_ports};
@@ -154,56 +108,27 @@ cast_flags_as_u32!(
     CLAP_AUDIO_PORT_SUPPORTS_64BITS
 );
 
-export_cstr_from_bytes!(
-    CLAP_EXT_AUDIO_PORTS,
-    CLAP_PORT_MONO,
-    CLAP_PORT_STEREO,
-    CLAP_PORT_SURROUND,
-    CLAP_PORT_AMBISONIC
-);
+pub use ffi::{
+    CLAP_EXT_AUDIO_PORTS, CLAP_PORT_AMBISONIC, CLAP_PORT_MONO, CLAP_PORT_STEREO, CLAP_PORT_SURROUND,
+};
 
 // CLAP_PLUGIN_FEATURE_*
-export_cstr_from_bytes!(
-    CLAP_PLUGIN_FEATURE_INSTRUMENT,
-    CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
-    CLAP_PLUGIN_FEATURE_NOTE_EFFECT,
-    CLAP_PLUGIN_FEATURE_NOTE_DETECTOR,
-    CLAP_PLUGIN_FEATURE_ANALYZER,
-    CLAP_PLUGIN_FEATURE_SYNTHESIZER,
-    CLAP_PLUGIN_FEATURE_SAMPLER,
-    CLAP_PLUGIN_FEATURE_DRUM,
-    CLAP_PLUGIN_FEATURE_DRUM_MACHINE,
-    CLAP_PLUGIN_FEATURE_FILTER,
-    CLAP_PLUGIN_FEATURE_PHASER,
-    CLAP_PLUGIN_FEATURE_EQUALIZER,
-    CLAP_PLUGIN_FEATURE_DEESSER,
-    CLAP_PLUGIN_FEATURE_PHASE_VOCODER,
-    CLAP_PLUGIN_FEATURE_GRANULAR,
-    CLAP_PLUGIN_FEATURE_FREQUENCY_SHIFTER,
-    CLAP_PLUGIN_FEATURE_PITCH_SHIFTER,
-    CLAP_PLUGIN_FEATURE_DISTORTION,
-    CLAP_PLUGIN_FEATURE_TRANSIENT_SHAPER,
-    CLAP_PLUGIN_FEATURE_COMPRESSOR,
-    CLAP_PLUGIN_FEATURE_EXPANDER,
-    CLAP_PLUGIN_FEATURE_GATE,
-    CLAP_PLUGIN_FEATURE_LIMITER,
-    CLAP_PLUGIN_FEATURE_FLANGER,
-    CLAP_PLUGIN_FEATURE_CHORUS,
-    CLAP_PLUGIN_FEATURE_DELAY,
-    CLAP_PLUGIN_FEATURE_REVERB,
-    CLAP_PLUGIN_FEATURE_TREMOLO,
-    CLAP_PLUGIN_FEATURE_GLITCH,
-    CLAP_PLUGIN_FEATURE_UTILITY,
-    CLAP_PLUGIN_FEATURE_PITCH_CORRECTION,
-    CLAP_PLUGIN_FEATURE_RESTORATION,
-    CLAP_PLUGIN_FEATURE_MULTI_EFFECTS,
-    CLAP_PLUGIN_FEATURE_MIXING,
-    CLAP_PLUGIN_FEATURE_MASTERING,
-    CLAP_PLUGIN_FEATURE_MONO,
-    CLAP_PLUGIN_FEATURE_STEREO,
-    CLAP_PLUGIN_FEATURE_SURROUND,
-    CLAP_PLUGIN_FEATURE_AMBISONIC
-);
+pub use ffi::{
+    CLAP_PLUGIN_FEATURE_AMBISONIC, CLAP_PLUGIN_FEATURE_ANALYZER, CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
+    CLAP_PLUGIN_FEATURE_CHORUS, CLAP_PLUGIN_FEATURE_COMPRESSOR, CLAP_PLUGIN_FEATURE_DEESSER,
+    CLAP_PLUGIN_FEATURE_DELAY, CLAP_PLUGIN_FEATURE_DISTORTION, CLAP_PLUGIN_FEATURE_DRUM,
+    CLAP_PLUGIN_FEATURE_DRUM_MACHINE, CLAP_PLUGIN_FEATURE_EQUALIZER, CLAP_PLUGIN_FEATURE_EXPANDER,
+    CLAP_PLUGIN_FEATURE_FILTER, CLAP_PLUGIN_FEATURE_FLANGER, CLAP_PLUGIN_FEATURE_FREQUENCY_SHIFTER,
+    CLAP_PLUGIN_FEATURE_GATE, CLAP_PLUGIN_FEATURE_GLITCH, CLAP_PLUGIN_FEATURE_GRANULAR,
+    CLAP_PLUGIN_FEATURE_INSTRUMENT, CLAP_PLUGIN_FEATURE_LIMITER, CLAP_PLUGIN_FEATURE_MASTERING,
+    CLAP_PLUGIN_FEATURE_MIXING, CLAP_PLUGIN_FEATURE_MONO, CLAP_PLUGIN_FEATURE_MULTI_EFFECTS,
+    CLAP_PLUGIN_FEATURE_NOTE_DETECTOR, CLAP_PLUGIN_FEATURE_NOTE_EFFECT,
+    CLAP_PLUGIN_FEATURE_PHASE_VOCODER, CLAP_PLUGIN_FEATURE_PHASER,
+    CLAP_PLUGIN_FEATURE_PITCH_CORRECTION, CLAP_PLUGIN_FEATURE_PITCH_SHIFTER,
+    CLAP_PLUGIN_FEATURE_RESTORATION, CLAP_PLUGIN_FEATURE_REVERB, CLAP_PLUGIN_FEATURE_SAMPLER,
+    CLAP_PLUGIN_FEATURE_STEREO, CLAP_PLUGIN_FEATURE_SURROUND, CLAP_PLUGIN_FEATURE_SYNTHESIZER,
+    CLAP_PLUGIN_FEATURE_TRANSIENT_SHAPER, CLAP_PLUGIN_FEATURE_TREMOLO, CLAP_PLUGIN_FEATURE_UTILITY,
+};
 
 // clap_log
 
@@ -238,4 +163,4 @@ cast_const_as_clap_log_severity!(
     CLAP_LOG_HOST_MISBEHAVING,
     CLAP_LOG_PLUGIN_MISBEHAVING
 );
-export_cstr_from_bytes!(CLAP_EXT_LOG);
+pub use ffi::CLAP_EXT_LOG;

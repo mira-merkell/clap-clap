@@ -15,6 +15,9 @@ fn main() {
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+        .ctypes_prefix("std::ffi")
+        .generate_cstr(true)
+        //.block_extern_crate(true)
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.
