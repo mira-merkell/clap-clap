@@ -4,6 +4,7 @@ use clap_sys::{
     CLAP_LOG_PLUGIN_MISBEHAVING, CLAP_LOG_WARNING, clap_host, clap_host_log, clap_log_severity,
 };
 use std::ffi::{CString, NulError};
+use std::fmt::{Display, Formatter};
 
 pub struct Log<'a> {
     clap_host: &'a clap_host,
@@ -21,7 +22,7 @@ impl<'a> Log<'a> {
     pub fn log(&self, severity: Severity, msg: &str) -> Result<(), Error> {
         let msg = CString::new(msg)?;
         let callback = self.clap_host_log.log.ok_or(Error::Callback)?;
-        
+
         // Safety:
         // We just checked if callback is non-null.  The callback is thread-safe,
         // and we own the pointer to msg until the callback returns.
@@ -84,6 +85,17 @@ pub enum Error {
     NulError(NulError),
 }
 
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::Callback => write!(f, "callback not found"),
+            Error::NulError(e) => write!(f, "error converting to C string: {}", e),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
 impl From<NulError> for Error {
     fn from(value: NulError) -> Self {
         Self::NulError(value)
@@ -95,4 +107,3 @@ impl From<Error> for crate::Error {
         host::Error::Log(value).into()
     }
 }
-

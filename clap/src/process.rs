@@ -2,6 +2,7 @@ use clap_sys::{
     CLAP_PROCESS_CONTINUE, CLAP_PROCESS_CONTINUE_IF_NOT_QUIET, CLAP_PROCESS_SLEEP,
     CLAP_PROCESS_TAIL, clap_audio_buffer, clap_process, clap_process_status,
 };
+use std::fmt::{Display, Formatter};
 use std::ptr::{slice_from_raw_parts, slice_from_raw_parts_mut};
 
 pub struct Process<'a>(&'a mut clap_process);
@@ -72,14 +73,16 @@ impl<'a> Process<'a> {
     }
 
     pub fn link_audio_ports(&mut self, port_in: usize, port_out: usize) -> Result<Link<'_>, Error> {
+        let e = Error::Link(port_in, port_out);
+
         let port_in = ((port_in as u32) < self.0.audio_inputs_count)
             .then_some(unsafe { &*self.0.audio_inputs.add(port_in) })
-            .ok_or(Error::Link)?;
+            .ok_or(e)?;
         let port_out = ((port_out as u32) < self.0.audio_outputs_count)
             .then_some(unsafe { &mut *self.0.audio_outputs.add(port_out) })
-            .ok_or(Error::Link)?;
+            .ok_or(e)?;
 
-        Link::new(port_in, port_out, self.frames_count()).ok_or(Error::Link)
+        Link::new(port_in, port_out, self.frames_count()).ok_or(e)
     }
 }
 
@@ -226,9 +229,18 @@ impl From<Status> for clap_process_status {
 
 #[derive(Debug, Copy, Clone)]
 pub enum Error {
-    Init,
-    Link,
+    Link(usize, usize),
 }
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::Link(x, y) => write!(f, "Link error, cannot link ports in:{x} and out:{y}"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 impl From<Error> for crate::Error {
     fn from(value: Error) -> Self {

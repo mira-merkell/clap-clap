@@ -1,3 +1,6 @@
+use std::error;
+use std::fmt::{Display, Formatter};
+
 pub mod entry;
 pub mod ext;
 pub mod factory;
@@ -28,3 +31,17 @@ pub enum Error {
     Process(process::Error),
     User(i32),
 }
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use Error::*;
+        match self {
+            Plugin(e) => write!(f, "Plugin: {}", e),
+            Host(e) => write!(f, "Host: {}", e),
+            Process(e) => write!(f, "Process: {}", e),
+            User(rc) => write!(f, "User: {rc}"),
+        }
+    }
+}
+
+impl error::Error for Error {}

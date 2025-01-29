@@ -1,6 +1,7 @@
 use crate::{ext::log, ext::log::Log, version::ClapVersion};
-use clap_sys::{CLAP_EXT_LOG, clap_host, clap_host_log};
+use clap_sys::{clap_host, clap_host_log, CLAP_EXT_LOG};
 use std::ffi::CStr;
+use std::fmt::{Display, Formatter};
 use std::ptr::NonNull;
 
 #[derive(Debug, Clone)]
@@ -8,6 +9,17 @@ pub enum Error {
     GetExtensions,
     Log(log::Error),
 }
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::GetExtensions => f.write_str("method 'get_extensions()' not found"),
+            Error::Log(e) => write!(f, "Host extension (Log): {}", e),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
 
 impl From<Error> for crate::Error {
     fn from(value: Error) -> Self {
