@@ -17,7 +17,7 @@ fn main() {
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .ctypes_prefix("std::ffi")
         .generate_cstr(true)
-        //.block_extern_crate(true)
+        .block_extern_crate(true)
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.
