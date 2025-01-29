@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Error {
     InvalidId,
     Overflow,
@@ -10,9 +10,9 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::InvalidId => write!(f, "Invalid ID"),
-            Error::Overflow => write!(f, "Overflow"),
-            Error::Underflow => write!(f, "Underflow"),
+            Error::InvalidId => write!(f, "invalid ID"),
+            Error::Overflow => write!(f, "overflow during type conversion"),
+            Error::Underflow => write!(f, "underflow during type conversion"),
         }
     }
 }

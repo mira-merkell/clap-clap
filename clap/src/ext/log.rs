@@ -79,7 +79,7 @@ impl From<Severity> for clap_log_severity {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     Callback,
     NulError(NulError),

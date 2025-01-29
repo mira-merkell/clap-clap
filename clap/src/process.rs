@@ -227,7 +227,7 @@ impl From<Status> for clap_process_status {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Error {
     Link(usize, usize),
 }

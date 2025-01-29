@@ -6,7 +6,7 @@ use clap_sys::clap_plugin;
 use std::fmt::Display;
 use std::sync::{Arc, Mutex};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Error {}
 
 impl Display for Error {

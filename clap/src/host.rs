@@ -4,17 +4,17 @@ use std::ffi::CStr;
 use std::fmt::{Display, Formatter};
 use std::ptr::NonNull;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Error {
-    GetExtensions,
+    GetExtension,
     Log(log::Error),
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::GetExtensions => f.write_str("method 'get_extensions()' not found"),
-            Error::Log(e) => write!(f, "Host extension (Log): {}", e),
+            Error::GetExtension => write!(f, "method 'get_extensions()' not found"),
+            Error::Log(e) => write!(f, "extension 'host_log': {}", e),
         }
     }
 }
@@ -94,7 +94,7 @@ impl<'a> HostExtensions<'a> {
         };
         (!clap_host_log.is_null())
             .then_some(Log::new(self.clap_host, unsafe { &*clap_host_log }))
-            .ok_or(Error::GetExtensions)
+            .ok_or(Error::GetExtension)
     }
 }
 
@@ -105,6 +105,6 @@ impl<'a> TryFrom<&'a clap_host> for HostExtensions<'a> {
         clap_host
             .get_extension
             .map(|_| Self { clap_host })
-            .ok_or(Error::GetExtensions)
+            .ok_or(Error::GetExtension)
     }
 }
