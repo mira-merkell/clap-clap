@@ -1,5 +1,4 @@
-use crate::host::log::Log;
-use crate::version::ClapVersion;
+use crate::{ext::log, ext::log::Log, version::ClapVersion};
 use clap_sys::{CLAP_EXT_LOG, clap_host, clap_host_log};
 use std::ffi::CStr;
 use std::ptr::NonNull;
@@ -97,5 +96,3 @@ impl<'a> TryFrom<&'a clap_host> for HostExtensions<'a> {
             .ok_or(Error::GetExtensions)
     }
 }
-
-pub mod log;

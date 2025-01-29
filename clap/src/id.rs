@@ -46,7 +46,7 @@ impl TryFrom<i32> for ClapId {
     type Error = Error;
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if (value >= 0) {
+        if value >= 0 {
             (value as u32).try_into()
         } else {
             Err(Error::Underflow)

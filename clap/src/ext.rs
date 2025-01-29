@@ -21,3 +21,4 @@ where
 }
 
 pub mod audio_ports;
+pub mod log;
