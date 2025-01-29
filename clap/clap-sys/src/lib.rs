@@ -8,42 +8,6 @@ mod ffi {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
-macro_rules! cast_const_as_usize {
-    ($($name:ident),*) => {$(
-        pub const $name: usize = ffi::$name as usize;
-
-        #[allow(non_snake_case)]
-        #[cfg(test)]
-        mod $name {
-            use super::ffi;
-
-            #[test]
-            fn cast_as_usize() {
-                usize::try_from(ffi::$name).expect("should fit into usize");
-            }
-        }
-    )*};
-}
-
-macro_rules! cast_flags_as_u32 {
-    ($($flag:ident),*) => {
-        $(
-            pub const $flag: u32 = ffi::$flag as u32;
-
-            #[allow(non_snake_case)]
-            #[cfg(test)]
-            mod $flag {
-                use super::ffi;
-
-                #[test]
-                fn cast_as_u32() {
-                    u32::try_from(ffi::$flag).expect("should fit into u32");
-                }
-            }
-        )*
-    };
-}
-
 // Export raw, null-terminated byte strings as CStr.
 //
 // Safety:
@@ -84,6 +48,25 @@ macro_rules! export_cstr_from_bytes {
         }
     )* }
 }
+
+
+macro_rules! cast_const_as_usize {
+    ($($name:ident),*) => {$(
+        pub const $name: usize = ffi::$name as usize;
+
+        #[allow(non_snake_case)]
+        #[cfg(test)]
+        mod $name {
+            use super::ffi;
+
+            #[test]
+            fn cast_as_usize() {
+                usize::try_from(ffi::$name).expect("should fit into usize");
+            }
+        }
+    )*};
+}
+
 
 cast_const_as_usize!(CLAP_NAME_SIZE, CLAP_PATH_SIZE);
 
@@ -143,6 +126,25 @@ export_cstr_from_bytes!(CLAP_PLUGIN_FACTORY_ID);
 
 // CLAP plugin extension: audio_ports
 pub use ffi::{clap_audio_port_info, clap_plugin_audio_ports};
+
+macro_rules! cast_flags_as_u32 {
+    ($($flag:ident),*) => {
+        $(
+            pub const $flag: u32 = ffi::$flag as u32;
+
+            #[allow(non_snake_case)]
+            #[cfg(test)]
+            mod $flag {
+                use super::ffi;
+
+                #[test]
+                fn cast_as_u32() {
+                    u32::try_from(ffi::$flag).expect("should fit into u32");
+                }
+            }
+        )*
+    };
+}
 
 cast_flags_as_u32!(
     CLAP_AUDIO_PORT_IS_MAIN,
