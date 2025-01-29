@@ -17,7 +17,6 @@ jobs:
         os:
           - ubuntu-latest
           - windows-latest
-          - macos-11
         toolchain:
           - beta
           - nightly
