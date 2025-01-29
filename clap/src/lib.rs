@@ -1,5 +1,4 @@
-//! A CLAP plugin runtime.  ⧉⧉⧉
-//!
+//! A CLAP plugin runtime.
 
 pub mod entry;
 pub mod ext;

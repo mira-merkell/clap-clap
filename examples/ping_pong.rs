@@ -1,4 +1,4 @@
-use clap::{
+use clap_clap::clap::{
     ext::{audio_ports::StereoPorts, AudioPorts, Extensions},
     host::Host,
     plugin::{AudioThread, Plugin},

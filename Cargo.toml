@@ -1,7 +1,23 @@
+[package]
+name = "clap-clap"
+version = "0.1.0"
+rust-version = "1.85.0"
+edition = "2024"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+clap = {path = "./clap"}
+
+[[example]]
+name = "ping-pong"
+crate-type = ["cdylib"]
+path = "examples/ping_pong.rs"
+
 [workspace]
 resolver = "3"
 members = [
     "clap",
     "clap/clap-sys",
-    "examples/ping-pong"
 ]

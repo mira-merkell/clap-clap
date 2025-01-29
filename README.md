@@ -19,7 +19,7 @@ A [CLAP] plugin runtime. Very much WIP. 🚧
 Implement a [ping-pong delay]:
 
 ```rust
-use clap::{
+use clap_clap::clap::{
     ext::{audio_ports::StereoPorts, AudioPorts, Extensions},
     host::Host,
     plugin::{AudioThread, Plugin},
@@ -126,10 +126,10 @@ git clone --recurse-submodules https://github.com/mira-merkell/clap-clap
 Build the example plugin with:
 
 ```bash
-cargo build -p ping-pong --release
+cargo build --example ping-pong --release
 ```
 
-and look for the compiled dynamical library in `target/release/`.
+and look for the compiled dynamical library in `target/release/examples/`.
 
 The name of the library is OS-specific. For example, on Linux it should be:
 `libping_pong.so`, whereas on Windows it's `ping_pong.dll`. Copy the file to
