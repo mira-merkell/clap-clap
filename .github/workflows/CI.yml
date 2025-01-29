@@ -25,6 +25,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
-      - run: cargo build --verbose --workspace
-      - run: cargo test --verbose --workspace
+      - name: Build and test
+        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }} \
+          cargo build --verbose --workspace \
+          cargo test --verbose --workspace
+      - name: Show bindings.rs
+        if: always()
+        run: find ./ -name "bindings.rs" -exec cat {} +
