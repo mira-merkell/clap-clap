@@ -207,6 +207,32 @@ export_cstr_from_bytes!(
 pub use ffi::clap_host_log;
 pub use ffi::clap_log_severity;
 
-pub const CLAP_LOG_INFO: clap_log_severity = ffi::CLAP_LOG_INFO as clap_log_severity;
+macro_rules! cast_const_as_clap_log_severity {
+    ($($name:ident),*) => {
+        $(
+            pub const $name: clap_log_severity = ffi::$name as clap_log_severity;
 
+            #[allow(non_snake_case)]
+            #[cfg(test)]
+            mod $name {
+                use super::*;
+
+                #[test]
+                fn cast_as_clap_log_severity() {
+                    clap_log_severity::try_from(ffi::$name).expect("value should fit into clap_log_severity");
+                }
+            }
+        )*
+    };
+}
+
+cast_const_as_clap_log_severity!(
+    CLAP_LOG_FATAL,
+    CLAP_LOG_ERROR,
+    CLAP_LOG_WARNING,
+    CLAP_LOG_INFO,
+    CLAP_LOG_DEBUG,
+    CLAP_LOG_HOST_MISBEHAVING,
+    CLAP_LOG_PLUGIN_MISBEHAVING
+);
 export_cstr_from_bytes!(CLAP_EXT_LOG);
