@@ -6,7 +6,7 @@ A [CLAP] plugin runtime. Very much WIP. 🚧
 
 ## Goals
 
-* Provide a safe-Rust, dynamical interface to the [CLAP API].
+* Provide a dynamical runtime environment to access safe-Rust [CLAP API].
 * Follow CLAP terminology and the framework of CLAP extension modules.
 * Build a testing and debugging platform for plugin authors.
 
@@ -45,7 +45,7 @@ impl Plugin for PingPong {
     const ID: &'static str = "clap.example.ping_pong";
     const NAME: &'static str = "Ping-Pong";
     const VENDOR: &'static str = "⧉⧉⧉";
-    
+
     type AudioThread = Delay;
     type Extensions = Self;
 
@@ -114,7 +114,7 @@ clap::entry!(PingPong);
 
 [ping-pong delay]: https://en.wikipedia.org/wiki/Delay_(audio_effect)#Ping-pong_delay
 
-## Compile the source code
+## How to compile the source code
 
 Install Rust >=1.85.0 (for the 2024 edition, available on *nightly* and *beta*
 channels) and clone this repository together with its submodules:
@@ -129,8 +129,23 @@ Build the example plugin with:
 cargo build --example ping-pong --release
 ```
 
-and look for the compiled dynamical library in `target/release/examples/`.
+and look for the compiled dynamical library in `target/release/examples/`. The
+name of the library is OS-specific:
 
-The name of the library is OS-specific. For example, on Linux it should be:
-`libping_pong.so`, whereas on Windows it's `ping_pong.dll`. Copy the file to
-where your DAW can find it and rename it to: `ping_pong.clap`.
+* Linux: `libping_pong.so`
+* Windows: `ping_pong.dll`
+* macOS: `libping_pong.dylib`
+
+Copy the file to where your DAW can find it and rename it to: `ping_pong.clap`.
+
+*Note.* If you're having problems trying to compile the sources on Windows,
+remember to [install clang+llvm] first. If you're experiencing issues on macOS
+due to bindgen's failing to generate valid declarations for `clap-sys`, see the
+[workaround][GHA] I used for GHA, and the
+ready-made [macOS bindings][macos-bindings] there.
+
+[install clang+llvm]: https://github.com/llvm/llvm-project/releases
+
+[GHA]: ./.github/workflows/CI-darwin.yml
+
+[macos-bindings]: ./.github/assets/bindings_darwin_clap123.rs
