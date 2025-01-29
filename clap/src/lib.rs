@@ -26,4 +26,5 @@ pub enum Error {
     Plugin(plugin::Error),
     Host(host::Error),
     Process(process::Error),
+    User(i32),
 }

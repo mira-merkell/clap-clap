@@ -26,7 +26,7 @@ impl ClapId {
     pub fn invalid_id() -> Self {
         Self(None)
     }
-    
+
     pub fn is_valid(&self) -> bool {
         self.0.is_some()
     }
@@ -46,9 +46,11 @@ impl TryFrom<i32> for ClapId {
     type Error = Error;
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
-        (value >= 0)
-            .then_some((value as u32).try_into())
-            .unwrap_or(Err(Error::Underflow))
+        if (value >= 0) {
+            (value as u32).try_into()
+        } else {
+            Err(Error::Underflow)
+        }
     }
 }
 
@@ -95,7 +97,7 @@ mod tests {
         let _ = ClapId::try_from(-1).unwrap_err();
         let _ = ClapId::try_from(-10).unwrap_err();
     }
-    
+
     #[test]
     fn is_valid() {
         assert!(ClapId::from(0).is_valid());
@@ -103,7 +105,7 @@ mod tests {
         assert!(ClapId::from(100).is_valid());
         assert!(ClapId::from(1000).is_valid());
         assert!(ClapId::from(10000).is_valid());
-        
+
         assert!(!ClapId::invalid_id().is_valid());
     }
 

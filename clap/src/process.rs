@@ -4,9 +4,13 @@ use clap_sys::{
 };
 use std::ptr::{slice_from_raw_parts, slice_from_raw_parts_mut};
 
-pub struct Process(pub(crate) clap_process);
+pub struct Process<'a>(&'a mut clap_process);
 
-impl Process {
+impl<'a> Process<'a> {
+    pub(crate) fn new(clap_process: &'a mut clap_process) -> Self {
+        Self(clap_process)
+    }
+
     pub fn steady_time(&self) -> i64 {
         self.0.steady_time
     }
@@ -145,7 +149,7 @@ impl Output<'_> {
     }
 }
 
-/// Up to 8 channel ports.
+/// Audio ports up to 8 channels.
 pub struct Link<'a> {
     port_in: &'a clap_audio_buffer,
     port_out: &'a mut clap_audio_buffer,
@@ -224,7 +228,6 @@ impl From<Status> for clap_process_status {
 pub enum Error {
     Init,
     Link,
-    Plugin,
 }
 
 impl From<Error> for crate::Error {

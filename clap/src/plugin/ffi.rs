@@ -7,6 +7,7 @@ use clap_sys::{
 };
 use std::{
     ffi::{CStr, c_char, c_void},
+    mem,
     ptr::null,
 };
 
@@ -22,12 +23,14 @@ extern "C" fn init<P: Plugin>(plugin: *const clap_plugin) -> bool {
 
     // Safety:
     // This function is called on the main thread during the initialization.
-    // It is guaranteed that we are the only function accessing the plugin now.
-    // So a mutable reference to runtime for the duration of this call is safe.
-    let runtime = unsafe { &mut *runtime };
+    // It is guaranteed that we are the only function accessing
+    // runtime.plugin or runtime.host now.
+    // So a mutable reference to runtime.plugin or runtime.host
+    // for the duration of this call is safe.
+    let plugin = unsafe { &mut (*runtime).plugin };
+    let host = unsafe { &(*runtime).host }.clone();
 
-    let host = runtime.host.clone();
-    runtime.plugin.init(host).is_ok()
+    plugin.init(host).is_ok()
 }
 
 extern "C" fn destroy<P: Plugin>(plugin: *const clap_plugin) {
@@ -66,20 +69,24 @@ extern "C" fn activate<P: Plugin>(
 
     // Safety:
     // This function is called on the main thread.
-    // It is guaranteed that we are the only function accessing the runtime now,
-    // because the audio thread hasn't started yet. So a mutable reference
-    // to the entire runtime for the duration of this call is safe.
-    let runtime = unsafe { &mut *runtime };
-    runtime.audio_thread = runtime
-        .plugin
-        .activate(
-            sample_rate,
-            min_frames_count as usize,
-            max_frames_count as usize,
-        )
-        .ok();
+    // It is guaranteed that we are the only function accessing
+    // runtime.plugin and runtime.audio_thread now, because the audio thread
+    // hasn't started yet. So a mutable reference to runtime.plugin
+    // and runtime.audio_thread for the duration of this call is safe.
+    let plugin = unsafe { &mut (*runtime).plugin };
+    let audio_thread = unsafe { &mut (*runtime).audio_thread };
+    let should_be_none = mem::replace(
+        audio_thread,
+        plugin
+            .activate(
+                sample_rate,
+                min_frames_count as usize,
+                max_frames_count as usize,
+            )
+            .ok(),
+    );
 
-    runtime.audio_thread.is_some()
+    should_be_none.is_none() && audio_thread.is_some()
 }
 
 extern "C" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
@@ -114,7 +121,7 @@ extern "C" fn start_processing<P: Plugin>(plugin: *const clap_plugin) -> bool {
     let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
 
     // Safety:
-    // This function is call on the audio thread.  It is guaranteed that
+    // This function is called on the audio thread.  It is guaranteed that
     // we are the only function accessing runtime.audio_thread now.
     // So a mutable reference to runtime.audio_thread for the duration of this
     // call is safe.
@@ -135,7 +142,7 @@ extern "C" fn stop_processing<P: Plugin>(plugin: *const clap_plugin) {
     let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
 
     // Safety:
-    // This function is call on the audio thread.  It is guaranteed that
+    // This function is called on the audio thread.  It is guaranteed that
     // we are the only function accessing runtime.audio_thread now.
     // So a mutable reference to runtime.audio_thread for the duration of this
     // call is safe.
@@ -156,7 +163,7 @@ extern "C" fn reset<P: Plugin>(plugin: *const clap_plugin) {
     let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
 
     // Safety:
-    // This function is call on the audio thread.  It is guaranteed that
+    // This function is called on the audio thread.  It is guaranteed that
     // we are the only function accessing runtime.audio_thread now.
     // So a mutable reference to runtime.audio_thread for the duration of this
     // call is safe.
@@ -181,7 +188,7 @@ extern "C" fn process<P: Plugin>(
     let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
 
     // Safety:
-    // This function is call on the audio thread.  It is guaranteed that
+    // This function is called on the audio thread.  It is guaranteed that
     // we are the only function accessing runtime.audio_thread now.
     // So a mutable reference to runtime.audio_thread for the duration of this
     // call is safe.
@@ -189,8 +196,12 @@ extern "C" fn process<P: Plugin>(
         return CLAP_PROCESS_ERROR;
     };
 
-    /// TODO: Redesign the Process wrapper.
-    let process = &mut Process(unsafe { *process });
+    // Safety:
+    // The pointer to clap_process is guaranteed to be valid and pointing
+    // to an exclusive struct for the duration of this call.
+    // So a mutable reference to process is safe.
+    let process = unsafe { &mut *(process as *mut _) };
+    let process = &mut Process::new(process);
     audio_thread
         .process(process)
         .map(Into::into)

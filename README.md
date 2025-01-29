@@ -7,7 +7,7 @@ A [CLAP] plugin runtime. Very much WIP. 🚧
 ## Goals
 
 * Provide a safe-Rust, dynamical interface to the [CLAP API].
-* Follow CLAP terminology and the framework of extension modules.
+* Follow CLAP terminology and the framework of CLAP extension modules.
 * Build a testing and debugging platform for plugin authors.
 
 [CLAP]: https://cleveraudio.org
@@ -44,6 +44,8 @@ impl Extensions<Self> for PingPong {
 impl Plugin for PingPong {
     const ID: &'static str = "clap.example.ping_pong";
     const NAME: &'static str = "Ping-Pong";
+    const VENDOR: &'static str = "⧉⧉⧉";
+    
     type AudioThread = Delay;
     type Extensions = Self;
 

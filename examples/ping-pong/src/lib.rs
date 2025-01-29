@@ -23,6 +23,7 @@ impl Extensions<Self> for PingPong {
 impl Plugin for PingPong {
     const ID: &'static str = "clap.example.ping_pong";
     const NAME: &'static str = "Ping-Pong";
+    const VENDOR: &'static str = "⧉⧉⧉";
     type AudioThread = Delay;
     type Extensions = Self;
 
