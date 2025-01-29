@@ -14,7 +14,7 @@ mod ffi {
 // The symbols exported must be static, null-terminated byte strings from ffi.
 macro_rules! export_cstr_from_bytes {
     ($($name_id:ident),*) => { $(
-        pub const $name_id: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(ffi::$name_id) };
+        pub const $name_id: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(ffi::$name_id.as_slice()) };
 
         #[allow(non_snake_case)]
         #[cfg(test)]
