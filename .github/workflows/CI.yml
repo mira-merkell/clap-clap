@@ -30,6 +30,3 @@ jobs:
         run: cargo build --verbose --workspace
       - name: Test
         run: cargo test --verbose --workspace
-      - name: Show bindings.rs
-        if: always()
-        run: find ./ -name "bindings.rs" -exec cat {} +
