@@ -19,10 +19,25 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
+/// A type that corresponds to CLAP's `clap_id`.
+///
+/// It is either a `u32` value less that [`u32::MAX`], or a value that
+/// represents an invalid id.
+///
+/// # Example
+///
+/// ```rust
+/// # use crate::clap::id::ClapId;
+/// let id = ClapId::from(3);
+///
+/// assert!(id.is_valid());
+/// assert_ne!(id, ClapId::invalid_id());
+/// ```
 #[derive(Default, Debug, Copy, Clone, Hash, PartialEq)]
 pub struct ClapId(Option<u32>);
 
 impl ClapId {
+    /// The value representing an invalid id.
     pub fn invalid_id() -> Self {
         Self(None)
     }
@@ -80,6 +95,11 @@ impl From<ClapId> for clap_sys::clap_id {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clap_sys_invalid_id_more_than_u16max() {
+        assert!(clap_sys::CLAP_INVALID_ID > u16::MAX as clap_sys::clap_id);
+    }
 
     #[test]
     fn valid() {
