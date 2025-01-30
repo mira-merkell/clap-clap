@@ -25,7 +25,7 @@ impl<'a> Log<'a> {
 
         // Safety:
         // We just checked if callback is non-null.  The callback is thread-safe,
-        // and we own the pointer to msg until the callback returns.
+        // and we own the reference to msg until the callback returns.
         // So the call is safe.
         unsafe { callback(&raw const *self.clap_host, severity.into(), msg.as_ptr()) };
         Ok(())
