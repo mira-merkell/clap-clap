@@ -14,9 +14,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
+        os: [ ubuntu-22.04, ubuntu-24.04, windows-2022 ]
         toolchain:
           - beta
           - nightly
@@ -30,3 +28,7 @@ jobs:
         run: cargo build --verbose --workspace
       - name: Test
         run: cargo test --verbose --workspace
+      - name: Build/test docs
+        run: |
+          cargo doc --verbose --workspace
+          cargo test --doc --verbose --workspace

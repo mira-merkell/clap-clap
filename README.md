@@ -138,14 +138,15 @@ name of the library is OS-specific:
 
 Copy the file to where your DAW can find it and rename it to: `ping_pong.clap`.
 
-*Note.* If you're having problems trying to compile the sources on Windows,
+*Note.*
+If you're having problems trying to compile the sources on Windows,
 remember to [install clang+llvm] first. If you're experiencing issues on macOS
 due to bindgen's failing to generate valid declarations for `clap-sys`, see the
-[workaround][GHA] I used for GHA, and the
-ready-made [macOS bindings][macos-bindings] there.
+[workaround][GHA-workaround] I used for GHA, and the
+ready-made [bindings][macos-bindings] for macOS/M1.
 
 [install clang+llvm]: https://github.com/llvm/llvm-project/releases
 
-[GHA]: ./.github/workflows/CI-darwin.yml
+[GHA-workaround]: ./.github/workflows/CI-darwin.yml
 
-[macos-bindings]: ./.github/assets/bindings_darwin_clap123.rs
+[macos-bindings]: ./.github/assets/bindings_darwin-M1_clap123.rs
