@@ -45,8 +45,12 @@ impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
     }
 
     fn boxed_clap_plugin(&self, host: FactoryHost) -> Box<clap_plugin> {
-        let host = Arc::new(Host::new(host.into_inner()));
-        Runtime::<P>::initialize(host).boxed_clap_plugin()
+        // Safety:
+        // The pointer unwrapped from FactoryHost is a valid pointer
+        // to a CLAP host, obtained as the argument passed to plugin
+        // factory's create_plugin().
+        let host = unsafe { Host::new(host.into_inner()) };
+        Runtime::<P>::initialize(Arc::new(host)).boxed_clap_plugin()
     }
 }
 

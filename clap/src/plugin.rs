@@ -95,7 +95,7 @@ impl<P: Plugin> Runtime<P> {
             descriptor: PluginDescriptor::allocate(),
             plugin: P::default(),
             audio_thread: None,
-            host: host.clone(),
+            host,
             plugin_extensions: Mutex::new(ClapPluginExtensions::new()),
         }
     }
