@@ -8,11 +8,11 @@ use std::fmt::{Display, Formatter};
 
 pub struct Log<'a> {
     clap_host: &'a clap_host,
-    clap_host_log: &'a clap_host_log,
+    clap_host_log: clap_host_log,
 }
 
 impl<'a> Log<'a> {
-    pub(crate) fn new(clap_host: &'a clap_host, clap_host_log: &'a clap_host_log) -> Self {
+    pub(crate) fn new(clap_host: &'a clap_host, clap_host_log: clap_host_log) -> Self {
         Self {
             clap_host,
             clap_host_log,
