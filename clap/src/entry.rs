@@ -78,8 +78,8 @@ macro_rules! entry {
                 create_plugin: Some(create_plugin),
             };
 
-            extern "C" fn init(_plugin_path: *const std::ffi::c_char) -> bool {
-                true
+            extern "C" fn init(plugin_path: *const std::ffi::c_char) -> bool {
+                !plugin_path.is_null()
             }
 
             extern "C" fn deinit() {}

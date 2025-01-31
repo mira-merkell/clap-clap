@@ -35,7 +35,8 @@ use _clap_entry::clap_entry;
 #[test]
 fn export_clap_entry() {
     let entry_init = clap_entry.init.unwrap();
-    assert!(unsafe { entry_init(null()) });
+    assert!(!unsafe { entry_init(null()) });
+    assert!(unsafe { entry_init(c"".as_ptr()) });
 
     let get_factory = clap_entry.get_factory.unwrap();
     let factory = unsafe { get_factory(null()) };
