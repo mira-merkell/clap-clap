@@ -1,6 +1,6 @@
 use crate::ext::Extensions;
 use crate::host::Host;
-use crate::process::Process;
+use crate::process::{Process};
 use crate::{ext::audio_ports::ClapPluginAudioPorts, process};
 use clap_sys::clap_plugin;
 use std::fmt::Display;
@@ -69,6 +69,12 @@ pub trait AudioThread<P: Plugin>: Send + Sync + Sized {
     fn deactivate(self, plugin: &mut P) {}
 }
 
+impl<P: Plugin> AudioThread<P> for () {
+    fn process(&mut self, _: &mut Process<'_>) -> Result<process::Status, crate::Error> {
+        Ok(Continue)
+    }
+}
+
 pub(crate) struct ClapPluginExtensions<P> {
     pub(crate) audio_ports: Option<ClapPluginAudioPorts<P>>,
 }
@@ -116,6 +122,7 @@ impl<P: Plugin> Runtime<P> {
     }
 }
 
+use crate::process::Status::Continue;
 pub(crate) use desc::PluginDescriptor;
 
 mod desc;

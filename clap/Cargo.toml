@@ -5,4 +5,4 @@ rust-version = "1.85.0"
 edition = "2024"
 
 [dependencies]
-clap-sys = {path = "./clap-sys"}
+clap-sys = { path = "./clap-sys" }
