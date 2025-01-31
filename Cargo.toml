@@ -15,10 +15,13 @@ name = "ping-pong"
 crate-type = ["cdylib"]
 path = "examples/ping_pong.rs"
 
+[[example]]
+name = "dummy"
+crate-type = ["cdylib"]
+
 [workspace]
 resolver = "3"
 members = [
     "clap",
     "clap/clap-sys",
-    "tests/test-dummy-plugin",
 ]

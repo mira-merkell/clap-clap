@@ -4,10 +4,10 @@ use clap_clap::{
 };
 
 #[derive(Default)]
-struct PluginExport;
+struct Dummy;
 
-impl Plugin for PluginExport {
-    const ID: &'static str = "test.dummy.plugin";
+impl Plugin for Dummy {
+    const ID: &'static str = "dummy";
     type AudioThread = ();
     type Extensions = ();
 
@@ -16,4 +16,4 @@ impl Plugin for PluginExport {
     }
 }
 
-clap::entry!(PluginExport);
+clap::entry!(Dummy);
