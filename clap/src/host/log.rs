@@ -5,33 +5,42 @@ use std::{
 
 use clap_sys::{
     CLAP_LOG_DEBUG, CLAP_LOG_ERROR, CLAP_LOG_FATAL, CLAP_LOG_HOST_MISBEHAVING, CLAP_LOG_INFO,
-    CLAP_LOG_PLUGIN_MISBEHAVING, CLAP_LOG_WARNING, clap_host, clap_host_log, clap_log_severity,
+    CLAP_LOG_PLUGIN_MISBEHAVING, CLAP_LOG_WARNING, clap_host_log, clap_log_severity,
 };
 
-use crate::host;
+use crate::{host, host::Host};
 
 pub struct Log<'a> {
-    clap_host: &'a clap_host,
-    clap_host_log: clap_host_log,
+    host: &'a Host,
+    clap_host_log: *const clap_host_log,
 }
 
 impl<'a> Log<'a> {
-    pub(crate) fn new(clap_host: &'a clap_host, clap_host_log: clap_host_log) -> Self {
+    /// Safety:
+    ///
+    /// The pointer to clap_host_log must be non-null
+    pub(crate) unsafe fn new(host: &'a Host, clap_host_log: *const clap_host_log) -> Self {
         Self {
-            clap_host,
+            host,
             clap_host_log,
         }
     }
 
     pub fn log(&self, severity: Severity, msg: &str) -> Result<(), Error> {
         let msg = CString::new(msg)?;
-        let callback = self.clap_host_log.log.ok_or(Error::Callback)?;
+        let callback = unsafe { *self.clap_host_log }.log.ok_or(Error::Callback)?;
 
         // Safety:
         // We just checked if callback is non-null.  The callback is thread-safe,
         // and we own the reference to msg until the callback returns.
         // So the call is safe.
-        unsafe { callback(&raw const *self.clap_host, severity.into(), msg.as_ptr()) };
+        unsafe {
+            callback(
+                &raw const **self.host.as_clap_host(),
+                severity.into(),
+                msg.as_ptr(),
+            )
+        };
         Ok(())
     }
 }

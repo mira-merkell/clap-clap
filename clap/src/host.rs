@@ -1,16 +1,80 @@
 use std::{
     ffi::{CStr, c_void},
     fmt::{Display, Formatter},
+    ops::Deref,
     str::Utf8Error,
 };
 
 use clap_sys::{CLAP_EXT_LOG, clap_host, clap_host_log};
+use log::Log;
 
-use crate::{
-    ext::{log, log::Log},
-    factory::FactoryHost,
-    version::ClapVersion,
-};
+use crate::version::ClapVersion;
+
+pub mod log;
+
+#[derive(Debug)]
+struct ClapHost(*const clap_host);
+
+/// A safe wrapper around the pointer to `clap_host` obtained from host.
+impl ClapHost {
+    /// Wrap a pointer to host.
+    ///
+    /// This function checks if host and all host struct's fields are non-null
+    /// pointers (except the private host_data).
+    ///
+    /// # Safety
+    ///
+    /// The pointer to host must point to a valid clap_host structure obtained
+    /// from CLAP host.
+    unsafe fn try_new(host: *const clap_host) -> Result<Self, Error> {
+        if host.is_null() {
+            return Err(Error::NullPtr);
+        };
+        // The pointer is convertible to a reference, because it points
+        // to a genuine clap_host structure obtained from the host.
+        let host_ref = unsafe { &*host };
+
+        if host_ref.name.is_null()
+            || host_ref.vendor.is_null()
+            || host_ref.url.is_null()
+            || host_ref.version.is_null()
+        {
+            return Err(Error::NullPtr);
+        }
+
+        if host_ref.get_extension.is_none() {
+            return Err(Error::MethodNotFound("get_extension"));
+        }
+        if host_ref.request_restart.is_none() {
+            return Err(Error::MethodNotFound("request_restart"));
+        }
+        if host_ref.request_process.is_none() {
+            return Err(Error::MethodNotFound("request_process"));
+        }
+        if host_ref.request_callback.is_none() {
+            return Err(Error::MethodNotFound("request_callback"));
+        }
+
+        Ok(Self(host))
+    }
+}
+
+impl Deref for ClapHost {
+    type Target = clap_host;
+
+    fn deref(&self) -> &Self::Target {
+        // Safety:
+        // self.0 is a pointer to a constant struct obtained from CLAP
+        // host, which is well aligned and convertible to a reference.
+        unsafe { &*self.0 }
+    }
+}
+
+// Safety:
+// ClapHost is a wrapper around `*const` as represents a constant
+// data structure that can be sent and referenced in a multithreaded context.
+unsafe impl Send for ClapHost {}
+unsafe impl Sync for ClapHost {}
 
 #[derive(Debug)]
 struct HostDescriptor {
@@ -21,17 +85,9 @@ struct HostDescriptor {
 }
 
 impl HostDescriptor {
-    // Safety:
-    // Must be a valid clap_host struct obtained from host via Factory.
-    unsafe fn from_clap_host(clap_host: &clap_host) -> Result<Self, Error> {
-        if clap_host.name.is_null()
-            || clap_host.vendor.is_null()
-            || clap_host.url.is_null()
-            || clap_host.version.is_null()
-        {
-            return Err(Error::NullPtr);
-        }
-
+    fn from_clap_host(clap_host: &ClapHost) -> Result<Self, Error> {
+        // Safety:
+        // clap_host points to a valid host with all struct fields non-null.
         Ok(Self {
             name: String::from(unsafe { CStr::from_ptr(clap_host.name) }.to_str()?),
             vendor: String::from(unsafe { CStr::from_ptr(clap_host.vendor) }.to_str()?),
@@ -43,42 +99,24 @@ impl HostDescriptor {
 
 #[derive(Debug)]
 pub struct Host {
-    clap_host: clap_host,
+    clap_host: ClapHost,
     descriptor: HostDescriptor,
 }
 
-unsafe impl Send for Host {}
-unsafe impl Sync for Host {}
-
 impl Host {
-    // Safety:
-    // The host argument must be a valid pointer (wrapped in FactoryHost)
-    // to a CLAP host, obtained as the argument passed to plugin factory's
-    // create_plugin().
-    //
-    // The function returns a Host struct if all host methods are non-null pointers,
-    // and the Host description strings are properly validated UTF-8 strings.
-    pub(crate) unsafe fn try_from_factory(host: FactoryHost) -> Result<Self, Error> {
-        // Safety:
-        // The user must uphold the safety requirement about the pointer to clap_host.
-        let clap_host = unsafe { *host.into_inner().as_ptr() };
-        let descriptor = unsafe { HostDescriptor::from_clap_host(&clap_host) }?;
-
-        if clap_host.get_extension.is_none() {
-            return Err(Error::MethodNotFound("get_extension"));
-        }
-        if clap_host.request_restart.is_none() {
-            return Err(Error::MethodNotFound("request_restart"));
-        }
-        if clap_host.request_process.is_none() {
-            return Err(Error::MethodNotFound("request_process"));
-        }
-        if clap_host.request_callback.is_none() {
-            return Err(Error::MethodNotFound("request_callback"));
-        }
-
+    /// # Safety
+    ///
+    /// The host argument must be a valid pointer
+    /// to a CLAP host, obtained as the argument passed to plugin factory's
+    /// create_plugin().
+    ///
+    /// The function returns a Host struct if all host methods are non-null
+    /// pointers, and the Host description strings are properly validated
+    /// UTF-8 strings.
+    pub(crate) unsafe fn try_from_factory(host: *const clap_host) -> Result<Self, Error> {
+        let clap_host = unsafe { ClapHost::try_new(host) }?;
         Ok(Self {
-            descriptor,
+            descriptor: HostDescriptor::from_clap_host(&clap_host)?,
             clap_host,
         })
     }
@@ -88,10 +126,11 @@ impl Host {
     }
 
     pub fn get_extension(&self) -> HostExtensions {
-        // Safety:
-        // The Host constructor guarantees that self.clap_host.get_extension
-        // is non-null.
-        unsafe { HostExtensions::new(&self.clap_host) }
+        HostExtensions::new(self)
+    }
+
+    fn as_clap_host(&self) -> &ClapHost {
+        &self.clap_host
     }
 }
 
@@ -117,7 +156,7 @@ macro_rules! impl_host_request {
                         // The Host constructor checks if callback is non-null during the initialization.
                         // The pointer is a valid function obtained from the CLAP host.
                         // It is guaranteed be the host that the call is safe.
-                        unsafe { callback(&raw const self.clap_host) }
+                        unsafe { callback(&raw const *self.clap_host) }
                     }
                 }
             )*
@@ -129,29 +168,24 @@ impl_host_get_str!(name, vendor, url, version);
 impl_host_request!(request_process, request_restart, request_callback);
 
 pub struct HostExtensions<'a> {
-    clap_host: &'a clap_host,
+    host: &'a Host,
 }
 
 impl<'a> HostExtensions<'a> {
-    // Safety:
-    // The reference to clap_host must point to a valid clap_host struct,
-    // obtained from host via Factory.
-    // Additionally, the clap_host.get_extension() method must be a non-null
-    // pointer.
-    unsafe fn new(clap_host: &'a clap_host) -> Self {
-        Self { clap_host }
+    fn new(host: &'a Host) -> Self {
+        Self { host }
     }
 
     fn get_extension_ptr(&self, extension_id: &CStr) -> Option<*const c_void> {
         // HostExtensions::new() guarantees that unwrap won't panic.
-        let callback = self.clap_host.get_extension.unwrap();
+        let callback = self.host.clap_host.get_extension.unwrap();
         // Safety:
-        // HostExtension::new() guarantees that the call is safe.
-        let ext_ptr = unsafe { callback(&raw const *self.clap_host, extension_id.as_ptr()) };
+        // ClapHost::try_new() guarantees that the call is safe.
+        let ext_ptr = unsafe { callback(&raw const *self.host.clap_host, extension_id.as_ptr()) };
         (!ext_ptr.is_null()).then_some(ext_ptr)
     }
 
-    pub fn log(self) -> Result<Log<'a>, Error> {
+    pub fn log(&self) -> Result<Log<'a>, Error> {
         let clap_host_log = self
             .get_extension_ptr(CLAP_EXT_LOG)
             .ok_or(Error::ExtensionNotFound("log"))?;
@@ -159,7 +193,7 @@ impl<'a> HostExtensions<'a> {
 
         // Safety:
         // We just checked if the pointer to clap_host_log is non-null.
-        Ok(Log::new(self.clap_host, unsafe { *clap_host_log }))
+        Ok(unsafe { Log::new(self.host, clap_host_log) })
     }
 }
 

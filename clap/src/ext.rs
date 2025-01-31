@@ -1,7 +1,6 @@
 use crate::{ext::audio_ports::AudioPortInfo, plugin::Plugin};
 
 pub mod audio_ports;
-pub mod log;
 
 pub trait Extensions<P: Plugin> {
     fn audio_ports() -> Option<impl AudioPorts<P>> {

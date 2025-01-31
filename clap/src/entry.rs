@@ -63,7 +63,7 @@ macro_rules! entry {
                 }
 
                 // Safety: We just checked that host is non-null.
-                let host = FactoryHost::new(unsafe{ std::ptr::NonNull::new_unchecked(host as *mut _)});
+                let host = unsafe { FactoryHost::new(host) };
                 // Safety: We checked if plug_id is non-null.
                 // The host guarantees that this is a valid C string now.
                 let plugin_id = unsafe { std::ffi::CStr::from_ptr(plugin_id) };

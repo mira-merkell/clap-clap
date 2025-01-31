@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     ffi::{CStr, CString},
     fmt::{Display, Formatter},
-    ptr::NonNull,
     sync::Arc,
 };
 
@@ -16,15 +15,18 @@ use crate::{
 
 /// This type exists only be visible from within `clap::entry!` macro.
 pub struct FactoryHost {
-    host: NonNull<clap_host>,
+    host: *const clap_host,
 }
 
 impl FactoryHost {
-    pub const fn new(host: NonNull<clap_host>) -> Self {
+    /// # Safety
+    ///
+    /// host must be non-null.
+    pub const unsafe fn new(host: *const clap_host) -> Self {
         Self { host }
     }
 
-    pub(crate) fn into_inner(self) -> NonNull<clap_host> {
+    pub(crate) fn into_inner(self) -> *const clap_host {
         self.host
     }
 }
@@ -57,7 +59,8 @@ impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
         // The pointer unwrapped from FactoryHost is a valid pointer
         // to a CLAP host, obtained as the argument passed to plugin
         // factory's create_plugin().
-        let host = unsafe { Host::try_from_factory(host) }.map_err(Error::CreateHost)?;
+        let host =
+            unsafe { Host::try_from_factory(host.into_inner()) }.map_err(Error::CreateHost)?;
         Ok(Runtime::<P>::initialize(Arc::new(host)).boxed_clap_plugin())
     }
 }
