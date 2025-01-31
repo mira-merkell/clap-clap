@@ -21,5 +21,4 @@ members = [
     "clap",
     "clap/clap-sys",
     "tests/test-dummy-plugin",
-    "tests/test-export-clap-entry"
 ]
