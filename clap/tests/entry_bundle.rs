@@ -41,7 +41,6 @@ fn export_clap_entry() {
     let get_factory = clap_entry.get_factory.unwrap();
     let factory = unsafe { get_factory(null()) };
     assert!(factory.is_null());
-
     let factory = unsafe { get_factory(CLAP_PLUGIN_FACTORY_ID.as_ptr()) };
     assert!(!factory.is_null());
     let factory = factory as *const clap_plugin_factory;
