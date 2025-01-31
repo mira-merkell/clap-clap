@@ -86,9 +86,12 @@ impl Factory {
             .expect("plugins_count should fit into u32")
     }
 
-    pub fn descriptor(&self, index: u32) -> &clap_plugin_descriptor {
-        self.plugins[usize::try_from(index).expect("index should fit into usize")]
-            .clap_plugin_descriptor()
+    pub fn descriptor(&self, index: u32) -> Result<&clap_plugin_descriptor, Error> {
+        let index = usize::try_from(index).map_err(|_| Error::IndexOutOfBounds)?;
+        (index < self.plugins.len())
+            // This needs to be lazy to avoid evaluating on invalid index.
+            .then(|| self.plugins[index].clap_plugin_descriptor())
+            .ok_or(Error::IndexOutOfBounds)
     }
 
     pub fn boxed_clap_plugin(
@@ -108,6 +111,7 @@ unsafe impl Sync for Factory {}
 pub enum Error {
     PluginIdNotFound,
     CreateHost(host::Error),
+    IndexOutOfBounds,
 }
 
 impl Display for Error {
@@ -115,6 +119,7 @@ impl Display for Error {
         match self {
             Error::PluginIdNotFound => write!(f, "factory plugin id not found"),
             Error::CreateHost(_) => write!(f, "create host handle"),
+            Error::IndexOutOfBounds => write!(f, "index out ouf bounds"),
         }
     }
 }

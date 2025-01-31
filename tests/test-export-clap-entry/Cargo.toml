@@ -1,0 +1,19 @@
+# To run the test in this create, you have to build the entire workspace
+# first.  Issuing just cargo test --workspace is not enough, as the
+# dymical library test_dummy_plugin.so will not be created.
+#
+# See this issue for more information:
+# https://github.com/rust-lang/cargo/issues/8628
+#
+
+[package]
+name = "test-export-plugin-entry"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap-clap = { path = "../.." }
+
+[build-dependencies]
+test-dummy-plugin = { path = "../test-dummy-plugin" }
+

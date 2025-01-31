@@ -44,6 +44,8 @@ macro_rules! entry {
                 index: u32,
             ) -> *const clap_plugin_descriptor {
                 factory_init_once().descriptor(index)
+                    .map(|&desc| &raw const desc)
+                    .unwrap_or(std::ptr::null())
             }
 
             /// Safety:

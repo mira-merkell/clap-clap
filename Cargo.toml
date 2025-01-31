@@ -8,7 +8,7 @@ edition = "2024"
 crate-type = ["rlib"]
 
 [dependencies]
-clap = {path = "./clap"}
+clap = { path = "./clap" }
 
 [[example]]
 name = "ping-pong"
@@ -20,4 +20,6 @@ resolver = "3"
 members = [
     "clap",
     "clap/clap-sys",
+    "tests/test-dummy-plugin",
+    "tests/test-export-clap-entry"
 ]
