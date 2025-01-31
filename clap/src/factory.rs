@@ -39,7 +39,7 @@ impl<P: Plugin> FactoryPluginDescriptor<P> {
 
 pub trait FactoryPlugin {
     fn plugin_id(&self) -> &CStr;
-    fn clap_plugin_descriptor(&self) -> &clap_plugin_descriptor;
+    fn clap_plugin_descriptor(&self) -> *const clap_plugin_descriptor;
     fn boxed_clap_plugin(&self, host: FactoryHost) -> Result<Box<clap_plugin>, Error>;
 }
 
@@ -48,8 +48,8 @@ impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
         &self.0.id
     }
 
-    fn clap_plugin_descriptor(&self) -> &clap_plugin_descriptor {
-        &self.0.raw_descriptor
+    fn clap_plugin_descriptor(&self) -> *const clap_plugin_descriptor {
+        &raw const self.0.raw_descriptor
     }
 
     fn boxed_clap_plugin(&self, host: FactoryHost) -> Result<Box<clap_plugin>, Error> {
@@ -86,7 +86,7 @@ impl Factory {
             .expect("plugins_count should fit into u32")
     }
 
-    pub fn descriptor(&self, index: u32) -> Result<&clap_plugin_descriptor, Error> {
+    pub fn descriptor(&self, index: u32) -> Result<*const clap_plugin_descriptor, Error> {
         let index = usize::try_from(index).map_err(|_| Error::IndexOutOfBounds)?;
         (index < self.plugins.len())
             // This needs to be lazy to avoid evaluating on invalid index.

@@ -44,7 +44,6 @@ macro_rules! entry {
                 index: u32,
             ) -> *const clap_plugin_descriptor {
                 factory_init_once().descriptor(index)
-                    .map(|&desc| &raw const desc)
                     .unwrap_or(std::ptr::null())
             }
 
@@ -103,7 +102,8 @@ macro_rules! entry {
             #[allow(non_upper_case_globals)]
             #[allow(warnings, unused)]
             #[unsafe(no_mangle)]
-            static clap_entry: clap_plugin_entry = clap_plugin_entry {
+            // Make this symbor pub(crate), so that tests cat access it.
+            pub(crate) static clap_entry: clap_plugin_entry = clap_plugin_entry {
                 clap_version: CLAP_VERSION,
                 init: Some(init),
                 deinit: Some(deinit),
