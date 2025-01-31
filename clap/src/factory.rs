@@ -42,7 +42,7 @@ impl<P: Plugin> FactoryPluginDescriptor<P> {
 pub trait FactoryPlugin {
     fn plugin_id(&self) -> &CStr;
     fn clap_plugin_descriptor(&self) -> *const clap_plugin_descriptor;
-    fn boxed_clap_plugin(&self, host: FactoryHost) -> Result<Box<clap_plugin>, Error>;
+    fn clap_plugin(&self, host: FactoryHost) -> Result<*const clap_plugin, Error>;
 }
 
 impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
@@ -54,14 +54,16 @@ impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
         &raw const self.0.raw_descriptor
     }
 
-    fn boxed_clap_plugin(&self, host: FactoryHost) -> Result<Box<clap_plugin>, Error> {
+    fn clap_plugin(&self, host: FactoryHost) -> Result<*const clap_plugin, Error> {
         // Safety:
         // The pointer unwrapped from FactoryHost is a valid pointer
         // to a CLAP host, obtained as the argument passed to plugin
         // factory's create_plugin().
         let host =
             unsafe { Host::try_from_factory(host.into_inner()) }.map_err(Error::CreateHost)?;
-        Ok(Runtime::<P>::initialize(Arc::new(host)).boxed_clap_plugin())
+        Ok(Runtime::<P>::initialize(Arc::new(host))
+            .into_clap_plugin()
+            .into_inner())
     }
 }
 
@@ -97,13 +99,13 @@ impl Factory {
             .ok_or(Error::IndexOutOfBounds)
     }
 
-    pub fn boxed_clap_plugin(
+    pub fn clap_plugin(
         &self,
         plugin_id: &CStr,
         host: FactoryHost,
-    ) -> Result<Box<clap_plugin>, Error> {
+    ) -> Result<*const clap_plugin, Error> {
         let i = self.id_map.get(plugin_id).ok_or(Error::PluginIdNotFound)?;
-        self.plugins[*i].boxed_clap_plugin(host)
+        self.plugins[*i].clap_plugin(host)
     }
 }
 

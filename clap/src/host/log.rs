@@ -16,7 +16,7 @@ pub struct Log<'a> {
 }
 
 impl<'a> Log<'a> {
-    /// Safety:
+    /// # Safety
     ///
     /// The pointer to clap_host_log must be non-null
     pub(crate) unsafe fn new(host: &'a Host, clap_host_log: *const clap_host_log) -> Self {
@@ -102,7 +102,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::Callback => write!(f, "callback not found"),
-            Error::NulError(e) => write!(f, "error converting to C string: {}", e),
+            Error::NulError(e) => write!(f, "error converting to C string: {e}"),
         }
     }
 }

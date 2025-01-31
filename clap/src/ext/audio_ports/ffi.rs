@@ -2,7 +2,7 @@ use clap_sys::{clap_audio_port_info, clap_plugin, clap_plugin_audio_ports};
 
 use crate::{
     ext::AudioPorts,
-    plugin::{Plugin, Runtime},
+    plugin::{ClapPlugin, Plugin},
 };
 
 extern "C" fn count<A, P>(plugin: *const clap_plugin, is_input: bool) -> u32
@@ -16,14 +16,14 @@ where
     // Safety:
     // We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
 
     // Safety:
     // This function is called on the main thread.
     // It is guaranteed that we are the only function accessing the plugin now.
-    // So the mutable reference to runtime.plugin for the duration of this call is
+    // So the mutable reference to plugin for the duration of this call is
     // safe.
-    let plugin = unsafe { &mut (*runtime).plugin };
+    let plugin = unsafe { clap_plugin.plugin() };
 
     if is_input {
         A::inputs(plugin) as u32
@@ -48,14 +48,14 @@ where
     // Safety:
     // We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
 
     // Safety:
     // This function is called on the main thread.
     // It is guaranteed that we are the only function accessing the plugin now.
-    // So the mutable reference to runtime.plugin for the duration of this call is
+    // So the mutable reference to plugin for the duration of this call is
     // safe.
-    let plugin = unsafe { &mut (*runtime).plugin };
+    let plugin = unsafe { clap_plugin.plugin() };
 
     let index = index.try_into().expect("index must fit into usize");
 

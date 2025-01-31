@@ -1,5 +1,7 @@
 use std::{
     fmt::Display,
+    marker::PhantomData,
+    ops::Deref,
     sync::{Arc, Mutex},
 };
 
@@ -13,9 +15,10 @@ use crate::{
 };
 
 mod desc;
-mod ffi;
 
 pub(crate) use desc::PluginDescriptor;
+
+mod ffi;
 
 pub trait Plugin: Default {
     const ID: &'static str;
@@ -100,20 +103,100 @@ impl<P: Plugin> Runtime<P> {
         }
     }
 
-    pub(crate) fn boxed_clap_plugin(self) -> Box<clap_plugin> {
-        ffi::box_clap_plugin(self)
+    pub(crate) fn into_clap_plugin(self) -> ClapPlugin<P> {
+        // Safety:
+        // The leaked (via Box::into_raw) pointer satisfies requirements
+        // for a safe call to ClapPlugin::new():
+        // 1. it is non-null
+        // 2. it represents a valid clap_plugin tied to type P.
+        unsafe { ClapPlugin::new(Box::into_raw(ffi::box_clap_plugin(self))) }
     }
 
-    /// Safety:
+    /// Retake ownership of the runtime from the pointer to  clap_plugin.
+    ///
+    /// # Safety:
+    ///
+    /// The caller must assure it's only them who have access to the entire
+    /// runtime: both main thread and the audio thread.
+    /// This can requirement can be met during plugin initialization and
+    /// destruction.
+    unsafe fn from_clap_plugin(clap_plugin: ClapPlugin<P>) -> Self {
+        let plugin_data = clap_plugin.plugin_data as *mut _;
+        // Safety:
+        // We can transmute the pointer to plugin_data like this, because:
+        // 1. We have exclusive reference to it.
+        // 2. We know the pointer's real type because of the constraints put on the
+        //    constructor of ClapPlugin.
+        // 3. We know that the pointer was initially leaked with Box::into_raw().
+        *unsafe { Box::from_raw(plugin_data) }
+    }
+}
+
+/// Safe wrapper around clap_plugin.
+pub(crate) struct ClapPlugin<P: Plugin>(*const clap_plugin, PhantomData<P>);
+
+impl<P: Plugin> ClapPlugin<P> {
+    /// # Safety
     ///
     /// 1. The user must assure the pointer to plugin is non-null.
     /// 2. The pointer must point to a valid clap_plugin structure tied to the
     ///    plugin type P, and living in the host.
     ///
     /// Typically, a valid pointer comes from the host calling the plugin's
-    /// methods.
-    pub(crate) const unsafe fn from_host_ptr(clap_plugin: *const clap_plugin) -> *mut Self {
-        unsafe { (*clap_plugin).plugin_data as *mut _ }
+    /// methods, or from Runtime::into_clap_plugin()
+    pub(crate) const unsafe fn new(clap_plugin: *const clap_plugin) -> Self {
+        Self(clap_plugin, PhantomData)
+    }
+
+    pub(crate) const fn into_inner(self) -> *const clap_plugin {
+        self.0
+    }
+
+    /// Obtain a mutable reference to the entire runtime.
+    ///
+    /// # Safety
+    ///
+    /// The caller must assure they're the only ones who access the runtime.
+    pub(crate) const unsafe fn runtime(&mut self) -> &mut Runtime<P> {
+        let runtime: *mut Runtime<P> = unsafe { *self.0 }.plugin_data as *mut _;
+        unsafe { &mut *runtime }
+    }
+
+    /// Obtain a mutable reference to plugin.
+    ///
+    /// # Safety
+    ///
+    /// The caller must assure they're the only ones who access the plugin.
+    pub(crate) const unsafe fn plugin(&mut self) -> &mut P {
+        let runtime: *mut Runtime<P> = unsafe { *self.0 }.plugin_data as *mut _;
+        unsafe { &mut (*runtime).plugin }
+    }
+
+    /// Obtain a mutable reference to audio thread.
+    ///
+    /// # Safety
+    ///
+    /// The caller must assure they're the only ones who access the
+    /// audio_thread.
+    pub(crate) const unsafe fn audio_thread(&mut self) -> Option<&mut P::AudioThread> {
+        let runtime: *mut Runtime<P> = unsafe { *self.0 }.plugin_data as *mut _;
+        unsafe { &mut (*runtime).audio_thread }.as_mut()
+    }
+
+    /// Obtain a mutex to plugin extensions.
+    pub(crate) const fn plugin_extensions(&mut self) -> &Mutex<ClapPluginExtensions<P>> {
+        let runtime: *mut Runtime<P> = unsafe { *self.0 }.plugin_data as *mut _;
+        unsafe { &(*runtime).plugin_extensions }
+    }
+}
+
+impl<P: Plugin> Deref for ClapPlugin<P> {
+    type Target = clap_plugin;
+
+    fn deref(&self) -> &Self::Target {
+        // Safety:
+        // ClapPlugin constructor guarantees that this is safe.
+        unsafe { &*self.0 }
     }
 }
 

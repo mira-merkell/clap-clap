@@ -9,7 +9,7 @@ use clap_sys::{
 };
 
 use crate::{
-    plugin::{AudioThread, Plugin, Runtime},
+    plugin::{AudioThread, ClapPlugin, Plugin, Runtime},
     process::Process,
 };
 
@@ -21,18 +21,15 @@ extern "C" fn init<P: Plugin>(plugin: *const clap_plugin) -> bool {
     // Safety:
     // We just checked that the pointer is non-null and the plugin
     // has been obtained from host, and is tied to type P.
-    let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
 
     // Safety:
     // This function is called on the main thread during the initialization.
-    // It is guaranteed that we are the only function accessing
-    // runtime.plugin or runtime.host now.
-    // So a mutable reference to runtime.plugin or runtime.host
-    // for the duration of this call is safe.
-    let plugin = unsafe { &mut (*runtime).plugin };
-    let host = unsafe { &(*runtime).host }.clone();
+    // It is guaranteed that we are the only function accessing the entire runtime.
+    let runtime = unsafe { clap_plugin.runtime() };
+    let host = runtime.host.clone();
 
-    plugin.init(host).is_ok()
+    runtime.plugin.init(host).is_ok()
 }
 
 extern "C" fn destroy<P: Plugin>(plugin: *const clap_plugin) {
@@ -42,15 +39,13 @@ extern "C" fn destroy<P: Plugin>(plugin: *const clap_plugin) {
     // Safety:
     // We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
+    let clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
 
     // Safety:
     // This function is called on the main thread to destroy the plugin.
-    // It is guaranteed that we are the only function accessing the plugin now.
-    // The pointer was initially obtained from the call to Box::into_raw,
-    // in box_clap_plugin() below.
-    // So retaking the ownership of the runtime by Box::from_raw is safe.
-    let runtime = unsafe { Box::from_raw(runtime) };
+    // It is guaranteed that we are the only function accessing the runtime now.
+    // So retaking the ownership of the runtime is safe.
+    let runtime = unsafe { Runtime::from_clap_plugin(clap_plugin) };
 
     drop(runtime)
 }
@@ -67,16 +62,15 @@ extern "C" fn activate<P: Plugin>(
     // Safety:
     // We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
 
     // Safety:
-    // This function is called on the main thread.
-    // It is guaranteed that we are the only function accessing
-    // runtime.plugin and runtime.audio_thread now, because the audio thread
-    // hasn't started yet. So a mutable reference to runtime.plugin
-    // and runtime.audio_thread for the duration of this call is safe.
-    let plugin = unsafe { &mut (*runtime).plugin };
-    let audio_thread = unsafe { &mut (*runtime).audio_thread };
+    // This function is called on the main thread. It is guaranteed that we are the
+    // only function accessing runtime now, because the audio thread hasn't
+    // started yet. So a mutable reference to runtime is safe.
+    let runtime = unsafe { clap_plugin.runtime() };
+    let (plugin, audio_thread) = (&mut runtime.plugin, &mut runtime.audio_thread);
+
     let should_be_none = mem::replace(
         audio_thread,
         plugin
@@ -98,7 +92,7 @@ extern "C" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
     // Safety:
     // We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
 
     // Safety:
     // This function is called on the main thread.
@@ -107,7 +101,7 @@ extern "C" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
     // function that has access to the entire runtime now.
     // So the mutable reference to the entire runtime for the duration of this call
     // is safe.
-    let runtime = unsafe { &mut *runtime };
+    let runtime = unsafe { clap_plugin.runtime() };
 
     if let Some(audio_thread) = runtime.audio_thread.take() {
         audio_thread.deactivate(&mut runtime.plugin);
@@ -121,14 +115,13 @@ extern "C" fn start_processing<P: Plugin>(plugin: *const clap_plugin) -> bool {
     // Safety:
     // We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
 
     // Safety:
     // This function is called on the audio thread.  It is guaranteed that
-    // we are the only function accessing runtime.audio_thread now.
-    // So a mutable reference to runtime.audio_thread for the duration of this
-    // call is safe.
-    let Some(audio_thread) = (unsafe { &mut (*runtime).audio_thread }) else {
+    // we are the only function accessing audio_thread now. So a mutable reference
+    // to audio_thread for the duration of this call is safe.
+    let Some(audio_thread) = (unsafe { clap_plugin.audio_thread() }) else {
         return false;
     };
 
@@ -142,14 +135,13 @@ extern "C" fn stop_processing<P: Plugin>(plugin: *const clap_plugin) {
     // Safety:
     // We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
 
     // Safety:
     // This function is called on the audio thread.  It is guaranteed that
-    // we are the only function accessing runtime.audio_thread now.
-    // So a mutable reference to runtime.audio_thread for the duration of this
-    // call is safe.
-    let Some(audio_thread) = (unsafe { &mut (*runtime).audio_thread }) else {
+    // we are the only function accessing audio_thread now. So a mutable reference
+    // to audio_thread for the duration of this call is safe.
+    let Some(audio_thread) = (unsafe { clap_plugin.audio_thread() }) else {
         return;
     };
 
@@ -163,14 +155,13 @@ extern "C" fn reset<P: Plugin>(plugin: *const clap_plugin) {
     // Safety:
     // We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
 
     // Safety:
     // This function is called on the audio thread.  It is guaranteed that
-    // we are the only function accessing runtime.audio_thread now.
-    // So a mutable reference to runtime.audio_thread for the duration of this
-    // call is safe.
-    let Some(audio_thread) = (unsafe { &mut (*runtime).audio_thread }) else {
+    // we are the only function accessing audio_thread now. So a mutable reference
+    // to audio_thread for the duration of this call is safe.
+    let Some(audio_thread) = (unsafe { clap_plugin.audio_thread() }) else {
         return;
     };
 
@@ -188,14 +179,13 @@ extern "C" fn process<P: Plugin>(
     // Safety:
     // We just checked that the pointer is non-null and the plugin
     // has been obtained from host, and is tied to type P.
-    let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
 
     // Safety:
     // This function is called on the audio thread.  It is guaranteed that
-    // we are the only function accessing runtime.audio_thread now.
-    // So a mutable reference to runtime.audio_thread for the duration of this
-    // call is safe.
-    let Some(audio_thread) = (unsafe { &mut (*runtime).audio_thread }) else {
+    // we are the only function accessing audio_thread now. So a mutable reference
+    // to audio_thread for the duration of this call is safe.
+    let Some(audio_thread) = (unsafe { clap_plugin.audio_thread() }) else {
         return CLAP_PROCESS_ERROR;
     };
 
@@ -222,7 +212,7 @@ extern "C" fn get_extension<P: Plugin>(
     // Safety:
     // We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
 
     // Safety:
     // The plugin id is a valid C string obtained from the host.  The C string
@@ -232,7 +222,7 @@ extern "C" fn get_extension<P: Plugin>(
     // Safety:
     // This function must be thread-safe.
     // We're accessing only runtime.plugin_extensions that is guarded by a Mutex.
-    let mutex = unsafe { &(*runtime).plugin_extensions };
+    let mutex = clap_plugin.plugin_extensions();
     let Ok(extensions) = mutex.lock() else {
         return null();
     };
@@ -253,14 +243,13 @@ extern "C" fn on_main_thread<P: Plugin>(plugin: *const clap_plugin) {
     // Safety:
     // We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let runtime = unsafe { Runtime::<P>::from_host_ptr(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
 
     // Safety:
     // This function is called on the main thread.
     // It is guaranteed that we are the only function accessing the plugin now.
-    // So the mutable reference to runtime.plugin for the duration of this call is
-    // safe.
-    let plugin = unsafe { &mut (*runtime).plugin };
+    // So the mutable reference to plugin for the duration of this call is safe.
+    let plugin = unsafe { clap_plugin.plugin() };
 
     plugin.on_main_thread();
 }
