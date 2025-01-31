@@ -1,9 +1,16 @@
-use crate::factory::FactoryHost;
-use crate::{ext::log, ext::log::Log, version::ClapVersion};
+use std::{
+    ffi::{CStr, c_void},
+    fmt::{Display, Formatter},
+    str::Utf8Error,
+};
+
 use clap_sys::{CLAP_EXT_LOG, clap_host, clap_host_log};
-use std::ffi::{CStr, c_void};
-use std::fmt::{Display, Formatter};
-use std::str::Utf8Error;
+
+use crate::{
+    ext::{log, log::Log},
+    factory::FactoryHost,
+    version::ClapVersion,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
@@ -81,7 +88,8 @@ unsafe impl Sync for Host {}
 impl Host {
     // Safety:
     // The host argument must be a valid pointer (wrapped in FactoryHost)
-    // to a CLAP host, obtained as the argument passed to plugin factory's create_plugin().
+    // to a CLAP host, obtained as the argument passed to plugin factory's
+    // create_plugin().
     //
     // The function returns a Host struct if all host methods are non-null pointers,
     // and the Host description strings are properly validated UTF-8 strings.
@@ -163,7 +171,8 @@ impl<'a> HostExtensions<'a> {
     // Safety:
     // The reference to clap_host must point to a valid clap_host struct,
     // obtained from host via Factory.
-    // Additionally, the clap_host.get_extension() method must be a non-null pointer.
+    // Additionally, the clap_host.get_extension() method must be a non-null
+    // pointer.
     unsafe fn new(clap_host: &'a clap_host) -> Self {
         Self { clap_host }
     }

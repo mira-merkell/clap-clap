@@ -1,10 +1,14 @@
-use crate::host;
+use std::{
+    ffi::{CString, NulError},
+    fmt::{Display, Formatter},
+};
+
 use clap_sys::{
     CLAP_LOG_DEBUG, CLAP_LOG_ERROR, CLAP_LOG_FATAL, CLAP_LOG_HOST_MISBEHAVING, CLAP_LOG_INFO,
     CLAP_LOG_PLUGIN_MISBEHAVING, CLAP_LOG_WARNING, clap_host, clap_host_log, clap_log_severity,
 };
-use std::ffi::{CString, NulError};
-use std::fmt::{Display, Formatter};
+
+use crate::host;
 
 pub struct Log<'a> {
     clap_host: &'a clap_host,

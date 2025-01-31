@@ -1,10 +1,13 @@
+use std::{
+    ffi::{CStr, c_char, c_void},
+    ptr::{null, null_mut},
+};
+
 use clap::{
     Error,
     factory::{Factory, FactoryPluginDescriptor},
     plugin::Plugin,
 };
-use std::ffi::{CStr, c_char, c_void};
-use std::ptr::{null, null_mut};
 
 const NAME: &CStr = c"test.plugin";
 
@@ -57,9 +60,11 @@ fn create_factory() -> Factory {
 }
 
 mod bad_host {
-    use crate::{DummyHost, NAME, create_factory};
-    use clap::factory::FactoryHost;
     use std::ptr::{NonNull, null};
+
+    use clap::factory::FactoryHost;
+
+    use crate::{DummyHost, NAME, create_factory};
 
     #[test]
     #[should_panic(expected = "called `Result::unwrap()` on an `Err` value: PluginIdNotFound")]
@@ -79,8 +84,8 @@ mod bad_host {
             .boxed_clap_plugin(NAME, FactoryHost::new(host))
             .unwrap();
 
-        // Runtime gets leaked here.  We need to make Runtime visible to tests first,
-        // but hidden to the user.
+        // Runtime gets leaked here.  We need to make Runtime visible to tests
+        // first, but hidden to the user.
     }
 
     macro_rules! test_host_null_desc {

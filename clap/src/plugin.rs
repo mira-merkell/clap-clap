@@ -1,10 +1,16 @@
-use crate::ext::Extensions;
-use crate::host::Host;
-use crate::process::{Process};
-use crate::{ext::audio_ports::ClapPluginAudioPorts, process};
+use std::{
+    fmt::Display,
+    sync::{Arc, Mutex},
+};
+
 use clap_sys::clap_plugin;
-use std::fmt::Display;
-use std::sync::{Arc, Mutex};
+
+use crate::{
+    ext::{Extensions, audio_ports::ClapPluginAudioPorts},
+    host::Host,
+    process,
+    process::Process,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {}
@@ -113,17 +119,19 @@ impl<P: Plugin> Runtime<P> {
     /// Safety:
     ///
     /// 1. The user must assure the pointer to plugin is non-null.
-    /// 2. The pointer must point to a valid clap_plugin structure tied to the plugin
-    ///    type P, and living in the host.
+    /// 2. The pointer must point to a valid clap_plugin structure tied to the
+    ///    plugin type P, and living in the host.
     ///
-    /// Typically, a valid pointer comes from the host calling the plugin's methods.
+    /// Typically, a valid pointer comes from the host calling the plugin's
+    /// methods.
     pub(crate) const unsafe fn from_host_ptr(clap_plugin: *const clap_plugin) -> *mut Self {
         unsafe { (*clap_plugin).plugin_data as *mut _ }
     }
 }
 
-use crate::process::Status::Continue;
 pub(crate) use desc::PluginDescriptor;
+
+use crate::process::Status::Continue;
 
 mod desc;
 mod ffi;

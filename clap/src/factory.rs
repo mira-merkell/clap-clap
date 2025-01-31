@@ -1,12 +1,18 @@
-use crate::host;
-use crate::host::Host;
-use crate::plugin::{Plugin, PluginDescriptor, Runtime};
+use std::{
+    collections::HashMap,
+    ffi::{CStr, CString},
+    fmt::{Display, Formatter},
+    ptr::NonNull,
+    sync::Arc,
+};
+
 use clap_sys::{clap_host, clap_plugin, clap_plugin_descriptor};
-use std::collections::HashMap;
-use std::ffi::{CStr, CString};
-use std::fmt::{Display, Formatter};
-use std::ptr::NonNull;
-use std::sync::Arc;
+
+use crate::{
+    host,
+    host::Host,
+    plugin::{Plugin, PluginDescriptor, Runtime},
+};
 
 /// This type exists only be visible from within `clap::entry!` macro.
 pub struct FactoryHost {

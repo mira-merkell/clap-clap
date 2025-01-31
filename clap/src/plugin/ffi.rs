@@ -1,14 +1,16 @@
-use crate::{
-    plugin::{AudioThread, Plugin, Runtime},
-    process::Process,
-};
-use clap_sys::{
-    CLAP_EXT_AUDIO_PORTS, CLAP_PROCESS_ERROR, clap_plugin, clap_process, clap_process_status,
-};
 use std::{
     ffi::{CStr, c_char, c_void},
     mem,
     ptr::null,
+};
+
+use clap_sys::{
+    CLAP_EXT_AUDIO_PORTS, CLAP_PROCESS_ERROR, clap_plugin, clap_process, clap_process_status,
+};
+
+use crate::{
+    plugin::{AudioThread, Plugin, Runtime},
+    process::Process,
 };
 
 #[allow(warnings, unused)]
@@ -100,10 +102,11 @@ extern "C" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
 
     // Safety:
     // This function is called on the main thread.
-    // It is guaranteed that we are the only function accessing runtime.audio_thread now,
-    // and we are on the main thread -- so it is guaranteed we are the only function that
-    // has access to the entire runtime now.
-    // So the mutable reference to the entire runtime for the duration of this call is safe.
+    // It is guaranteed that we are the only function accessing runtime.audio_thread
+    // now, and we are on the main thread -- so it is guaranteed we are the only
+    // function that has access to the entire runtime now.
+    // So the mutable reference to the entire runtime for the duration of this call
+    // is safe.
     let runtime = unsafe { &mut *runtime };
 
     if let Some(audio_thread) = runtime.audio_thread.take() {
@@ -255,7 +258,8 @@ extern "C" fn on_main_thread<P: Plugin>(plugin: *const clap_plugin) {
     // Safety:
     // This function is called on the main thread.
     // It is guaranteed that we are the only function accessing the plugin now.
-    // So the mutable reference to runtime.plugin for the duration of this call is safe.
+    // So the mutable reference to runtime.plugin for the duration of this call is
+    // safe.
     let plugin = unsafe { &mut (*runtime).plugin };
 
     plugin.on_main_thread();

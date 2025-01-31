@@ -4,7 +4,7 @@ use std::path::PathBuf;
 fn main() {
     // Tell cargo to look for shared libraries in the specified directory
     println!("cargo:rustc-link-search=clap/include/clap");
-    
+
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.

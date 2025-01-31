@@ -1,11 +1,12 @@
+use std::sync::Arc;
+
 use clap_clap::clap::{
-    ext::{audio_ports::StereoPorts, AudioPorts, Extensions},
+    Error,
+    ext::{AudioPorts, Extensions, audio_ports::StereoPorts},
     host::Host,
     plugin::{AudioThread, Plugin},
     process::{Process, Status, Status::Continue},
-    Error,
 };
-use std::sync::Arc;
 
 #[derive(Default)]
 struct PingPong;
@@ -76,7 +77,8 @@ impl AudioThread<PingPong> for Delay {
                 frame[0] = front_l;
                 frame[1] = front_r;
 
-                self.cur += 1; // Prepare for overflow in about 12 million years.
+                self.cur += 1; // Prepare for overflow in about 12 million
+                // years.
             });
 
         // Pass the dry signal to the second output port.

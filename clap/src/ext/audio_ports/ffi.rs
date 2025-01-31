@@ -1,6 +1,9 @@
-use crate::ext::AudioPorts;
-use crate::plugin::{Plugin, Runtime};
 use clap_sys::{clap_audio_port_info, clap_plugin, clap_plugin_audio_ports};
+
+use crate::{
+    ext::AudioPorts,
+    plugin::{Plugin, Runtime},
+};
 
 extern "C" fn count<A, P>(plugin: *const clap_plugin, is_input: bool) -> u32
 where
@@ -18,7 +21,8 @@ where
     // Safety:
     // This function is called on the main thread.
     // It is guaranteed that we are the only function accessing the plugin now.
-    // So the mutable reference to runtime.plugin for the duration of this call is safe.
+    // So the mutable reference to runtime.plugin for the duration of this call is
+    // safe.
     let plugin = unsafe { &mut (*runtime).plugin };
 
     if is_input {
@@ -49,7 +53,8 @@ where
     // Safety:
     // This function is called on the main thread.
     // It is guaranteed that we are the only function accessing the plugin now.
-    // So the mutable reference to runtime.plugin for the duration of this call is safe.
+    // So the mutable reference to runtime.plugin for the duration of this call is
+    // safe.
     let plugin = unsafe { &mut (*runtime).plugin };
 
     let index = index.try_into().expect("index must fit into usize");

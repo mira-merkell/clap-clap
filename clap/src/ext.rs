@@ -1,5 +1,4 @@
-use crate::ext::audio_ports::AudioPortInfo;
-use crate::plugin::Plugin;
+use crate::{ext::audio_ports::AudioPortInfo, plugin::Plugin};
 
 pub trait Extensions<P: Plugin> {
     fn audio_ports() -> Option<impl AudioPorts<P>> {

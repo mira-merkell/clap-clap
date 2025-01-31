@@ -1,9 +1,13 @@
-use crate::plugin::Plugin;
+use std::{
+    ffi::{CString, c_char},
+    marker::PhantomData,
+    ptr::null,
+    str::FromStr,
+};
+
 use clap_sys::{CLAP_VERSION, clap_plugin_descriptor};
-use std::ffi::{CString, c_char};
-use std::marker::PhantomData;
-use std::ptr::null;
-use std::str::FromStr;
+
+use crate::plugin::Plugin;
 
 #[allow(dead_code)]
 pub(crate) struct PluginDescriptor<P> {
