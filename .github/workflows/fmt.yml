@@ -21,6 +21,9 @@ jobs:
         with:
           submodules: recursive
       - name: Update Rust
-        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+        run: |
+          rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+          rustup component add rustfmt
       - name: Format
-        run: cargo fmt --check --verbose --all
+        run: |
+          cargo fmt --check --verbose --all

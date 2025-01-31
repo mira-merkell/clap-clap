@@ -24,8 +24,11 @@ jobs:
         with:
           submodules: recursive
       - name: Update Rust
-        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+        run: |
+          rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
       - name: Build
-        run: cargo build --verbose --workspace --profile ${{ matrix.profile }}
+        run: |
+          cargo build --verbose --workspace --profile ${{ matrix.profile }}
       - name: Test
-        run: cargo test --verbose --workspace --profile ${{ matrix.profile }}
+        run: |
+          cargo test --verbose --workspace --profile ${{ matrix.profile }}
