@@ -1,4 +1,4 @@
-name: CI
+name: Docs
 
 on:
   push:
@@ -14,7 +14,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        profile: [ dev, release ]
         os: [ ubuntu-24.04, windows-2022 ]
         toolchain:
           - beta
@@ -25,7 +24,7 @@ jobs:
           submodules: recursive
       - name: Update Rust
         run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
-      - name: Build
-        run: cargo build --verbose --workspace --profile ${{ matrix.profile }}
-      - name: Test
-        run: cargo test --verbose --workspace --profile ${{ matrix.profile }}
+      - name: Build docs
+        run: cargo doc --verbose --workspace
+      - name: Test docs
+        run: cargo test --doc --verbose --workspace
