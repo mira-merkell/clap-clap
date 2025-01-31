@@ -1,29 +1,27 @@
-use std::ptr::{NonNull, null};
+use std::ptr::null;
 
 use clap::factory::FactoryHost;
 
-use crate::{DummyHost, NAME, create_factory};
+use crate::{create_factory, DummyHost, NAME};
 
 #[test]
 #[should_panic(expected = "called `Result::unwrap()` on an `Err` value: PluginIdNotFound")]
 fn wrong_plugin_id() {
     let mut host = DummyHost::new();
-    let host = NonNull::new(&raw mut host.0).unwrap();
     create_factory()
-        .boxed_clap_plugin(c"testxxxn", FactoryHost::new(host))
+        .boxed_clap_plugin(c"testxxxn", FactoryHost::new(host.as_non_null()))
         .unwrap();
 }
 
 #[test]
 fn dummy_host() {
     let mut host = DummyHost::new();
-    let host = NonNull::new(&raw mut host.0).unwrap();
-    create_factory()
-        .boxed_clap_plugin(NAME, FactoryHost::new(host))
+    let plugin = create_factory()
+        .boxed_clap_plugin(NAME, FactoryHost::new(host.as_non_null()))
         .unwrap();
 
-    // Runtime gets leaked here.  We need to make Runtime visible to tests
-    // first, but hidden to the user.
+    let destroy_plugin = plugin.destroy.unwrap();
+    unsafe { destroy_plugin(plugin.as_ref()) };
 }
 
 macro_rules! test_host_null_desc {
@@ -36,10 +34,8 @@ macro_rules! test_host_null_desc {
             let mut host = DummyHost::new();
 
             host.0.$erase_string = null();
-
-            let host = NonNull::new(&raw mut host.0).unwrap();
             create_factory()
-                .boxed_clap_plugin(NAME, FactoryHost::new(host))
+                .boxed_clap_plugin(NAME, FactoryHost::new(host.as_non_null()))
                 .unwrap();
         }
     };
@@ -61,9 +57,8 @@ macro_rules! test_host_null_method {
 
             host.0.$method = None;
 
-            let host = NonNull::new(&raw mut host.0).unwrap();
             create_factory()
-                .boxed_clap_plugin(NAME, FactoryHost::new(host))
+                .boxed_clap_plugin(NAME, FactoryHost::new(host.as_non_null()))
                 .unwrap();
         }
     };

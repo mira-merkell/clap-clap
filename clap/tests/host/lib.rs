@@ -1,14 +1,14 @@
 mod bad;
 
-use std::{
-    ffi::{CStr, c_char, c_void},
-    ptr::{null, null_mut},
-};
-
 use clap::{
-    Error,
     factory::{Factory, FactoryPluginDescriptor},
     plugin::Plugin,
+    Error,
+};
+use std::ptr::NonNull;
+use std::{
+    ffi::{c_char, c_void, CStr},
+    ptr::{null, null_mut},
 };
 
 const NAME: &CStr = c"test.plugin";
@@ -52,6 +52,10 @@ impl DummyHost {
             request_process: Some(request_process),
             request_callback: Some(request_callback),
         })
+    }
+    
+    fn as_non_null(&mut self) -> NonNull<clap_sys::clap_host> {
+        unsafe { NonNull::new_unchecked(&raw mut self.0) }
     }
 }
 
