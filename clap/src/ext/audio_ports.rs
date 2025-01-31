@@ -13,6 +13,8 @@ use crate::{
     plugin::Plugin,
 };
 
+mod ffi;
+
 #[derive(Debug, Default, Clone)]
 pub struct AudioPortInfo {
     id: ClapId,
@@ -267,5 +269,3 @@ impl<P: Plugin> ClapPluginAudioPorts<P> {
         }
     }
 }
-
-mod ffi;

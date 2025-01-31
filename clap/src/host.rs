@@ -12,41 +12,6 @@ use crate::{
     version::ClapVersion,
 };
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Error {
-    NullPtr,
-    Utf8Conversion(Utf8Error),
-    MethodNotFound(&'static str),
-    ExtensionNotFound(&'static str),
-    Log(log::Error),
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::NullPtr => write!(f, "null pointer"),
-            Error::Utf8Conversion(e) => write!(f, "error while converting C string: {e}"),
-            Error::MethodNotFound(name) => write!(f, "method not found: {name}"),
-            Error::ExtensionNotFound(name) => write!(f, "extension not found: {name}"),
-            Error::Log(e) => write!(f, "extension 'host_log': {e}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-impl From<Utf8Error> for Error {
-    fn from(value: Utf8Error) -> Self {
-        Self::Utf8Conversion(value)
-    }
-}
-
-impl From<Error> for crate::Error {
-    fn from(value: Error) -> Self {
-        Self::Host(value)
-    }
-}
-
 #[derive(Debug)]
 struct HostDescriptor {
     name: String,
@@ -195,5 +160,40 @@ impl<'a> HostExtensions<'a> {
         // Safety:
         // We just checked if the pointer to clap_host_log is non-null.
         Ok(Log::new(self.clap_host, unsafe { *clap_host_log }))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Error {
+    NullPtr,
+    Utf8Conversion(Utf8Error),
+    MethodNotFound(&'static str),
+    ExtensionNotFound(&'static str),
+    Log(log::Error),
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::NullPtr => write!(f, "null pointer"),
+            Error::Utf8Conversion(e) => write!(f, "error while converting C string: {e}"),
+            Error::MethodNotFound(name) => write!(f, "method not found: {name}"),
+            Error::ExtensionNotFound(name) => write!(f, "extension not found: {name}"),
+            Error::Log(e) => write!(f, "extension 'host_log': {e}"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<Utf8Error> for Error {
+    fn from(value: Utf8Error) -> Self {
+        Self::Utf8Conversion(value)
+    }
+}
+
+impl From<Error> for crate::Error {
+    fn from(value: Error) -> Self {
+        Self::Host(value)
     }
 }

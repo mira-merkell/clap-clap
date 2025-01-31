@@ -9,25 +9,13 @@ use crate::{
     ext::{Extensions, audio_ports::ClapPluginAudioPorts},
     host::Host,
     process,
-    process::Process,
+    process::{Process, Status::Continue},
 };
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Error {}
+mod desc;
+mod ffi;
 
-impl Display for Error {
-    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        Ok(())
-    }
-}
-
-impl std::error::Error for Error {}
-
-impl From<Error> for crate::Error {
-    fn from(value: Error) -> Self {
-        Self::Plugin(value)
-    }
-}
+pub(crate) use desc::PluginDescriptor;
 
 pub trait Plugin: Default {
     const ID: &'static str;
@@ -129,9 +117,19 @@ impl<P: Plugin> Runtime<P> {
     }
 }
 
-pub(crate) use desc::PluginDescriptor;
+#[derive(Debug, Clone, PartialEq)]
+pub enum Error {}
 
-use crate::process::Status::Continue;
+impl Display for Error {
+    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        Ok(())
+    }
+}
 
-mod desc;
-mod ffi;
+impl std::error::Error for Error {}
+
+impl From<Error> for crate::Error {
+    fn from(value: Error) -> Self {
+        Self::Plugin(value)
+    }
+}
