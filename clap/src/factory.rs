@@ -10,7 +10,8 @@ use clap_sys::{clap_host, clap_plugin, clap_plugin_descriptor};
 use crate::{
     host,
     host::Host,
-    plugin::{Plugin, PluginDescriptor, Runtime},
+    plugin,
+    plugin::{Plugin, PluginDescriptor, Runtime, build_plugin_descriptor},
 };
 
 /// This type exists only be visible from within `clap::entry!` macro.
@@ -51,7 +52,7 @@ impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
     }
 
     fn clap_plugin_descriptor(&self) -> *const clap_plugin_descriptor {
-        &raw const self.0.raw_descriptor
+        &raw const self.0.clap_plugin_descriptor
     }
 
     fn clap_plugin(&self, host: FactoryHost) -> Result<*const clap_plugin, Error> {
