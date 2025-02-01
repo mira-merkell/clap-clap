@@ -9,6 +9,8 @@ use clap_sys::{
     CLAP_PROCESS_TAIL, clap_audio_buffer, clap_process, clap_process_status,
 };
 
+use crate::process::Status::Continue;
+
 pub struct Process(NonNull<clap_process>);
 
 impl Process {
@@ -33,6 +35,22 @@ impl Process {
         // Safety: The requirements satisfied by the constructor guarantee that
         // dereferencing the pointer is safe.
         unsafe { *self.0.as_ptr() }.frames_count as usize
+    }
+
+    pub fn frames(
+        &mut self,
+        op: impl FnMut(&mut Frame<'_>) -> Result<Status, Error>,
+    ) -> Result<Status, crate::Error> {
+        let mut res = Ok(Continue);
+        let mut op = op;
+        for i in 0..self.frames_count() {
+            let mut frame = unsafe { Frame::new_unchecked(self, i) };
+            res = op(&mut frame);
+            if res.is_err() {
+                break;
+            }
+        }
+        res.map_err(Into::into)
     }
 
     pub fn transport(&self) {
@@ -316,5 +334,19 @@ impl std::error::Error for Error {}
 impl From<Error> for crate::Error {
     fn from(value: Error) -> Self {
         Self::Process(value)
+    }
+}
+
+pub struct Frame<'a> {
+    process: &'a mut Process,
+    index: usize,
+}
+
+impl<'a> Frame<'a> {
+    /// # Safety
+    ///
+    /// index must be less that process.frames_count().
+    const unsafe fn new_unchecked(process: &'a mut Process, index: usize) -> Self {
+        Self { process, index }
     }
 }
