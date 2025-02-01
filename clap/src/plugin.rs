@@ -21,6 +21,9 @@ pub(crate) use desc::PluginDescriptor;
 mod ffi;
 
 pub trait Plugin: Default {
+    type AudioThread: AudioThread<Self>;
+    type Extensions: Extensions<Self>;
+
     const ID: &'static str;
     const NAME: &'static str = "";
     const VENDOR: &'static str = "";
@@ -29,12 +32,10 @@ pub trait Plugin: Default {
     const SUPPORT_URL: &'static str = "";
     const VERSION: &'static str = "";
     const DESCRIPTION: &'static str = "";
+
     /// Arbitrary keywords separated by whitespace.
     /// For example: `"fx stereo distortion"`.
     const FEATURES: &'static str = "";
-
-    type AudioThread: AudioThread<Self>;
-    type Extensions: Extensions<Self>;
 
     #[allow(unused_variables)]
     fn init(&mut self, host: Arc<Host>) -> Result<(), crate::Error> {
