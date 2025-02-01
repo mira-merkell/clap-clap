@@ -45,8 +45,8 @@ pub trait Plugin: Default {
     fn activate(
         &mut self,
         sample_rate: f64,
-        min_frames: usize,
-        max_frames: usize,
+        min_frames: u32,
+        max_frames: u32,
     ) -> Result<Self::AudioThread, crate::Error>;
 
     fn on_main_thread(&mut self) {}

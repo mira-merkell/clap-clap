@@ -35,7 +35,7 @@ impl Plugin for PingPong {
     }
 
     /// Start the audio thread.
-    fn activate(&mut self, sample_rate: f64, _: usize, _: usize) -> Result<Delay, Error> {
+    fn activate(&mut self, sample_rate: f64, _: u32, _: u32) -> Result<Delay, Error> {
         // Allocate resources: a stereo delay line, 125ms.
         Ok(Delay::new(sample_rate, 0.125))
     }

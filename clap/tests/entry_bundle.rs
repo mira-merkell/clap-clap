@@ -18,8 +18,8 @@ macro_rules! impl_dummy_plugin {
             fn activate(
                 &mut self,
                 _: f64,
-                _: usize,
-                _: usize,
+                _: u32,
+                _: u32,
             ) -> Result<Self::AudioThread, clap::Error> {
                 Ok(())
             }

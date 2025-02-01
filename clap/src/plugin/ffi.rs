@@ -74,11 +74,7 @@ extern "C" fn activate<P: Plugin>(
     let should_be_none = mem::replace(
         audio_thread,
         plugin
-            .activate(
-                sample_rate,
-                min_frames_count as usize,
-                max_frames_count as usize,
-            )
+            .activate(sample_rate, min_frames_count, max_frames_count)
             .ok(),
     );
 
