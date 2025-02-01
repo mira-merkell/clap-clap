@@ -19,7 +19,6 @@ enum PluginDescriptorKey {
     SupportUrl,
     Version,
     Description,
-    Features,
 }
 
 #[derive(Default)]
@@ -37,7 +36,7 @@ impl PluginDescriptorBuilder {
 
     fn build<P: Plugin>(&self) -> Result<PluginDescriptor<P>, Error> {
         // Check for mandatory fields
-        if self.map.get(&Id).is_none() || self.map.get(&Name).is_none() {
+        if !self.map.contains_key(&Id) || !self.map.contains_key(&Name) {
             return Err(Error::MissingFields);
         }
         Ok(PluginDescriptor::new(
