@@ -62,27 +62,26 @@ impl AudioThread<PingPong> for Delay {
         let n = self.buf.len();
         // Link audio ports: in:0 and out:0 with a closure that processes
         // one frame (two channels) of samples at a time.
-        process
-            .link_audio_ports(0, 0)?
-            .with_op(|frame: &mut [f32]| {
-                let (front, back) = (self.cur % n, (n - 1 + self.cur) % n);
-                let (front_l, front_r) = (self.buf[front][0], self.buf[front][1]);
-
-                // Write from the in port into the back of the delay line.
-                // Feed the signal back with 0.66 damping, swap left/right channels.
-                self.buf[back][0] = frame[1] + 0.66 * front_r;
-                self.buf[back][1] = frame[0] + 0.66 * front_l;
-
-                // Write into the out port from the front of the delay line.
-                frame[0] = front_l;
-                frame[1] = front_r;
-
-                self.cur += 1; // Prepare for overflow in about 12 million
-                // years.
-            });
-
-        // Pass the dry signal to the second output port.
-        process.link_audio_ports(0, 1)?.with_op(|_| ());
+        // process
+        //     .frames(|frame: &mut Frame<'_>| {
+        //         // let (front, back) = (self.cur % n, (n - 1 + self.cur) % n);
+        //         // let (front_l, front_r) = (self.buf[front][0], self.buf[front][1]);
+        //         //
+        //         // // Write from the in port into the back of the delay line.
+        //         // // Feed the signal back with 0.66 damping, swap left/right
+        // channels.         // self.buf[back][0] = frame[1] + 0.66 * front_r;
+        //         // self.buf[back][1] = frame[0] + 0.66 * front_l;
+        //         //
+        //         // // Write into the out port from the front of the delay line.
+        //         // frame[0] = front_l;
+        //         // frame[1] = front_r;
+        //         //
+        //         // self.cur += 1; // Prepare for overflow in about 12 million
+        //         // // years.
+        //     });
+        //
+        // // Pass the dry signal to the second output port.
+        // process.link_audio_ports(0, 1)?.with_op(|_| ());
 
         Ok(Continue)
     }

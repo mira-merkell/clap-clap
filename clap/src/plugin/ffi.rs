@@ -1,7 +1,7 @@
 use std::{
     ffi::{CStr, c_char, c_void},
     mem,
-    ptr::null,
+    ptr::{NonNull, null},
 };
 
 use clap_sys::{
@@ -189,12 +189,15 @@ extern "C" fn process<P: Plugin>(
         return CLAP_PROCESS_ERROR;
     };
 
+    if process.is_null() {
+        return CLAP_PROCESS_ERROR;
+    }
     // Safety:
     // The pointer to clap_process is guaranteed to be valid and pointing
     // to an exclusive struct for the duration of this call.
     // So a mutable reference to process is safe.
     let process = unsafe { &mut *(process as *mut _) };
-    let process = &mut Process::new(process);
+    let process = &mut unsafe { Process::new(NonNull::new_unchecked(process)) };
     audio_thread
         .process(process)
         .map(Into::into)

@@ -68,7 +68,7 @@ pub trait AudioThread<P: Plugin>: Send + Sync + Sized {
 }
 
 impl<P: Plugin> AudioThread<P> for () {
-    fn process(&mut self, _: &mut Process<'_>) -> Result<process::Status, crate::Error> {
+    fn process(&mut self, _: &mut Process) -> Result<process::Status, crate::Error> {
         Ok(Continue)
     }
 }
