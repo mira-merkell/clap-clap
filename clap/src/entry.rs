@@ -68,7 +68,7 @@ macro_rules! entry {
                 // The host guarantees that this is a valid C string now.
                 let plugin_id = unsafe { std::ffi::CStr::from_ptr(plugin_id) };
                 factory_init_once()
-                        .clap_plugin(plugin_id, host)
+                        .create_plugin(plugin_id, host)
                         .unwrap_or(std::ptr::null_mut())
             }
 

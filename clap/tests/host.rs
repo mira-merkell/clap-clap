@@ -15,7 +15,7 @@ fn create_factory() -> Factory {
 fn wrong_plugin_id() {
     let host = DummyHost::new();
     create_factory()
-        .clap_plugin(c"testxxxn", unsafe {
+        .create_plugin(c"testxxxn", unsafe {
             FactoryHost::new(host.as_clap_host())
         })
         .unwrap();
@@ -25,7 +25,7 @@ fn wrong_plugin_id() {
 fn dummy_host() {
     let host = DummyHost::new();
     let plugin = create_factory()
-        .clap_plugin(c"dummy", unsafe { FactoryHost::new(host.as_clap_host()) })
+        .create_plugin(c"dummy", unsafe { FactoryHost::new(host.as_clap_host()) })
         .unwrap();
 
     unsafe { (*plugin).destroy.unwrap()(plugin) };
@@ -42,7 +42,7 @@ macro_rules! test_host_null_desc {
 
             host.0.$erase_string = null();
             create_factory()
-                .clap_plugin(c"dummy", unsafe { FactoryHost::new(host.as_clap_host()) })
+                .create_plugin(c"dummy", unsafe { FactoryHost::new(host.as_clap_host()) })
                 .unwrap();
         }
     };
@@ -65,7 +65,7 @@ macro_rules! test_host_null_method {
             host.0.$method = None;
 
             create_factory()
-                .clap_plugin(c"dummy", unsafe { FactoryHost::new(host.as_clap_host()) })
+                .create_plugin(c"dummy", unsafe { FactoryHost::new(host.as_clap_host()) })
                 .unwrap();
         }
     };

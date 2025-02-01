@@ -99,7 +99,7 @@ impl Factory {
             .ok_or(Error::IndexOutOfBounds(index))
     }
 
-    pub fn clap_plugin(
+    pub fn create_plugin(
         &self,
         plugin_id: &CStr,
         host: FactoryHost,
