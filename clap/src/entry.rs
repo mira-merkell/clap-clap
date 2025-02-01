@@ -12,7 +12,8 @@ macro_rules! entry {
             use $crate::plugin::Plugin;
 
             pub fn plugin_prototype<P: Plugin>() -> Box<FactoryPluginDescriptor<P>> {
-                Box::new(FactoryPluginDescriptor::allocate())
+                Box::new(FactoryPluginDescriptor::build_plugin_descriptor()
+                            .expect("cannot build factory plugin descriptor"))
             }
 
             use super::*; // Access the types supplied as macro arguments.

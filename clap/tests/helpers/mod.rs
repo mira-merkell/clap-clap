@@ -10,6 +10,7 @@ pub struct Dummy;
 
 impl Plugin for Dummy {
     const ID: &'static str = "dummy";
+    const NAME: &'static str = "Dummy";
     type AudioThread = ();
     type Extensions = ();
 

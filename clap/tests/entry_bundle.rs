@@ -12,6 +12,7 @@ macro_rules! impl_dummy_plugin {
 
         impl Plugin for $plug {
             const ID: &'static str = $id;
+            const NAME: &'static str = $id;
             type AudioThread = ();
             type Extensions = ();
 

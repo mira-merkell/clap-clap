@@ -7,7 +7,9 @@ use crate::helpers::{Dummy, DummyHost};
 mod helpers;
 
 fn create_factory() -> Factory {
-    Factory::new(vec![Box::new(FactoryPluginDescriptor::<Dummy>::allocate())])
+    Factory::new(vec![Box::new(
+        FactoryPluginDescriptor::<Dummy>::build_plugin_descriptor().unwrap(),
+    )])
 }
 
 #[test]

@@ -25,7 +25,9 @@ fn empty() {
 fn dummy(n: usize) -> Factory {
     Factory::new(
         (0..n)
-            .map(|_| Box::new(FactoryPluginDescriptor::<Dummy>::allocate()) as _)
+            .map(|_| {
+                Box::new(FactoryPluginDescriptor::<Dummy>::build_plugin_descriptor().unwrap()) as _
+            })
             .collect(),
     )
 }
@@ -84,6 +86,7 @@ impl Plugin for DummyToo {
     type AudioThread = ();
     type Extensions = ();
     const ID: &'static str = "also dummy";
+    const NAME: &'static str = "Dummy II";
 
     fn activate(
         &mut self,
@@ -97,8 +100,8 @@ impl Plugin for DummyToo {
 
 fn two_dummies() -> Factory {
     Factory::new(vec![
-        Box::new(FactoryPluginDescriptor::<Dummy>::allocate()),
-        Box::new(FactoryPluginDescriptor::<DummyToo>::allocate()),
+        Box::new(FactoryPluginDescriptor::<Dummy>::build_plugin_descriptor().unwrap()),
+        Box::new(FactoryPluginDescriptor::<DummyToo>::build_plugin_descriptor().unwrap()),
     ])
 }
 
