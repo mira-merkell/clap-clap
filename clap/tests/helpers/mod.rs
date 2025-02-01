@@ -50,3 +50,6 @@ impl DummyHost {
         &self.0
     }
 }
+
+unsafe impl Send for DummyHost {}
+unsafe impl Sync for DummyHost {}

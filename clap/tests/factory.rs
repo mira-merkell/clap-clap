@@ -55,13 +55,15 @@ fn factory_dummy_create_bad() {
     );
 }
 
+static DUMMY_HOST: DummyHost = DummyHost::new();
+
 #[test]
 fn factory_dummy_create() {
     let factory = dummy(1);
 
     let plugin = factory
         .clap_plugin(c"dummy", unsafe {
-            FactoryHost::new(DummyHost::new().as_clap_host())
+            FactoryHost::new(DUMMY_HOST.as_clap_host())
         })
         .unwrap();
 
