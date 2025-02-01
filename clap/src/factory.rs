@@ -92,11 +92,11 @@ impl Factory {
     }
 
     pub fn descriptor(&self, index: u32) -> Result<*const clap_plugin_descriptor, Error> {
-        let index = usize::try_from(index).map_err(|_| Error::IndexOutOfBounds)?;
-        (index < self.plugins.len())
+        let uindex = usize::try_from(index).map_err(|_| Error::IndexOutOfBounds(index))?;
+        (uindex < self.plugins.len())
             // This needs to be lazy to avoid evaluating on invalid index.
-            .then(|| self.plugins[index].clap_plugin_descriptor())
-            .ok_or(Error::IndexOutOfBounds)
+            .then(|| self.plugins[uindex].clap_plugin_descriptor())
+            .ok_or(Error::IndexOutOfBounds(index))
     }
 
     pub fn clap_plugin(
@@ -112,11 +112,11 @@ impl Factory {
 unsafe impl Send for Factory {}
 unsafe impl Sync for Factory {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     PluginIdNotFound,
     CreateHost(host::Error),
-    IndexOutOfBounds,
+    IndexOutOfBounds(u32),
 }
 
 impl Display for Error {
@@ -124,7 +124,7 @@ impl Display for Error {
         match self {
             Error::PluginIdNotFound => write!(f, "factory plugin id not found"),
             Error::CreateHost(_) => write!(f, "create host handle"),
-            Error::IndexOutOfBounds => write!(f, "index out ouf bounds"),
+            Error::IndexOutOfBounds(n) => write!(f, "index out ouf bounds: {n}"),
         }
     }
 }

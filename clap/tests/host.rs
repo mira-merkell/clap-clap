@@ -1,15 +1,23 @@
 use std::ptr::null;
 
-use clap::factory::FactoryHost;
+use clap::factory::{Factory, FactoryHost, FactoryPluginDescriptor};
 
-use crate::{DummyHost, NAME, create_factory};
+use crate::helpers::{Dummy, DummyHost};
+
+mod helpers;
+
+fn create_factory() -> Factory {
+    Factory::new(vec![Box::new(FactoryPluginDescriptor::<Dummy>::allocate())])
+}
 
 #[test]
 #[should_panic(expected = "called `Result::unwrap()` on an `Err` value: PluginIdNotFound")]
 fn wrong_plugin_id() {
     let host = DummyHost::new();
     create_factory()
-        .clap_plugin(c"testxxxn", unsafe { FactoryHost::new(host.as_ptr()) })
+        .clap_plugin(c"testxxxn", unsafe {
+            FactoryHost::new(host.as_clap_host())
+        })
         .unwrap();
 }
 
@@ -17,7 +25,7 @@ fn wrong_plugin_id() {
 fn dummy_host() {
     let host = DummyHost::new();
     let plugin = create_factory()
-        .clap_plugin(NAME, unsafe { FactoryHost::new(host.as_ptr()) })
+        .clap_plugin(c"dummy", unsafe { FactoryHost::new(host.as_clap_host()) })
         .unwrap();
 
     unsafe { (*plugin).destroy.unwrap()(plugin) };
@@ -34,7 +42,7 @@ macro_rules! test_host_null_desc {
 
             host.0.$erase_string = null();
             create_factory()
-                .clap_plugin(NAME, unsafe { FactoryHost::new(host.as_ptr()) })
+                .clap_plugin(c"dummy", unsafe { FactoryHost::new(host.as_clap_host()) })
                 .unwrap();
         }
     };
@@ -57,7 +65,7 @@ macro_rules! test_host_null_method {
             host.0.$method = None;
 
             create_factory()
-                .clap_plugin(NAME, unsafe { FactoryHost::new(host.as_ptr()) })
+                .clap_plugin(c"dummy", unsafe { FactoryHost::new(host.as_clap_host()) })
                 .unwrap();
         }
     };

@@ -1,35 +1,27 @@
-mod bad;
-
 use std::{
-    ffi::{CStr, c_char, c_void},
+    ffi::{c_char, c_void},
     ptr::{null, null_mut},
 };
 
-use clap::{
-    Error,
-    factory::{Factory, FactoryPluginDescriptor},
-    plugin::Plugin,
-};
-
-const NAME: &CStr = c"test.plugin";
+use clap::plugin::Plugin;
 
 #[derive(Default)]
-struct TestPlug;
+pub struct Dummy;
 
-impl Plugin for TestPlug {
-    const ID: &'static str = "test.plugin";
+impl Plugin for Dummy {
+    const ID: &'static str = "dummy";
     type AudioThread = ();
     type Extensions = ();
 
-    fn activate(&mut self, _: f64, _: usize, _: usize) -> Result<(), Error> {
+    fn activate(&mut self, _: f64, _: usize, _: usize) -> Result<Self::AudioThread, clap::Error> {
         Ok(())
     }
 }
 
-struct DummyHost(clap_sys::clap_host);
+pub struct DummyHost(pub clap_sys::clap_host);
 
 impl DummyHost {
-    const fn new() -> Self {
+    pub const fn new() -> Self {
         extern "C" fn get_extensions(
             _: *const clap_sys::clap_host,
             _: *const c_char,
@@ -54,13 +46,7 @@ impl DummyHost {
         })
     }
 
-    fn as_ptr(&self) -> *const clap_sys::clap_host {
+    pub fn as_clap_host(&self) -> *const clap_sys::clap_host {
         &self.0
     }
-}
-
-fn create_factory() -> Factory {
-    Factory::new(vec![Box::new(
-        FactoryPluginDescriptor::<TestPlug>::allocate(),
-    )])
 }
