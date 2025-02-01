@@ -1,5 +1,8 @@
 //! A CLAP plugin runtime.
 
+#[cfg(not(any(target_pointer_width = "32", target_pointer_width = "64")))]
+compile_error!("target's pointer width must be at least 32");
+
 pub mod entry;
 pub mod ext;
 pub mod factory;

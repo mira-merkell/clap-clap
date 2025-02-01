@@ -1,6 +1,5 @@
 use std::{
     fmt::{Display, Formatter},
-    ops::{Deref, DerefMut},
     ptr::{NonNull, slice_from_raw_parts, slice_from_raw_parts_mut},
 };
 
@@ -232,71 +231,54 @@ impl<'a> AudioBufferMut<'a> {
     /// # Safety
     ///
     /// n must be less than self.channel_count()
-    pub unsafe fn data32_unchecked(&mut self, n: usize) -> &mut [f32] {
+    /// process.frames_count() must fit into u32 (cast without checking)
+    pub unsafe fn data32_unchecked(&mut self, n: u32) -> &mut [f32] {
         // Safety:
         // The caller guarantees this dereferencing is safe.
-        let chan = unsafe { *self.data32.add(n) };
+        let chan = unsafe { *self.as_clap_audio_buffer_mut().data32.add(n as usize) };
 
         // Safety:
         // The CLAP host guarantees that the channel is at
         // least process.frames_count() long.
-        unsafe { &mut *slice_from_raw_parts_mut(chan, self.process.frames_count()) }
+        unsafe { &mut *slice_from_raw_parts_mut(chan, self.process.frames_count() as usize) }
     }
 
-    pub fn data32(&mut self, n: usize) -> Option<&mut [f32]> {
+    pub fn data32(&mut self, n: u32) -> Option<&mut [f32]> {
         // Safety:
         // We just checked if n < channel_count()
         (n < self.channel_count()).then_some(unsafe { self.data32_unchecked(n) })
     }
 
     /// # Safety
-    ///
     /// n must be less than self.channel_count()
-    pub unsafe fn data64_unchecked(&mut self, n: usize) -> &mut [f64] {
+    /// process.frames_count() must fit into u32 (cast without checking)
+    pub unsafe fn data64_unchecked(&mut self, n: u32) -> &mut [f64] {
         // Safety:
         // The caller guarantees this dereferencing is safe.
-        let chan = unsafe { *self.data64.add(n) };
+        let chan = unsafe { *self.as_clap_audio_buffer_mut().data64.add(n as usize) };
 
         // Safety:
         // The CLAP host guarantees that the channel is at
         // least process.frames_count() long.
-        unsafe { &mut *slice_from_raw_parts_mut(chan, self.process.frames_count()) }
+        unsafe { &mut *slice_from_raw_parts_mut(chan, self.process.frames_count() as usize) }
     }
 
-    pub fn data64(&mut self, n: usize) -> Option<&mut [f64]> {
+    pub fn data64(&mut self, n: u32) -> Option<&mut [f64]> {
         // Safety:
         // We just checked if n < channel_count()
         (n < self.channel_count()).then_some(unsafe { self.data64_unchecked(n) })
     }
 
-    pub fn channel_count(&self) -> usize {
-        self.channel_count as usize
+    pub const fn channel_count(&self) -> u32 {
+        self.as_clap_audio_buffer().channel_count
     }
 
-    pub fn latency(&self) -> usize {
-        self.latency as usize
+    pub const fn latency(&self) -> u32 {
+        self.as_clap_audio_buffer().latency
     }
 
     pub fn constant_mask(&self) -> u64 {
         self.constant_mask
-    }
-}
-
-impl Deref for AudioBufferMut<'_> {
-    type Target = clap_audio_buffer;
-
-    fn deref(&self) -> &Self::Target {
-        // Safety:
-        // The constructor of Self guarantees that this is safe.
-        unsafe { &*self.clap_audio_buffer.as_ptr() }
-    }
-}
-
-impl DerefMut for AudioBufferMut<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        // Safety:
-        // The constructor of Self guarantees that this is safe.
-        unsafe { &mut *self.clap_audio_buffer.as_ptr() }
     }
 }
 
@@ -339,14 +321,84 @@ impl From<Error> for crate::Error {
 
 pub struct Frame<'a> {
     process: &'a mut Process,
-    index: usize,
+    index: u32,
+    //in_events: (usize, usize), // First and last in-event for this frame in the process's event
+    // list.
 }
 
 impl<'a> Frame<'a> {
     /// # Safety
     ///
     /// index must be less that process.frames_count().
-    const unsafe fn new_unchecked(process: &'a mut Process, index: usize) -> Self {
+    const unsafe fn new_unchecked(process: &'a mut Process, index: u32) -> Self {
         Self { process, index }
+    }
+
+    /// # Safety
+    ///
+    /// n must be less that process.audio_inputs_count().
+    pub unsafe fn audio_input_unchecked(&self, n: u32) -> AudioFrame<'a, '_> {
+        // Safety: the caller upholds the safety requirements.
+        unsafe { AudioFrame::new_unchecked(self, n) }
+    }
+
+    pub fn audio_input(&self, n: u32) -> Option<AudioFrame<'a, '_>> {
+        (n < self.process.audio_inputs_count())
+            // Safety: We just checked if n is less that audio_input_count().
+            .then_some(unsafe { AudioFrame::new_unchecked(self, n) })
+    }
+}
+
+pub struct AudioFrame<'a: 'b, 'b> {
+    frame: &'b Frame<'a>,
+    n: u32,
+}
+
+impl<'a: 'b, 'b> AudioFrame<'a, 'b> {
+    /// # Safety
+    ///
+    /// n must be less than process.audio_inputs_count().
+    const unsafe fn new_unchecked(frame: &'b Frame<'a>, n: u32) -> Self {
+        Self { frame, n }
+    }
+
+    const fn audio_input(&self) -> AudioBuffer {
+        // Safety:
+        // By construction, n is less than process.audio_inputs_count().
+        unsafe { self.frame.process.audio_inputs_unchecked(self.n) }
+    }
+
+    pub const fn channel_count(&self) -> u32 {
+        self.audio_input().channel_count()
+    }
+
+    /// # Safety
+    ///
+    /// n must be less than self.channel_count()
+    pub const unsafe fn data32_unchecked(&mut self, channel: u32) -> f32 {
+        // Safety:
+        // The caller guarantees this dereferencing is safe.
+        unsafe { self.audio_input().data32_unchecked(channel)[self.frame.index as usize] }
+    }
+
+    pub fn data32(&mut self, channel: u32) -> Option<f32> {
+        // Safety:
+        // We just checked if n < channel_count()
+        (channel < self.channel_count()).then_some(unsafe { self.data32_unchecked(channel) })
+    }
+
+    /// # Safety
+    ///
+    /// n must be less than self.channel_count()
+    pub const unsafe fn data64_unchecked(&mut self, channel: u32) -> f64 {
+        // Safety:
+        // The caller guarantees this dereferencing is safe.
+        unsafe { self.audio_input().data64_unchecked(channel)[self.frame.index as usize] }
+    }
+
+    pub fn data64(&mut self, channel: u32) -> Option<f64> {
+        // Safety:
+        // We just checked if n < channel_count()
+        (channel < self.channel_count()).then_some(unsafe { self.data64_unchecked(channel) })
     }
 }
