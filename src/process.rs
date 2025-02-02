@@ -12,7 +12,7 @@ use clap_sys::{
     CLAP_PROCESS_TAIL, clap_audio_buffer, clap_process, clap_process_status,
 };
 
-use crate::process::{Status::Continue, frame::Frame};
+use crate::process::frame::FramesMut;
 
 pub mod frame;
 
@@ -51,21 +51,8 @@ impl Process {
         self.as_clap_process().frames_count
     }
 
-    pub fn frames(
-        &mut self,
-        op: impl FnMut(&mut Frame<'_>) -> Result<Status, Error>,
-    ) -> Result<Status, crate::Error> {
-        let mut res = Ok(Continue);
-        let mut op = op;
-        for i in 0..self.frames_count() {
-            // SAFETY: the index `i` is less than `self.frames_count()`.
-            let mut frame = unsafe { Frame::new_unchecked(self, i) };
-            res = op(&mut frame);
-            if res.is_err() {
-                break;
-            }
-        }
-        res.map_err(Into::into)
+    pub const fn frames(&mut self) -> FramesMut<'_> {
+        FramesMut::new(self)
     }
 
     pub fn transport(&self) {

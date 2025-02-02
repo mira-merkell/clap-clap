@@ -43,13 +43,17 @@ impl Plugin for PingPong {
 }
 
 /// The signal processor: Feedback delay with ping-pong effect.
+///
+/// Instances of this type will live on the audio thread.
 struct Delay {
     buf: Vec<[f32; 2]>,
-    cur: usize, // index into the delay queue
+    cur: usize, // index into the delay line
 }
 
 impl Delay {
     fn new(sample_rate: f64, time: f64) -> Self {
+        // Calculate the number of samples needed to hold
+        // the buffer of length `time` seconds.
         let samples = (sample_rate * time) as usize;
         Self {
             buf: vec![[0.0; 2]; samples],
@@ -60,23 +64,28 @@ impl Delay {
 
 impl AudioThread<PingPong> for Delay {
     fn process(&mut self, process: &mut Process) -> Result<Status, Error> {
-        let n = self.buf.len();
+        // Generate a lending iterator over mutable references
+        // to consecutiveframes of audio samples and events.
+        let mut frames = process.frames();
 
-        // Process the audio block as individual frames of audio samples.
-        process.frames(|frame| {
+        let n = self.buf.len();
+        // Process the audio block frame by frame.
+        while let Some(frame) = frames.next() {
+            // Get the position of the current front and back of the delay line.
             let (front, back) = (self.cur % n, (n - 1 + self.cur) % n);
+            // Get the audio signal from the front of the delay line.
             let (front_l, front_r) = (self.buf[front][0], self.buf[front][1]);
 
-            // Get input signal from the main input port.
+            // Get the input signal from the main input port.
             let in_l = frame.audio_input(0).data32(0);
             let in_r = frame.audio_input(0).data32(1);
 
-            // Write from the in port into the back of the delay line.
+            // Write from the input port into the back of the delay line.
             // Feed the signal back with 0.66 damping, swap left/right channels.
             self.buf[back][0] = in_r + 0.66 * front_r;
             self.buf[back][1] = in_l + 0.66 * front_l;
 
-            // Write into the main out port from the front of the delay line.
+            // Write into the main output port from the front of the delay line.
             *frame.audio_output(0).data32(0) = front_l;
             *frame.audio_output(0).data32(1) = front_r;
 
@@ -86,9 +95,9 @@ impl AudioThread<PingPong> for Delay {
 
             // On a 64-bit machine, prepare for overflow in about 12 million years.
             self.cur += 1;
+        }
 
-            Ok(Continue)
-        })
+        Ok(Continue)
     }
 }
 

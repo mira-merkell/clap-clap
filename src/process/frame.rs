@@ -150,3 +150,79 @@ impl<'a: 'b, 'b> FrameOutput<'a, 'b> {
         }
     }
 }
+
+/// Lending iterator over frames from Process.
+pub struct FramesMut<'a> {
+    frame: Option<Frame<'a>>,
+    index: u32,
+}
+
+impl<'a> FramesMut<'a> {
+    pub const fn new(process: &'a mut Process) -> Self {
+        let frame = if process.frames_count() > 0 {
+            // SAFETY: we just checked if number of frames in the process
+            // is greater than zero.
+            Some(unsafe { Frame::new_unchecked(process, 0) })
+        } else {
+            None
+        };
+
+        Self { frame, index: 0 }
+    }
+
+    /// Generate mutable references to consecutive frames in the `process`.
+    ///
+    /// Unlike `next()` from the `Iterator` trait, this function is generic
+    /// over the lifetime of `&mut self`.  In other words, without lifetime
+    /// elision, the signature of this function reads:
+    ///
+    /// ```text
+    ///  pub const fn next<'b>(&'b mut self) -> Option<&'b mut Frame<'a>>;
+    /// ```
+    ///
+    /// and each returned reference is valid only until the subsequent call to
+    /// `next()`.
+    ///
+    /// Note also that unlike `Iterator::next()`, this function is `const`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use clap_clap::process::frame::FramesMut;
+    /// # use clap_clap::process::Process;
+    /// fn process_frames(process: &mut Process) {
+    ///     let mut frames = FramesMut::new(process);
+    ///     while let Some(frame) = frames.next() {
+    ///         // Process frame here.
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// Be aware that if you don't bind the iterator to `frames` in the
+    /// example above, and instead you write:
+    ///
+    /// ```rust,no_run
+    /// # use clap_clap::process::frame::FramesMut;
+    /// # use clap_clap::process::Process;
+    /// fn process_frames_endlessly(process: &mut Process) {
+    ///     while let Some(frame) = FramesMut::new(process).next() { // <-- Danger: infinite loop.
+    ///         // over and over again...
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// you will most probably end up with an infinite loop, as the iterator is
+    /// created anew each time we enter the `while` block.
+    #[allow(clippy::should_implement_trait)]
+    pub const fn next(&mut self) -> Option<&mut Frame<'a>> {
+        if let Some(frame) = self.frame.take() {
+            let process = frame.process;
+            if self.index < process.frames_count() {
+                self.frame = Some(unsafe { Frame::new_unchecked(process, self.index) });
+                self.index += 1;
+            }
+        }
+
+        self.frame.as_mut()
+    }
+}
