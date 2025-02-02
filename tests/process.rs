@@ -3,7 +3,7 @@ use std::{
     ptr::{NonNull, null},
 };
 
-use clap::process::Process;
+use clap_clap::process::Process;
 use clap_sys::{clap_audio_buffer, clap_event_transport, clap_process};
 
 trait Float: Copy + Clone + Default + PartialEq {}

@@ -1,6 +1,6 @@
 use std::{ffi::CStr, ptr::null};
 
-use clap::{
+use clap_clap::{
     Error,
     factory::{
         Error::{CreateHost, IndexOutOfBounds, PluginIdNotFound},

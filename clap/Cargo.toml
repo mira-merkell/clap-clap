@@ -1,8 +1,0 @@
-[package]
-name = "clap"
-version = "0.1.0"
-rust-version = "1.85.0"
-edition = "2024"
-
-[dependencies]
-clap-sys = { path = "./clap-sys" }

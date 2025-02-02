@@ -1,6 +1,6 @@
 use std::ptr::null;
 
-use clap::factory::{Factory, FactoryHost, FactoryPluginDescriptor};
+use clap_clap::factory::{Factory, FactoryHost, FactoryPluginDescriptor};
 
 use crate::dummy::{Dummy, DummyHost};
 

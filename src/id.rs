@@ -27,7 +27,7 @@ impl std::error::Error for Error {}
 /// # Example
 ///
 /// ```rust
-/// # use crate::clap::id::ClapId;
+/// # use clap_clap::id::ClapId;
 /// let id = ClapId::from(3);
 ///
 /// assert!(id.is_valid());

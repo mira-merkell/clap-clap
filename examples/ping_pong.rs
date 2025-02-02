@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use clap_clap::clap::{
+use clap_clap::{
     Error,
     ext::{AudioPorts, Extensions, audio_ports::StereoPorts},
     host::Host,
@@ -22,11 +22,12 @@ impl Extensions<Self> for PingPong {
 }
 
 impl Plugin for PingPong {
+    type AudioThread = Delay;
+    type Extensions = Self;
+
     const ID: &'static str = "clap.example.ping_pong";
     const NAME: &'static str = "Ping-Pong";
     const VENDOR: &'static str = "⧉⧉⧉";
-    type AudioThread = Delay;
-    type Extensions = Self;
 
     /// Let's say Hi to the host!
     fn init(&mut self, host: Arc<Host>) -> Result<(), Error> {
@@ -92,4 +93,4 @@ impl AudioThread<PingPong> for Delay {
 }
 
 // Export clap_entry symbols and build a plugin factory.
-clap::entry!(PingPong);
+clap_clap::entry!(PingPong);

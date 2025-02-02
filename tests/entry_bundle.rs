@@ -1,12 +1,36 @@
 use std::{ffi::CStr, ptr::null};
 
-use clap::entry::{CLAP_PLUGIN_FACTORY_ID, clap_plugin_factory};
+use clap_clap::{
+    entry::{CLAP_PLUGIN_FACTORY_ID, clap_plugin_factory},
+    plugin::Plugin,
+};
 
-mod dummy;
+macro_rules! impl_dummy_plugin {
+    ($plug:tt, $id:literal) => {
+        #[derive(Default)]
+        struct $plug;
 
-use crate::dummy::{Dummy, DummyHost};
+        impl Plugin for $plug {
+            const ID: &'static str = $id;
+            const NAME: &'static str = $id;
+            type AudioThread = ();
+            type Extensions = ();
 
-clap::entry!(Dummy);
+            fn activate(
+                &mut self,
+                _: f64,
+                _: u32,
+                _: u32,
+            ) -> Result<Self::AudioThread, clap_clap::Error> {
+                Ok(())
+            }
+        }
+    };
+}
+impl_dummy_plugin!(Dummy, "dummy");
+impl_dummy_plugin!(Dummier, "dummier");
+
+clap_clap::entry!(Dummy, Dummier);
 use _clap_entry::clap_entry;
 
 #[test]
@@ -24,30 +48,21 @@ fn export_clap_entry() {
 
     let get_plugin_count = unsafe { *factory }.get_plugin_count.unwrap();
     let n = unsafe { get_plugin_count(factory) };
-    assert_eq!(n, 1);
+    assert_eq!(n, 2);
 
     let get_plugin_descriptor = unsafe { *factory }.get_plugin_descriptor.unwrap();
-    let desc = unsafe { get_plugin_descriptor(factory, 1) };
+    let desc = unsafe { get_plugin_descriptor(factory, 2) };
     assert!(desc.is_null());
 
     let desc = unsafe { get_plugin_descriptor(factory, 0) };
     assert!(!desc.is_null());
-
     let id = unsafe { CStr::from_ptr((*desc).id) };
     assert_eq!(id, c"dummy");
 
-    let create_plugin = unsafe { *factory }.create_plugin.unwrap();
-    let host = DummyHost::new();
-    let plug = unsafe { create_plugin(factory, host.as_clap_host(), id.as_ptr()) };
-    assert!(!plug.is_null());
-
-    let plug_desc = unsafe { *plug }.desc;
-    assert!(!plug_desc.is_null());
-    let plug_id = unsafe { CStr::from_ptr((*plug_desc).id) };
-    assert_eq!(id, plug_id);
-
-    let plugin_destroy = unsafe { *plug }.destroy.unwrap();
-    unsafe { plugin_destroy(plug) };
+    let desc = unsafe { get_plugin_descriptor(factory, 1) };
+    assert!(!desc.is_null());
+    let id = unsafe { CStr::from_ptr((*desc).id) };
+    assert_eq!(id, c"dummier");
 
     let entry_deinit = clap_entry.deinit.unwrap();
     unsafe { entry_deinit() }

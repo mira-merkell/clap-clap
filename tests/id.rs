@@ -1,4 +1,4 @@
-use clap::id::ClapId;
+use clap_clap::id::ClapId;
 
 #[test]
 fn clap_sys_invalid_id_more_than_u16max() {

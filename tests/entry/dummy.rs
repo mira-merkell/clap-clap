@@ -3,18 +3,19 @@ use std::{
     ptr::{null, null_mut},
 };
 
-use clap::plugin::Plugin;
+use clap_clap::plugin::Plugin;
 
 #[derive(Default, Debug)]
 pub struct Dummy;
 
 impl Plugin for Dummy {
-    const ID: &'static str = "dummy";
-    const NAME: &'static str = "Dummy";
     type AudioThread = ();
     type Extensions = ();
 
-    fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread, clap::Error> {
+    const ID: &'static str = "dummy";
+    const NAME: &'static str = "Dummy";
+
+    fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread, clap_clap::Error> {
         Ok(())
     }
 }
