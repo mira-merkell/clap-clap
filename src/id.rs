@@ -38,11 +38,11 @@ pub struct ClapId(Option<u32>);
 
 impl ClapId {
     /// The value representing an invalid id.
-    pub fn invalid_id() -> Self {
+    pub const fn invalid_id() -> Self {
         Self(None)
     }
 
-    pub fn is_valid(&self) -> bool {
+    pub const fn is_valid(&self) -> bool {
         self.0.is_some()
     }
 }

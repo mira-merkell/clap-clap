@@ -14,9 +14,9 @@ pub trait AudioPorts<P>
 where
     P: Plugin,
 {
-    fn inputs(plugin: &P) -> usize;
-    fn outputs(plugin: &P) -> usize;
+    fn inputs(plugin: &P) -> u32;
+    fn outputs(plugin: &P) -> u32;
 
-    fn input_info(plugin: &P, index: usize) -> Option<AudioPortInfo>;
-    fn output_info(plugin: &P, index: usize) -> Option<AudioPortInfo>;
+    fn input_info(plugin: &P, index: u32) -> Option<AudioPortInfo>;
+    fn output_info(plugin: &P, index: u32) -> Option<AudioPortInfo>;
 }

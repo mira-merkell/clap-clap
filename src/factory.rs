@@ -27,7 +27,7 @@ impl FactoryHost {
         Self { host }
     }
 
-    pub(crate) fn into_inner(self) -> *const clap_host {
+    pub(crate) const fn into_inner(self) -> *const clap_host {
         self.host
     }
 }
@@ -50,7 +50,7 @@ pub trait FactoryPlugin {
 
 impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
     fn plugin_id(&self) -> &CStr {
-        &self.0.plugin_id()
+        self.0.plugin_id()
     }
 
     fn clap_plugin_descriptor(&self) -> *const clap_plugin_descriptor {

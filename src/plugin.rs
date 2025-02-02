@@ -2,7 +2,6 @@ use std::{
     ffi::NulError,
     fmt::Display,
     marker::PhantomData,
-    ops::Deref,
     sync::{Arc, Mutex},
 };
 
@@ -123,7 +122,7 @@ impl<P: Plugin> Runtime<P> {
     /// This can requirement can be met during plugin initialization and
     /// destruction.
     unsafe fn from_clap_plugin(clap_plugin: ClapPlugin<P>) -> Self {
-        let plugin_data = clap_plugin.plugin_data as *mut _;
+        let plugin_data = clap_plugin.as_ref().plugin_data as *mut _;
         // Safety:
         // We can transmute the pointer to plugin_data like this, because:
         // 1. We have exclusive reference to it.
@@ -143,11 +142,17 @@ impl<P: Plugin> ClapPlugin<P> {
     /// 1. The user must assure the pointer to plugin is non-null.
     /// 2. The pointer must point to a valid clap_plugin structure tied to the
     ///    plugin type P, and living in the host.
+    /// 3. There must be only one instance of ClapPlugin for a given pointer.
     ///
     /// Typically, a valid pointer comes from the host calling the plugin's
     /// methods, or from Runtime::into_clap_plugin()
     pub(crate) const unsafe fn new(clap_plugin: *const clap_plugin) -> Self {
         Self(clap_plugin, PhantomData)
+    }
+
+    const fn as_ref(&self) -> &clap_plugin {
+        // SAFETY: ClapPlugin constructor guarantees
+        unsafe { &*self.0 }
     }
 
     pub(crate) const fn into_inner(self) -> *const clap_plugin {
@@ -189,16 +194,6 @@ impl<P: Plugin> ClapPlugin<P> {
     pub(crate) const fn plugin_extensions(&mut self) -> &Mutex<ClapPluginExtensions<P>> {
         let runtime: *mut Runtime<P> = unsafe { *self.0 }.plugin_data as *mut _;
         unsafe { &(*runtime).plugin_extensions }
-    }
-}
-
-impl<P: Plugin> Deref for ClapPlugin<P> {
-    type Target = clap_plugin;
-
-    fn deref(&self) -> &Self::Target {
-        // Safety:
-        // ClapPlugin constructor guarantees that this is safe.
-        unsafe { &*self.0 }
     }
 }
 

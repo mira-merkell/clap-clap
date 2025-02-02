@@ -22,7 +22,7 @@ pub struct AudioPortInfo {
     flags: u32,
     channel_count: Option<u32>,
     port_type: Option<AudioPortType>,
-    in_place_pair: Option<u32>,
+    in_place_pair: Option<ClapId>,
 }
 
 impl AudioPortInfo {
@@ -55,7 +55,10 @@ impl AudioPortInfo {
             None => null(),
         };
 
-        info.in_place_pair = self.in_place_pair.unwrap_or(CLAP_INVALID_ID);
+        info.in_place_pair = self
+            .in_place_pair
+            .map(Into::into)
+            .unwrap_or(CLAP_INVALID_ID);
     }
 }
 
@@ -64,13 +67,13 @@ pub struct AudioPortInfoBuilder {
 }
 
 impl AudioPortInfoBuilder {
-    fn new(info: AudioPortInfo) -> Self {
+    const fn new(info: AudioPortInfo) -> Self {
         Self { info }
     }
 
-    pub fn id(&mut self, id: usize) -> Option<&mut Self> {
-        self.info.id = id.try_into().ok()?;
-        Some(self)
+    pub const fn id(&mut self, id: ClapId) -> &mut Self {
+        self.info.id = id;
+        self
     }
 
     pub fn name(&mut self, name: &str) -> &mut Self {
@@ -78,39 +81,37 @@ impl AudioPortInfoBuilder {
         self
     }
 
-    pub fn port_is_main(&mut self) -> &mut Self {
+    pub const fn port_is_main(&mut self) -> &mut Self {
         self.info.flags |= CLAP_AUDIO_PORT_IS_MAIN;
         self
     }
 
-    pub fn prefers_64_bits(&mut self) -> &mut Self {
+    pub const fn prefers_64_bits(&mut self) -> &mut Self {
         self.info.flags |= CLAP_AUDIO_PORT_PREFERS_64BITS;
         self
     }
 
-    pub fn supports_64_bits(&mut self) -> &mut Self {
+    pub const fn supports_64_bits(&mut self) -> &mut Self {
         self.info.flags |= CLAP_AUDIO_PORT_SUPPORTS_64BITS;
         self
     }
 
-    pub fn requires_common_sample_size(&mut self) -> &mut Self {
+    pub const fn requires_common_sample_size(&mut self) -> &mut Self {
         self.info.flags |= CLAP_AUDIO_PORT_REQUIRES_COMMON_SAMPLE_SIZE;
         self
     }
 
-    pub fn channel_count(&mut self, n: usize) -> Option<&mut Self> {
-        u32::try_from(n).ok().map(|n| {
-            self.info.channel_count = Some(n);
-            self
-        })
+    pub fn channel_count(&mut self, n: u32) -> &mut Self {
+        self.info.channel_count = Some(n);
+        self
     }
 
-    pub fn port_type(&mut self, port_type: AudioPortType) -> &mut Self {
+    pub const fn port_type(&mut self, port_type: AudioPortType) -> &mut Self {
         self.info.port_type = Some(port_type);
         self
     }
 
-    pub fn in_place_pair(&mut self, id: u32) -> &mut Self {
+    pub const fn in_place_pair(&mut self, id: ClapId) -> &mut Self {
         self.info.in_place_pair = Some(id);
         self
     }
@@ -129,72 +130,72 @@ pub enum AudioPortType {
 }
 
 impl<P: Plugin> AudioPorts<P> for () {
-    fn inputs(_plugin: &P) -> usize {
+    fn inputs(_plugin: &P) -> u32 {
         0
     }
 
-    fn outputs(_plugin: &P) -> usize {
+    fn outputs(_plugin: &P) -> u32 {
         0
     }
 
-    fn input_info(_plugin: &P, _index: usize) -> Option<AudioPortInfo> {
+    fn input_info(_plugin: &P, _index: u32) -> Option<AudioPortInfo> {
         None
     }
 
-    fn output_info(_plugin: &P, _index: usize) -> Option<AudioPortInfo> {
+    fn output_info(_plugin: &P, _index: u32) -> Option<AudioPortInfo> {
         None
     }
 }
 
 /// Static mono ports, in and out.
 #[derive(Debug, Copy, Clone)]
-pub struct MonoPorts<const IN: usize, const OUT: usize>;
+pub struct MonoPorts<const IN: u32, const OUT: u32>;
 
-impl<P, const IN: usize, const OUT: usize> AudioPorts<P> for MonoPorts<IN, OUT>
+impl<P, const IN: u32, const OUT: u32> AudioPorts<P> for MonoPorts<IN, OUT>
 where
     P: Plugin,
 {
-    fn inputs(_: &P) -> usize {
+    fn inputs(_: &P) -> u32 {
         IN
     }
 
-    fn outputs(_: &P) -> usize {
+    fn outputs(_: &P) -> u32 {
         OUT
     }
 
-    fn input_info(_: &P, index: usize) -> Option<AudioPortInfo> {
+    fn input_info(_: &P, index: u32) -> Option<AudioPortInfo> {
         (index < IN).then_some(if index == 0 {
             AudioPortInfo::builder()
-                .id(index)?
+                .id(index.try_into().unwrap())
                 .name("Main In")
                 .port_is_main()
-                .channel_count(1)?
+                .channel_count(1)
                 .port_type(AudioPortType::Mono)
                 .build()
         } else {
             AudioPortInfo::builder()
-                .id(index)?
+                .id(index.try_into().unwrap())
                 .name(format!("In {index}").as_str())
-                .channel_count(1)?
+                .channel_count(1)
                 .port_type(AudioPortType::Mono)
                 .build()
         })
     }
 
-    fn output_info(_: &P, index: usize) -> Option<AudioPortInfo> {
+    fn output_info(_: &P, index: u32) -> Option<AudioPortInfo> {
         (index < OUT).then_some(if index == 0 {
             AudioPortInfo::builder()
-                .id(index)?
+                .id(index.try_into().unwrap())
                 .name("Main Out")
                 .port_is_main()
-                .channel_count(1)?
+                .channel_count(1)
                 .port_type(AudioPortType::Mono)
                 .build()
         } else {
             AudioPortInfo::builder()
-                .id(index)?
+                .id(index.try_into().unwrap())
                 .name(format!("Out {index}").as_str())
-                .channel_count(1)?
+                .channel_count(1)
                 .port_type(AudioPortType::Mono)
                 .build()
         })
@@ -203,53 +204,53 @@ where
 
 /// Single static stereo port, in and out.
 #[derive(Debug, Copy, Clone)]
-pub struct StereoPorts<const IN: usize, const OUT: usize>;
+pub struct StereoPorts<const IN: u32, const OUT: u32>;
 
-impl<P, const IN: usize, const OUT: usize> AudioPorts<P> for StereoPorts<IN, OUT>
+impl<P, const IN: u32, const OUT: u32> AudioPorts<P> for StereoPorts<IN, OUT>
 where
     P: Plugin,
 {
-    fn inputs(_: &P) -> usize {
+    fn inputs(_: &P) -> u32 {
         IN
     }
 
-    fn outputs(_: &P) -> usize {
+    fn outputs(_: &P) -> u32 {
         OUT
     }
 
-    fn input_info(_: &P, index: usize) -> Option<AudioPortInfo> {
+    fn input_info(_: &P, index: u32) -> Option<AudioPortInfo> {
         (index < IN).then_some(if index == 0 {
             AudioPortInfo::builder()
-                .id(index)?
+                .id(index.try_into().unwrap())
                 .name("Main In")
                 .port_is_main()
-                .channel_count(2)?
+                .channel_count(2)
                 .port_type(AudioPortType::Stereo)
                 .build()
         } else {
             AudioPortInfo::builder()
-                .id(index)?
+                .id(index.try_into().unwrap())
                 .name(format!("In {index}").as_str())
-                .channel_count(2)?
+                .channel_count(2)
                 .port_type(AudioPortType::Stereo)
                 .build()
         })
     }
 
-    fn output_info(_: &P, index: usize) -> Option<AudioPortInfo> {
+    fn output_info(_: &P, index: u32) -> Option<AudioPortInfo> {
         (index < OUT).then_some(if index == 0 {
             AudioPortInfo::builder()
-                .id(index)?
+                .id(index.try_into().unwrap())
                 .name("Main Out")
                 .port_is_main()
-                .channel_count(2)?
+                .channel_count(2)
                 .port_type(AudioPortType::Stereo)
                 .build()
         } else {
             AudioPortInfo::builder()
-                .id(index)?
+                .id(index.try_into().unwrap())
                 .name(format!("Out {index}").as_str())
-                .channel_count(2)?
+                .channel_count(2)
                 .port_type(AudioPortType::Stereo)
                 .build()
         })
