@@ -59,15 +59,32 @@ impl Delay {
 
 impl AudioThread<PingPong> for Delay {
     fn process(&mut self, process: &mut Process) -> Result<Status, Error> {
+        let n = self.buf.len();
+
+        // Process the audio block as individual frames of audio samples.
         process.frames(|frame| {
+            let (front, back) = (self.cur % n, (n - 1 + self.cur) % n);
+            let (front_l, front_r) = (self.buf[front][0], self.buf[front][1]);
+
+            // Get input signal from the main input port.
             let in_l = frame.audio_input(0).data32(0);
             let in_r = frame.audio_input(0).data32(1);
 
-            let out_l = in_r;
-            let out_r = in_l;
+            // Write from the in port into the back of the delay line.
+            // Feed the signal back with 0.66 damping, swap left/right channels.
+            self.buf[back][0] = in_r + 0.66 * front_r;
+            self.buf[back][1] = in_l + 0.66 * front_l;
 
-            *frame.audio_output(0).data32(0) = out_l;
-            *frame.audio_output(0).data32(1) = out_r;
+            // Write into the main out port from the front of the delay line.
+            *frame.audio_output(0).data32(0) = front_l;
+            *frame.audio_output(0).data32(1) = front_r;
+
+            // Pass the dry signal to the second output port.
+            *frame.audio_output(1).data32(0) = in_l;
+            *frame.audio_output(1).data32(1) = in_r;
+
+            // On a 64-bit machine, prepare for overflow in about 12 million years.
+            self.cur += 1;
 
             Ok(Continue)
         })
