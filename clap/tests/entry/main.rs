@@ -2,14 +2,12 @@ use std::{ffi::CStr, ptr::null};
 
 use clap::entry::{CLAP_PLUGIN_FACTORY_ID, clap_plugin_factory};
 
-mod helpers;
+mod dummy;
 
-use helpers::Dummy;
+use crate::dummy::{Dummy, DummyHost};
 
 clap::entry!(Dummy);
 use _clap_entry::clap_entry;
-
-use crate::helpers::DummyHost;
 
 #[test]
 fn export_clap_entry() {

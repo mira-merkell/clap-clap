@@ -9,12 +9,13 @@ use clap::{
     plugin::Plugin,
 };
 
-use crate::helpers::{Dummy, DummyHost};
+use crate::dummy::{Dummy, DummyHost};
 
-mod helpers;
+#[path = "../entry/dummy.rs"]
+mod dummy;
 
 #[test]
-fn empty() {
+pub fn empty() {
     let factory = Factory::new(vec![]);
     assert_eq!(factory.plugins_count(), 0);
 

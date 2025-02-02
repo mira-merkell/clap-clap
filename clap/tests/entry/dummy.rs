@@ -5,7 +5,7 @@ use std::{
 
 use clap::plugin::Plugin;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Dummy;
 
 impl Plugin for Dummy {
@@ -18,6 +18,7 @@ impl Plugin for Dummy {
     }
 }
 
+#[derive(Debug)]
 pub struct DummyHost(pub clap_sys::clap_host);
 
 impl DummyHost {

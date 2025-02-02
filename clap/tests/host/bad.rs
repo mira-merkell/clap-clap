@@ -2,9 +2,7 @@ use std::ptr::null;
 
 use clap::factory::{Factory, FactoryHost, FactoryPluginDescriptor};
 
-use crate::helpers::{Dummy, DummyHost};
-
-mod helpers;
+use crate::dummy::{Dummy, DummyHost};
 
 fn create_factory() -> Factory {
     Factory::new(vec![Box::new(FactoryPluginDescriptor::<Dummy>::allocate())])
