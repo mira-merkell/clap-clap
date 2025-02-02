@@ -193,7 +193,7 @@ extern "C" fn process<P: Plugin>(
     // to an exclusive struct for the duration of this call.
     // So a mutable reference to process is safe.
     let process = unsafe { &mut *(process as *mut _) };
-    let process = &mut unsafe { Process::new(NonNull::new_unchecked(process)) };
+    let process = &mut unsafe { Process::new_unchecked(NonNull::new_unchecked(process)) };
     audio_thread
         .process(process)
         .map(Into::into)

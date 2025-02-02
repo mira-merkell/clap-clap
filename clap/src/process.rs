@@ -27,7 +27,7 @@ impl Process {
     ///    `clap_plugin.process()`, as the pointer represents valid data only
     ///    within that function scope.
     /// 3. There must be only one Process that wraps around the given pointer.
-    pub(crate) const unsafe fn new(clap_process: NonNull<clap_process>) -> Self {
+    pub const unsafe fn new_unchecked(clap_process: NonNull<clap_process>) -> Self {
         Self(clap_process)
     }
 
@@ -97,7 +97,7 @@ impl Process {
             // SAFETY: we just checked if n is less then the limit.
             unsafe { self.audio_inputs_unchecked(n) }
         } else {
-            panic!("the audio input number must be less than the number of available input ports")
+            panic!("audio input number must be less than the number of available input ports")
         }
     }
 
@@ -129,7 +129,7 @@ impl Process {
             // SAFETY: we just checked if n is less then the limit.
             unsafe { self.audio_outputs_unchecked(n) }
         } else {
-            panic!("the audio output number must be less than the number of available output ports",)
+            panic!("audio output number must be less than the number of available output ports",)
         }
     }
 
