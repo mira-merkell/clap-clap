@@ -59,7 +59,18 @@ impl Delay {
 
 impl AudioThread<PingPong> for Delay {
     fn process(&mut self, process: &mut Process) -> Result<Status, Error> {
-        process.frames(|_| Ok(Continue))
+        process.frames(|frame| {
+            let in_l = frame.audio_input(0).data32(0);
+            let in_r = frame.audio_input(0).data32(1);
+
+            let out_l = in_r;
+            let out_r = in_l;
+
+            *frame.audio_output(0).data32(0) = out_l;
+            *frame.audio_output(0).data32(1) = out_r;
+
+            Ok(Continue)
+        })
     }
 }
 
