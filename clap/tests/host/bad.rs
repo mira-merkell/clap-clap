@@ -5,7 +5,9 @@ use clap::factory::{Factory, FactoryHost, FactoryPluginDescriptor};
 use crate::dummy::{Dummy, DummyHost};
 
 fn create_factory() -> Factory {
-    Factory::new(vec![Box::new(FactoryPluginDescriptor::<Dummy>::allocate())])
+    Factory::new(vec![Box::new(
+        FactoryPluginDescriptor::<Dummy>::build_plugin_descriptor().unwrap(),
+    )])
 }
 
 #[test]

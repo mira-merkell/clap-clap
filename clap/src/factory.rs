@@ -10,7 +10,8 @@ use clap_sys::{clap_host, clap_plugin, clap_plugin_descriptor};
 use crate::{
     host,
     host::Host,
-    plugin::{Plugin, PluginDescriptor, Runtime},
+    plugin,
+    plugin::{Plugin, PluginDescriptor, Runtime, build_plugin_descriptor},
 };
 
 /// This type exists only be visible from within `clap::entry!` macro.
@@ -34,8 +35,10 @@ impl FactoryHost {
 pub struct FactoryPluginDescriptor<P>(PluginDescriptor<P>);
 
 impl<P: Plugin> FactoryPluginDescriptor<P> {
-    pub fn allocate() -> Self {
-        Self(PluginDescriptor::allocate())
+    pub fn build_plugin_descriptor() -> Result<Self, Error> {
+        build_plugin_descriptor()
+            .map(Self)
+            .map_err(Error::PluginDescriptor)
     }
 }
 
@@ -47,11 +50,11 @@ pub trait FactoryPlugin {
 
 impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
     fn plugin_id(&self) -> &CStr {
-        &self.0.id
+        &self.0.plugin_id()
     }
 
     fn clap_plugin_descriptor(&self) -> *const clap_plugin_descriptor {
-        &raw const self.0.raw_descriptor
+        &raw const self.0.clap_plugin_descriptor
     }
 
     fn clap_plugin(&self, host: FactoryHost) -> Result<*const clap_plugin, Error> {
@@ -62,6 +65,7 @@ impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
         let host =
             unsafe { Host::try_from_factory(host.into_inner()) }.map_err(Error::CreateHost)?;
         Ok(Runtime::<P>::initialize(Arc::new(host))
+            .map_err(Error::PluginDescriptor)?
             .into_clap_plugin()
             .into_inner())
     }
@@ -115,6 +119,7 @@ unsafe impl Sync for Factory {}
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     PluginIdNotFound,
+    PluginDescriptor(plugin::Error),
     CreateHost(host::Error),
     IndexOutOfBounds(u32),
 }
@@ -123,6 +128,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::PluginIdNotFound => write!(f, "factory plugin id not found"),
+            Error::PluginDescriptor(e) => write!(f, "plugin descriptor: {e}"),
             Error::CreateHost(_) => write!(f, "create host handle"),
             Error::IndexOutOfBounds(n) => write!(f, "index out ouf bounds: {n}"),
         }

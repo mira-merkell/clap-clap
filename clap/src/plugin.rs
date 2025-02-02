@@ -1,4 +1,5 @@
 use std::{
+    ffi::NulError,
     fmt::Display,
     marker::PhantomData,
     ops::Deref,
@@ -16,7 +17,7 @@ use crate::{
 
 mod desc;
 
-pub(crate) use desc::PluginDescriptor;
+pub(crate) use desc::{PluginDescriptor, build_plugin_descriptor};
 
 mod ffi;
 
@@ -25,7 +26,7 @@ pub trait Plugin: Default {
     type Extensions: Extensions<Self>;
 
     const ID: &'static str;
-    const NAME: &'static str = "";
+    const NAME: &'static str;
     const VENDOR: &'static str = "";
     const URL: &'static str = "";
     const MANUAL_URL: &'static str = "";
@@ -94,14 +95,14 @@ pub(crate) struct Runtime<P: Plugin> {
 }
 
 impl<P: Plugin> Runtime<P> {
-    pub(crate) fn initialize(host: Arc<Host>) -> Self {
-        Self {
-            descriptor: PluginDescriptor::allocate(),
+    pub(crate) fn initialize(host: Arc<Host>) -> Result<Self, Error> {
+        Ok(Self {
+            descriptor: build_plugin_descriptor()?,
             plugin: P::default(),
             audio_thread: None,
             host,
             plugin_extensions: Mutex::new(ClapPluginExtensions::new()),
-        }
+        })
     }
 
     pub(crate) fn into_clap_plugin(self) -> ClapPlugin<P> {
@@ -202,11 +203,17 @@ impl<P: Plugin> Deref for ClapPlugin<P> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Error {}
+pub enum Error {
+    MissingFields,
+    NulError(NulError),
+}
 
 impl Display for Error {
-    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        Ok(())
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Error::MissingFields => write!(f, "missing fields in plugin description"),
+            Error::NulError(_) => write!(f, "null error while converting C string"),
+        }
     }
 }
 
