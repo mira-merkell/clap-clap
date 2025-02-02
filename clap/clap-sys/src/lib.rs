@@ -164,3 +164,6 @@ cast_const_as_clap_log_severity!(
     CLAP_LOG_PLUGIN_MISBEHAVING
 );
 pub use ffi::CLAP_EXT_LOG;
+
+// CLAP event transport
+pub use ffi::clap_event_transport;

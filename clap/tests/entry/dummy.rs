@@ -13,7 +13,7 @@ impl Plugin for Dummy {
     type AudioThread = ();
     type Extensions = ();
 
-    fn activate(&mut self, _: f64, _: usize, _: usize) -> Result<Self::AudioThread, clap::Error> {
+    fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread, clap::Error> {
         Ok(())
     }
 }

@@ -1,6 +1,10 @@
+//! CLAP Process interface.
+//!
+//! The facilities here are mostly const functions to access audio buffers
+//! and event lists in a safe way.
 use std::{
     fmt::{Display, Formatter},
-    ptr::{slice_from_raw_parts, slice_from_raw_parts_mut},
+    ptr::{NonNull, slice_from_raw_parts, slice_from_raw_parts_mut},
 };
 
 use clap_sys::{
@@ -8,205 +12,267 @@ use clap_sys::{
     CLAP_PROCESS_TAIL, clap_audio_buffer, clap_process, clap_process_status,
 };
 
-pub struct Process<'a>(&'a mut clap_process);
+use crate::process::{Status::Continue, frame::Frame};
 
-impl<'a> Process<'a> {
-    pub(crate) fn new(clap_process: &'a mut clap_process) -> Self {
+pub mod frame;
+
+pub struct Process(NonNull<clap_process>);
+
+impl Process {
+    /// # Safety
+    ///
+    /// 1. The pointer to clap_process must be obtained from CLAP host calling
+    ///    `clap_plugin.process()`.
+    /// 2. The Process lifetime must not exceed the duration of the call to
+    ///    `clap_plugin.process()`, as the pointer represents valid data only
+    ///    within that function scope.
+    /// 3. There must be only one Process that wraps around the given pointer.
+    pub const unsafe fn new_unchecked(clap_process: NonNull<clap_process>) -> Self {
         Self(clap_process)
     }
 
-    pub fn steady_time(&self) -> i64 {
-        self.0.steady_time
+    const fn as_clap_process(&self) -> &clap_process {
+        // SAFETY: By the safety requirements of the constructor, we can obtain a shared
+        // reference to the underlying pointer.
+        unsafe { self.0.as_ref() }
     }
 
-    pub fn frames_count(&self) -> usize {
-        self.0
-            .frames_count
-            .try_into()
-            .expect("frame_count must fit into usize")
+    const fn as_clap_process_mut(&mut self) -> &mut clap_process {
+        // SAFETY: By the safety requirements of the constructor, we can obtain an
+        // exclusive reference to the underlying pointer.
+        unsafe { self.0.as_mut() }
     }
 
-    pub fn audio_inputs_count(&self) -> usize {
-        self.0
-            .audio_inputs_count
-            .try_into()
-            .expect("audio_inputs_count must fit into usize")
+    pub const fn steady_time(&self) -> i64 {
+        self.as_clap_process().steady_time
     }
 
-    pub unsafe fn audio_input_unchecked(&self, n: usize) -> Input<'_> {
-        Input {
-            buf: unsafe { &*self.0.audio_inputs.add(n) },
-            frames_count: self.frames_count(),
+    pub const fn frames_count(&self) -> u32 {
+        self.as_clap_process().frames_count
+    }
+
+    pub fn frames(
+        &mut self,
+        op: impl FnMut(&mut Frame<'_>) -> Result<Status, Error>,
+    ) -> Result<Status, crate::Error> {
+        let mut res = Ok(Continue);
+        let mut op = op;
+        for i in 0..self.frames_count() {
+            // SAFETY: the index `i` is less than `self.frames_count()`.
+            let mut frame = unsafe { Frame::new_unchecked(self, i) };
+            res = op(&mut frame);
+            if res.is_err() {
+                break;
+            }
+        }
+        res.map_err(Into::into)
+    }
+
+    pub fn transport(&self) {
+        todo!()
+    }
+
+    pub const fn audio_inputs_count(&self) -> u32 {
+        self.as_clap_process().audio_inputs_count
+    }
+
+    /// # Safety
+    ///
+    /// 1. The audio input number `n` must be less that
+    ///    `self.audio_inputs_count()`
+    /// 2. The audio input number `n` must fit into `usize` (cast).
+    const unsafe fn audio_inputs_unchecked(&self, n: u32) -> AudioBuffer<'_> {
+        // SAFETY: `n` is less than `self.audio_inputs_count()`, so `clap_audio_buffer`
+        // is a valid pointer that belongs to `Process`.
+        let clap_audio_buffer = unsafe { self.as_clap_process().audio_inputs.add(n as usize) };
+        unsafe { AudioBuffer::new(self, clap_audio_buffer) }
+    }
+
+    /// # Panic
+    ///
+    /// This function will panic if `n` is greater or equal
+    /// to `self.audio_input_counts()`.
+    pub const fn audio_inputs(&self, n: u32) -> AudioBuffer<'_> {
+        if n < self.audio_inputs_count() {
+            // SAFETY: we just checked if n is less then the limit.
+            unsafe { self.audio_inputs_unchecked(n) }
+        } else {
+            panic!("audio input number must be less than the number of available input ports")
         }
     }
 
-    pub fn audio_input(&self, n: usize) -> Option<Input<'_>> {
-        (n < self.0.audio_inputs_count as usize).then_some(unsafe { self.audio_input_unchecked(n) })
+    pub const fn audio_outputs_count(&self) -> u32 {
+        // SAFETY: the requirements of the constructor guarantee that dereferencing the
+        // pointer is safe.
+        unsafe { *self.0.as_ptr() }.audio_outputs_count
     }
 
-    pub fn audio_inputs_iter(&self) -> impl Iterator<Item = Input<'_>> {
-        (0..self.audio_inputs_count()).map(|n| unsafe { self.audio_input_unchecked(n) })
+    /// # Safety
+    ///
+    /// 1. The audio output number `n` must be less that
+    ///    self.audio_outputs_count()
+    /// 2. The audio output number `n` must fit into usize (cast).
+    const unsafe fn audio_outputs_unchecked(&mut self, n: u32) -> AudioBufferMut<'_> {
+        // SAFETY: `n` is less that `self.audio_output_count()`, so `clap_audio_buffer`
+        // is a valid pointer that belongs to `Process`.
+        let clap_audio_buffer = unsafe { self.as_clap_process_mut().audio_outputs.add(n as usize) };
+        let clap_audio_buffer = unsafe { NonNull::new_unchecked(clap_audio_buffer) };
+        unsafe { AudioBufferMut::new(self, clap_audio_buffer) }
     }
 
-    pub fn audio_outputs_count(&self) -> usize {
-        self.0
-            .audio_outputs_count
-            .try_into()
-            .expect("audio_outputs_count must fit into usize")
-    }
-
-    pub unsafe fn audio_output_unchecked(&mut self, n: usize) -> Output<'_> {
-        Output {
-            buf: unsafe { &mut *self.0.audio_outputs.add(n) },
-            frames_count: self.frames_count(),
+    /// # Panic
+    ///
+    /// This function will panic if `n` is larger or equal
+    /// `self.audio_output_counts()`.
+    pub const fn audio_outputs(&mut self, n: u32) -> AudioBufferMut<'_> {
+        if n < self.audio_outputs_count() {
+            // SAFETY: we just checked if n is less then the limit.
+            unsafe { self.audio_outputs_unchecked(n) }
+        } else {
+            panic!("audio output number must be less than the number of available output ports",)
         }
     }
 
-    pub fn audio_output(&mut self, n: usize) -> Option<Output<'_>> {
-        (n < self.0.audio_outputs_count as usize)
-            .then_some(unsafe { self.audio_output_unchecked(n) })
+    pub fn in_events(&self) {
+        todo!()
     }
 
-    pub unsafe fn link_ports_unchecked(&mut self, port_in: usize, port_out: usize) -> Link<'_> {
-        let channel_count = unsafe { self.audio_input_unchecked(port_in).channel_count() };
-        let port_in = unsafe { &*self.0.audio_inputs.add(port_in) };
-        let port_out = unsafe { &mut *self.0.audio_outputs.add(port_out) };
-
-        unsafe { Link::new_unchecked(port_in, port_out, channel_count, self.frames_count()) }
-    }
-
-    pub fn link_audio_ports(&mut self, port_in: usize, port_out: usize) -> Result<Link<'_>, Error> {
-        let e = Error::Link(port_in, port_out);
-
-        let port_in = ((port_in as u32) < self.0.audio_inputs_count)
-            .then_some(unsafe { &*self.0.audio_inputs.add(port_in) })
-            .ok_or(e)?;
-        let port_out = ((port_out as u32) < self.0.audio_outputs_count)
-            .then_some(unsafe { &mut *self.0.audio_outputs.add(port_out) })
-            .ok_or(e)?;
-
-        Link::new(port_in, port_out, self.frames_count()).ok_or(e)
+    pub fn out_events(&mut self) {
+        todo!()
     }
 }
 
-pub struct Input<'a> {
-    buf: &'a clap_audio_buffer,
-    frames_count: usize,
+/// Const audio buffer.
+pub struct AudioBuffer<'a> {
+    process: &'a Process,
+    clap_audio_buffer: *const clap_audio_buffer,
 }
 
-impl Input<'_> {
-    pub fn channel_count(&self) -> usize {
-        self.buf
-            .channel_count
-            .try_into()
-            .expect("channel count must fit into usize")
+impl<'a> AudioBuffer<'a> {
+    /// # Safety
+    ///
+    /// `clap_audio_buffer` must be non-null and must belong to Process.
+    const unsafe fn new(process: &'a Process, clap_audio_buffer: *const clap_audio_buffer) -> Self {
+        Self {
+            process,
+            clap_audio_buffer,
+        }
     }
 
-    pub fn latency(&self) -> usize {
-        self.buf
-            .latency
-            .try_into()
-            .expect("latency must fit into usize")
+    const fn as_clap_audio_buffer(&self) -> &clap_audio_buffer {
+        // SAFETY: By construction, audio_buffer can be only obtained from a shared
+        // reference to Process.
+        unsafe { self.clap_audio_buffer.as_ref().unwrap() }
     }
 
-    pub fn constant_mask(&self) -> u64 {
-        self.buf.constant_mask
+    /// # Safety
+    ///
+    /// 1. `channel` must be less than `self.channel_count()`,
+    /// 2. `process.frames_count()` must fit into `usize` (cast).
+    const unsafe fn data32_unchecked(&self, channel: u32) -> &[f32] {
+        // SAFETY: The caller guarantees this dereferencing is safe.
+        let chan = unsafe { *self.as_clap_audio_buffer().data32.add(channel as usize) };
+
+        // SAFETY: The CLAP host guarantees that the channel is at
+        // least process.frames_count() long.
+        unsafe { &*slice_from_raw_parts(chan, self.process.frames_count() as usize) }
     }
 
-    pub unsafe fn channel_unchecked(&self, n: usize) -> &[f32] {
-        let samples = unsafe { *self.buf.data32.add(n) };
-        unsafe { &*slice_from_raw_parts(samples, self.frames_count) }
+    /// # Panic
+    ///
+    /// This function will panic if `channel` is larger or equal to
+    /// `self.channel.count()`.
+    pub const fn data32(&self, channel: u32) -> &[f32] {
+        if channel < self.channel_count() {
+            // SAFETY: we just checked if `channel < self.channel_count()`
+            unsafe { self.data32_unchecked(channel) }
+        } else {
+            panic!("channel number must be less that the number of available channels")
+        }
     }
 
-    pub fn channel(&self, n: usize) -> Option<&[f32]> {
-        (n < self.buf.channel_count as usize).then_some(unsafe { self.channel_unchecked(n) })
+    pub const fn channel_count(&self) -> u32 {
+        self.as_clap_audio_buffer().channel_count
     }
 
-    pub fn channel_iter(&self) -> impl Iterator<Item = &[f32]> {
-        (0..self.channel_count()).map(|n| unsafe { self.channel_unchecked(n) })
-    }
-}
-
-pub struct Output<'a> {
-    buf: &'a mut clap_audio_buffer,
-    frames_count: usize,
-}
-
-impl Output<'_> {
-    pub fn channel_count(&self) -> usize {
-        self.buf.channel_count as _
+    pub const fn latency(&self) -> u32 {
+        self.as_clap_audio_buffer().latency
     }
 
-    pub fn latency(&self) -> usize {
-        self.buf.latency as _
-    }
-
-    pub fn constant_mask(&self) -> u64 {
-        self.buf.constant_mask
-    }
-
-    pub unsafe fn channel_unchecked(&mut self, n: usize) -> &mut [f32] {
-        let samples = unsafe { *self.buf.data32.add(n) };
-        unsafe { &mut *slice_from_raw_parts_mut(samples, self.frames_count) }
-    }
-
-    pub fn channel_mut(&mut self, n: usize) -> Option<&mut [f32]> {
-        (n < self.buf.channel_count as usize).then_some(unsafe { self.channel_unchecked(n) })
+    pub const fn constant_mask(&self) -> u64 {
+        self.as_clap_audio_buffer().constant_mask
     }
 }
 
-/// Audio ports up to 8 channels.
-pub struct Link<'a> {
-    port_in: &'a clap_audio_buffer,
-    port_out: &'a mut clap_audio_buffer,
-    channel_count: usize,
-    frames_count: usize,
-    frame: [f32; 8],
+/// Writable audio buffer.
+pub struct AudioBufferMut<'a> {
+    process: &'a mut Process,
+    clap_audio_buffer: NonNull<clap_audio_buffer>,
 }
 
-impl<'a> Link<'a> {
-    unsafe fn new_unchecked(
-        port_in: &'a clap_audio_buffer,
-        port_out: &'a mut clap_audio_buffer,
-        channel_count: usize,
-        frames_count: usize,
+impl<'a> AudioBufferMut<'a> {
+    /// # Safety
+    ///
+    /// `clap_audio_buffer` must be a writable buffer that belongs to Process.
+    const unsafe fn new(
+        process: &'a mut Process,
+        clap_audio_buffer: NonNull<clap_audio_buffer>,
     ) -> Self {
         Self {
-            port_in,
-            port_out,
-            channel_count,
-            frames_count,
-            frame: [0.0; 8],
+            process,
+            clap_audio_buffer,
         }
     }
 
-    fn new(
-        port_in: &'a clap_audio_buffer,
-        port_out: &'a mut clap_audio_buffer,
-        frames_count: usize,
-    ) -> Option<Self> {
-        let channel_count = usize::try_from(port_in.channel_count).ok()?;
-        (channel_count <= 8 && port_in.channel_count == port_out.channel_count).then_some(unsafe {
-            Self::new_unchecked(port_in, port_out, channel_count, frames_count)
-        })
+    const fn as_clap_audio_buffer(&self) -> &clap_audio_buffer {
+        // SAFETY: The constructor guarantees that we have exclusive access to the audio
+        // buffer. We know that the buffer remains constant for the lifetime of
+        // self, so the aliasing is safe.
+        unsafe { self.clap_audio_buffer.as_ref() }
     }
 
-    pub fn with_op(&mut self, op: impl FnMut(&mut [f32])) {
-        let mut op = op;
+    const fn as_clap_audio_buffer_mut(&mut self) -> &mut clap_audio_buffer {
+        // SAFETY: The constructor guarantees that we have exclusive access to the audio
+        // buffer.
+        unsafe { self.clap_audio_buffer.as_mut() }
+    }
 
-        for i in 0..self.frames_count {
-            for k in 0..self.channel_count {
-                let sample = unsafe { *(*self.port_in.data32.add(k)).add(i) };
-                self.frame[k] = sample;
-            }
+    /// # Safety
+    ///
+    /// 1. The number of channels  must be less than `self.channel_count()`
+    /// 2. `process.frames_count()` must fit into `usize` (cast)
+    const unsafe fn data32_unchecked(&mut self, channel: u32) -> &mut [f32] {
+        // SAFETY: The caller guarantees this dereferencing is safe.
+        let chan = unsafe { *self.as_clap_audio_buffer_mut().data32.add(channel as usize) };
 
-            op(&mut self.frame[0..self.channel_count]);
+        // SAFETY: The CLAP host guarantees that the channel is at
+        // least process.frames_count() long.
+        unsafe { &mut *slice_from_raw_parts_mut(chan, self.process.frames_count() as usize) }
+    }
 
-            for k in 0..self.channel_count {
-                let sample = unsafe { &mut *(*self.port_out.data32.add(k)).add(i) };
-                *sample = self.frame[k];
-            }
+    /// # Panic
+    ///
+    /// This function will panic if `channel` is greater or equal to
+    /// `self.channel.count()`.
+    pub const fn data32(&mut self, n: u32) -> &mut [f32] {
+        // SAFETY: We just checked if `n < channel_count()`
+        if n < self.channel_count() {
+            unsafe { self.data32_unchecked(n) }
+        } else {
+            panic!("channel number must be less that the number of available channels")
         }
+    }
+
+    pub const fn channel_count(&self) -> u32 {
+        self.as_clap_audio_buffer().channel_count
+    }
+
+    pub const fn latency(&self) -> u32 {
+        self.as_clap_audio_buffer().latency
+    }
+
+    pub fn constant_mask(&self) -> u64 {
+        self.as_clap_audio_buffer().constant_mask
     }
 }
 
@@ -231,15 +297,11 @@ impl From<Status> for clap_process_status {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Error {
-    Link(usize, usize),
-}
+pub enum Error {}
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::Link(x, y) => write!(f, "Link error, cannot link ports in:{x} and out:{y}"),
-        }
+        write!(f, "process")
     }
 }
 

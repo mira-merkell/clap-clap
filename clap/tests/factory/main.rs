@@ -89,8 +89,8 @@ impl Plugin for DummyToo {
     fn activate(
         &mut self,
         sample_rate: f64,
-        min_frames: usize,
-        max_frames: usize,
+        min_frames: u32,
+        max_frames: u32,
     ) -> Result<Self::AudioThread, Error> {
         self.0.activate(sample_rate, min_frames, max_frames)
     }
