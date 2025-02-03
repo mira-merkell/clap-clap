@@ -385,3 +385,134 @@ fn audio_output_data32() {
     assert_eq!(test_process.audio_outputs[0].data32[0].data()[0], 0.1);
     assert_eq!(test_process.audio_outputs[0].data32[0].data()[1], 0.2);
 }
+
+#[test]
+fn audio_input_output_map_data32() {
+    const NUM_FRAMES: u32 = 1024;
+
+    let mut test_process = TestProcess::builder()
+        .latency(0)
+        .steady_time(0)
+        .frames_count(NUM_FRAMES)
+        .channel_count(7)
+        .audio_inputs_count(3)
+        .audio_outputs_count(2)
+        .build()
+        .unwrap();
+
+    let mut buf = vec![];
+    for i in 0..NUM_FRAMES {
+        test_process.audio_inputs[2].data32[3].0[i as usize] = i as f32;
+    }
+
+    {
+        let mut clap_process = test_process.clap_process();
+        let mut process =
+            unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
+
+        for sample in process.audio_inputs(2).data32(3) {
+            buf.push(*sample)
+        }
+        for (out, sample) in process.audio_outputs(1).data32(6).iter_mut().zip(buf) {
+            *out = sample;
+        }
+    }
+
+    for i in 0..NUM_FRAMES as usize {
+        assert_eq!(test_process.audio_inputs[2].data32[3].0[i], i as f32);
+        assert_eq!(test_process.audio_outputs[1].data32[6].0[i], i as f32);
+    }
+}
+
+macro_rules! case_frames_init {
+    ($name:ident, $num_frames:literal, $num_chan:literal, $audio_in:literal, $audio_out:literal) => {
+        #[test]
+        fn $name() {
+            let mut test_process = TestProcess::builder()
+                .latency(0)
+                .steady_time(0)
+                .frames_count($num_frames)
+                .channel_count($num_chan)
+                .audio_inputs_count($audio_in)
+                .audio_outputs_count($audio_out)
+                .build()
+                .unwrap();
+
+            let mut clap_process = test_process.clap_process();
+            let mut process =
+                unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
+
+            let mut frames = process.frames();
+            for _ in 0..$num_frames {
+                let frame = frames.next().expect("the number of frames doesn't match");
+
+                for k in 0..$audio_in {
+                    assert_eq!(frame.audio_input(k).channel_count(), $num_chan);
+                }
+                for k in 0..$audio_out {
+                    assert_eq!(frame.audio_output(k).channel_count(), $num_chan);
+                }
+            }
+
+            let frame = frames.next();
+            assert!(frame.is_none());
+        }
+    };
+}
+
+case_frames_init!(frame_init_01, 1, 1, 1, 1);
+case_frames_init!(frame_init_02, 1, 2, 3, 4);
+case_frames_init!(frame_init_03, 1024, 2, 2, 2);
+case_frames_init!(frame_init_04, 8, 7, 10, 20);
+
+fn frames_input_output_map_data32(mut test_process: Pin<Box<TestProcess>>) {
+    for i in 0..test_process.frames_count {
+        test_process.audio_inputs[0].data32[0].0[i as usize] = i as f32;
+    }
+
+    {
+        let mut clap_process = test_process.clap_process();
+        let mut process =
+            unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
+
+        let mut frames = process.frames();
+        while let Some(frame) = frames.next() {
+            *frame.audio_output(1).data32(1) = frame.audio_input(0).data32(0);
+        }
+    }
+
+    for i in 0..test_process.frames_count as usize {
+        assert_eq!(test_process.audio_inputs[0].data32[0].0[i], i as f32);
+        assert_eq!(test_process.audio_outputs[1].data32[1].0[i], i as f32);
+    }
+}
+
+#[test]
+fn frames_input_output_map_data32_01() {
+    let test_process = TestProcess::builder()
+        .latency(0)
+        .steady_time(0)
+        .frames_count(32)
+        .channel_count(2)
+        .audio_inputs_count(1)
+        .audio_outputs_count(2)
+        .build()
+        .unwrap();
+
+    frames_input_output_map_data32(test_process);
+}
+
+#[test]
+fn frames_input_output_map_data32_02() {
+    let test_process = TestProcess::builder()
+        .latency(1)
+        .steady_time(2)
+        .frames_count(32)
+        .channel_count(3)
+        .audio_inputs_count(3)
+        .audio_outputs_count(3)
+        .build()
+        .unwrap();
+
+    frames_input_output_map_data32(test_process);
+}
