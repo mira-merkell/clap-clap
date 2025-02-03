@@ -84,8 +84,8 @@ struct TestProcess {
 }
 
 impl TestProcess {
-    fn builder() -> TestProcessBuilder {
-        TestProcessBuilder::default()
+    fn builder() -> TestProcessConfig {
+        TestProcessConfig::default()
     }
 
     fn new(
@@ -141,57 +141,39 @@ impl TestProcess {
 }
 
 #[derive(Copy, Clone, Debug, Default)]
-struct TestProcessBuilder {
-    latency: Option<u32>,
-    steady_time: Option<i64>,
-    frames_count: Option<u32>,
-    channel_count: Option<u32>,
-    audio_inputs_count: Option<u32>,
-    audio_outputs_count: Option<u32>,
+struct TestProcessConfig {
+    latency: u32,
+    steady_time: i64,
+    frames_count: u32,
+    channel_count: u32,
+    audio_inputs_count: u32,
+    audio_outputs_count: u32,
 }
 
-impl TestProcessBuilder {
-    fn build(&self) -> Option<Pin<Box<TestProcess>>> {
-        Some(TestProcess::new(
-            self.latency?,
-            self.steady_time?,
-            self.frames_count?,
-            self.channel_count?,
-            self.audio_inputs_count?,
-            self.audio_outputs_count?,
-        ))
+impl TestProcessConfig {
+    fn build(&self) -> Pin<Box<TestProcess>> {
+        TestProcess::new(
+            self.latency,
+            self.steady_time,
+            self.frames_count,
+            self.channel_count,
+            self.audio_inputs_count,
+            self.audio_outputs_count,
+        )
     }
 }
 
-macro_rules! impl_testprocess_builder {
-    ($Method:tt, $Typ:ty) => {
-        impl TestProcessBuilder {
-            fn $Method(&mut self, value: $Typ) -> &mut Self {
-                self.$Method = Some(value);
-                self
-            }
-        }
-    };
-}
-
-impl_testprocess_builder!(latency, u32);
-impl_testprocess_builder!(steady_time, i64);
-impl_testprocess_builder!(frames_count, u32);
-impl_testprocess_builder!(channel_count, u32);
-impl_testprocess_builder!(audio_inputs_count, u32);
-impl_testprocess_builder!(audio_outputs_count, u32);
-
 #[test]
 fn self_test_01() {
-    let process = TestProcess::builder()
-        .latency(0)
-        .steady_time(1)
-        .frames_count(2)
-        .channel_count(3)
-        .audio_inputs_count(4)
-        .audio_outputs_count(5)
-        .build()
-        .unwrap();
+    let process = TestProcessConfig {
+        latency: 0,
+        steady_time: 1,
+        frames_count: 2,
+        channel_count: 3,
+        audio_inputs_count: 4,
+        audio_outputs_count: 5,
+    }
+    .build();
 
     assert_eq!(process.audio_inputs[0].latency, 0);
     assert_eq!(process.audio_outputs[0].latency, 0);
@@ -207,15 +189,15 @@ fn self_test_01() {
 
 #[test]
 fn self_test_02() {
-    let mut process = TestProcess::builder()
-        .latency(0)
-        .steady_time(1)
-        .frames_count(2)
-        .channel_count(3)
-        .audio_inputs_count(4)
-        .audio_outputs_count(5)
-        .build()
-        .unwrap();
+    let mut process = TestProcessConfig {
+        latency: 0,
+        steady_time: 1,
+        frames_count: 2,
+        channel_count: 3,
+        audio_inputs_count: 4,
+        audio_outputs_count: 5,
+    }
+    .build();
 
     let clap_process = process.clap_process();
     assert_eq!(clap_process.steady_time, 1);
@@ -226,15 +208,15 @@ fn self_test_02() {
 
 #[test]
 fn self_test_03() {
-    let mut process = TestProcess::builder()
-        .latency(0)
-        .steady_time(1)
-        .frames_count(2)
-        .channel_count(3)
-        .audio_inputs_count(4)
-        .audio_outputs_count(5)
-        .build()
-        .unwrap();
+    let mut process = TestProcessConfig {
+        latency: 0,
+        steady_time: 1,
+        frames_count: 2,
+        channel_count: 3,
+        audio_inputs_count: 4,
+        audio_outputs_count: 5,
+    }
+    .build();
 
     process.audio_inputs[0].data32[0].data()[0] = 11.13;
     process.audio_outputs[2].data32[2].data()[1] = 0.777;
@@ -254,15 +236,16 @@ fn self_test_03() {
 
 #[test]
 fn process_new() {
-    let mut test_process = TestProcess::builder()
-        .latency(0)
-        .steady_time(1)
-        .frames_count(2)
-        .channel_count(3)
-        .audio_inputs_count(4)
-        .audio_outputs_count(5)
-        .build()
-        .unwrap();
+    let mut test_process = TestProcessConfig {
+        latency: 0,
+        steady_time: 1,
+        frames_count: 2,
+        channel_count: 3,
+        audio_inputs_count: 4,
+        audio_outputs_count: 5,
+    }
+    .build();
+
     let mut clap_process = test_process.clap_process();
     let mut process =
         unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
@@ -302,15 +285,15 @@ fn process_new() {
     expected = "audio input number must be less than the number of available input ports"
 )]
 fn audio_input_wrong_no() {
-    let mut test_process = TestProcess::builder()
-        .latency(0)
-        .steady_time(0)
-        .frames_count(2)
-        .channel_count(1)
-        .audio_inputs_count(1)
-        .audio_outputs_count(0)
-        .build()
-        .unwrap();
+    let mut test_process = TestProcessConfig {
+        latency: 0,
+        steady_time: 0,
+        frames_count: 2,
+        channel_count: 1,
+        audio_inputs_count: 1,
+        audio_outputs_count: 0,
+    }
+    .build();
     let mut clap_process = test_process.clap_process();
     let process = unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
 
@@ -319,15 +302,16 @@ fn audio_input_wrong_no() {
 
 #[test]
 fn audio_input_data32() {
-    let mut test_process = TestProcess::builder()
-        .latency(0)
-        .steady_time(0)
-        .frames_count(2)
-        .channel_count(1)
-        .audio_inputs_count(1)
-        .audio_outputs_count(0)
-        .build()
-        .unwrap();
+    let mut test_process = TestProcessConfig {
+        latency: 0,
+        steady_time: 0,
+        frames_count: 2,
+        channel_count: 1,
+        audio_inputs_count: 1,
+        audio_outputs_count: 0,
+    }
+    .build();
+
     test_process.audio_inputs[0].data32[0].data()[0] = 0.1;
     test_process.audio_inputs[0].data32[0].data()[1] = 0.2;
 
@@ -344,15 +328,16 @@ fn audio_input_data32() {
     expected = "audio output number must be less than the number of available output ports"
 )]
 fn audio_output_wrong_no() {
-    let mut test_process = TestProcess::builder()
-        .latency(0)
-        .steady_time(0)
-        .frames_count(2)
-        .channel_count(1)
-        .audio_inputs_count(1)
-        .audio_outputs_count(0)
-        .build()
-        .unwrap();
+    let mut test_process = TestProcessConfig {
+        latency: 0,
+        steady_time: 0,
+        frames_count: 2,
+        channel_count: 1,
+        audio_inputs_count: 1,
+        audio_outputs_count: 0,
+    }
+    .build();
+
     let mut clap_process = test_process.clap_process();
     let mut process =
         unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
@@ -362,15 +347,15 @@ fn audio_output_wrong_no() {
 
 #[test]
 fn audio_output_data32() {
-    let mut test_process = TestProcess::builder()
-        .latency(0)
-        .steady_time(0)
-        .frames_count(2)
-        .channel_count(1)
-        .audio_inputs_count(0)
-        .audio_outputs_count(1)
-        .build()
-        .unwrap();
+    let mut test_process = TestProcessConfig {
+        latency: 0,
+        steady_time: 0,
+        frames_count: 2,
+        channel_count: 1,
+        audio_inputs_count: 0,
+        audio_outputs_count: 1,
+    }
+    .build();
 
     {
         let mut clap_process = test_process.clap_process();
@@ -389,16 +374,15 @@ fn audio_output_data32() {
 #[test]
 fn audio_input_output_map_data32() {
     const NUM_FRAMES: u32 = 1024;
-
-    let mut test_process = TestProcess::builder()
-        .latency(0)
-        .steady_time(0)
-        .frames_count(NUM_FRAMES)
-        .channel_count(7)
-        .audio_inputs_count(3)
-        .audio_outputs_count(2)
-        .build()
-        .unwrap();
+    let mut test_process = TestProcessConfig {
+        latency: 0,
+        steady_time: 0,
+        frames_count: NUM_FRAMES,
+        channel_count: 7,
+        audio_inputs_count: 3,
+        audio_outputs_count: 2,
+    }
+    .build();
 
     let mut buf = vec![];
     for i in 0..NUM_FRAMES {
@@ -428,16 +412,15 @@ macro_rules! case_frames_init {
     ($name:ident, $num_frames:literal, $num_chan:literal, $audio_in:literal, $audio_out:literal) => {
         #[test]
         fn $name() {
-            let mut test_process = TestProcess::builder()
-                .latency(0)
-                .steady_time(0)
-                .frames_count($num_frames)
-                .channel_count($num_chan)
-                .audio_inputs_count($audio_in)
-                .audio_outputs_count($audio_out)
-                .build()
-                .unwrap();
-
+            let mut test_process = TestProcessConfig {
+                latency: 0,
+                steady_time: 0,
+                frames_count: $num_frames,
+                channel_count: $num_chan,
+                audio_inputs_count: $audio_in,
+                audio_outputs_count: $audio_out,
+            }
+            .build();
             let mut clap_process = test_process.clap_process();
             let mut process =
                 unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
@@ -465,54 +448,113 @@ case_frames_init!(frame_init_02, 1, 2, 3, 4);
 case_frames_init!(frame_init_03, 1024, 2, 2, 2);
 case_frames_init!(frame_init_04, 8, 7, 10, 20);
 
-fn frames_input_output_map_data32(mut test_process: Pin<Box<TestProcess>>) {
-    for i in 0..test_process.frames_count {
-        test_process.audio_inputs[0].data32[0].0[i as usize] = i as f32;
-    }
+fn frames_input_data32(mut test_process: Pin<Box<TestProcess>>) {
+    let num_in = test_process.audio_inputs_count;
+    let num_ch = test_process.audio_inputs[0].channel_count;
 
-    {
-        let mut clap_process = test_process.clap_process();
-        let mut process =
-            unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
-
-        let mut frames = process.frames();
-        while let Some(frame) = frames.next() {
-            *frame.audio_output(1).data32(1) = frame.audio_input(0).data32(0);
+    for pt in 0..num_in as usize {
+        for ch in 0..num_ch as usize {
+            for i in 0..test_process.frames_count as usize {
+                test_process.audio_inputs[pt].data32[ch].0[i] = (pt * ch * i) as f32;
+            }
         }
     }
 
-    for i in 0..test_process.frames_count as usize {
-        assert_eq!(test_process.audio_inputs[0].data32[0].0[i], i as f32);
-        assert_eq!(test_process.audio_outputs[1].data32[1].0[i], i as f32);
+    let mut clap_process = test_process.clap_process();
+    let mut process =
+        unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
+
+    let mut i = 0;
+    let mut frames = process.frames();
+    while let Some(frame) = frames.next() {
+        for pt in 0..num_in {
+            for ch in 0..num_ch {
+                assert_eq!(frame.audio_input(pt).data32(ch), (pt * ch * i) as f32);
+            }
+        }
+        i += 1;
     }
 }
 
-#[test]
-fn frames_input_output_map_data32_01() {
-    let test_process = TestProcess::builder()
-        .latency(0)
-        .steady_time(0)
-        .frames_count(32)
-        .channel_count(2)
-        .audio_inputs_count(1)
-        .audio_outputs_count(2)
-        .build()
-        .unwrap();
+macro_rules! case_frames_input_data32 {
+    ($name:ident, $num_ins:literal, $num_chan:literal) => {
+        #[test]
+        fn $name() {
+            let test_process = TestProcessConfig {
+                latency: 0,
+                steady_time: 0,
+                frames_count: 1024,
+                channel_count: $num_chan,
+                audio_inputs_count: $num_ins,
+                audio_outputs_count: 0,
+            }
+            .build();
 
-    frames_input_output_map_data32(test_process);
+            frames_input_data32(test_process);
+        }
+    };
 }
 
-#[test]
-fn frames_input_output_map_data32_02() {
-    let test_process = TestProcess::builder()
-        .latency(1)
-        .steady_time(2)
-        .frames_count(32)
-        .channel_count(3)
-        .audio_inputs_count(3)
-        .audio_outputs_count(3)
-        .build()
-        .unwrap();
+case_frames_input_data32!(frames_input_data32_01, 1, 1);
+case_frames_input_data32!(frames_input_data32_02, 2, 1);
+case_frames_input_data32!(frames_input_data32_03, 1, 2);
+case_frames_input_data32!(frames_input_data32_04, 2, 2);
+case_frames_input_data32!(frames_input_data32_05, 3, 1);
+case_frames_input_data32!(frames_input_data32_06, 1, 3);
 
-    frames_input_output_map_data32(test_process);
+fn frames_output_data32(mut test_process: Pin<Box<TestProcess>>) {
+    let num_out = test_process.audio_outputs_count;
+    let num_ch = test_process.audio_outputs[0].channel_count;
+
+    let mut clap_process = test_process.clap_process();
+    let mut process =
+        unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
+
+    let mut i = 0;
+    let mut frames = process.frames();
+    while let Some(frame) = frames.next() {
+        for pt in 0..num_out {
+            for ch in 0..num_ch {
+                *frame.audio_output(pt).data32(ch) = (pt * ch * i) as f32;
+            }
+        }
+        i += 1;
+    }
+
+    for pt in 0..num_out as usize {
+        for ch in 0..num_ch as usize {
+            for i in 0..test_process.frames_count as usize {
+                assert_eq!(
+                    test_process.audio_outputs[pt].data32[ch].0[i],
+                    (pt * ch * i) as f32
+                );
+            }
+        }
+    }
 }
+
+macro_rules! case_frames_output_data32 {
+    ($name:ident, $num_outs:literal, $num_chan:literal) => {
+        #[test]
+        fn $name() {
+            let test_process = TestProcessConfig {
+                latency: 0,
+                steady_time: 0,
+                frames_count: 1024,
+                channel_count: $num_chan,
+                audio_inputs_count: 0,
+                audio_outputs_count: $num_outs,
+            }
+            .build();
+
+            frames_output_data32(test_process);
+        }
+    };
+}
+
+case_frames_output_data32!(frames_output_data32_01, 1, 1);
+case_frames_output_data32!(frames_output_data32_02, 2, 1);
+case_frames_output_data32!(frames_output_data32_03, 1, 2);
+case_frames_output_data32!(frames_output_data32_04, 2, 2);
+case_frames_output_data32!(frames_output_data32_05, 3, 1);
+case_frames_output_data32!(frames_output_data32_06, 1, 3);
