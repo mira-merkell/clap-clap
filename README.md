@@ -16,8 +16,8 @@ A [CLAP] plugin runtime. Very much WIP. 🚧
 
 ## Example (ping-pong delay)
 
-You can find the full source code of the example [here]. In the example, we
-implement a feedback delay with ping-pong effect.
+Let's implement a feedback delay with ping-pong effect. You can find the source
+code of the example [here].
 
 ```rust
 #[derive(Default)]
@@ -34,6 +34,8 @@ impl Extensions<Self> for PingPong {
 }
 
 impl Plugin for PingPong {
+    // Specify associated types that will provide the plugin extensions
+    // and the audio processor.
     type AudioThread = Delay;
     type Extensions = Self;
 
@@ -76,8 +78,10 @@ impl Delay {
 
 impl AudioThread<PingPong> for Delay {
     fn process(&mut self, process: &mut Process) -> Result<Status, Error> {
-        // Generate a lending iterator over mutable references
-        // to consecutiveframes of audio samples and events.
+        // Generate a lending iterator over frames of audio samples and events.
+        // Almost the entire process API, together with its derived types like
+        // this iterator and the references to frames it generates, is `const`.
+        // The methods are cheap to use in a loop on the audio thread.
         let mut frames = process.frames();
 
         let n = self.buf.len();
@@ -108,7 +112,6 @@ impl AudioThread<PingPong> for Delay {
             // On a 64-bit machine, prepare for overflow in about 12 million years.
             self.cur += 1;
         }
-
         Ok(Continue)
     }
 }
