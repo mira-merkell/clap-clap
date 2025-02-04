@@ -3,23 +3,6 @@ use std::{
     ptr::{null, null_mut},
 };
 
-use clap_clap::plugin::Plugin;
-
-#[derive(Default, Debug)]
-pub struct Dummy;
-
-impl Plugin for Dummy {
-    type AudioThread = ();
-    type Extensions = ();
-
-    const ID: &'static str = "dummy";
-    const NAME: &'static str = "Dummy";
-
-    fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread, clap_clap::Error> {
-        Ok(())
-    }
-}
-
 #[derive(Debug)]
 pub struct DummyHost(pub clap_sys::clap_host);
 
@@ -51,6 +34,12 @@ impl DummyHost {
 
     pub fn as_clap_host(&self) -> *const clap_sys::clap_host {
         &self.0
+    }
+}
+
+impl Default for DummyHost {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

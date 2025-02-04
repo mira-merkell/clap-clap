@@ -9,10 +9,13 @@ use clap_clap::{
     plugin::Plugin,
 };
 
-use crate::dummy::{Dummy, DummyHost};
+use crate::{dummy_host::DummyHost, dummy_plugin::Dummy};
 
-#[path = "../entry/dummy.rs"]
-mod dummy;
+#[path = "../plugin/dummy.rs"]
+mod dummy_plugin;
+
+#[path = "../host/dummy.rs"]
+mod dummy_host;
 
 #[test]
 pub fn empty() {

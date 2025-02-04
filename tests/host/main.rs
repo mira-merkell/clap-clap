@@ -1,3 +1,6 @@
 mod bad;
-#[path = "../entry/dummy.rs"]
+
+#[path = "../plugin/dummy.rs"]
+mod dummy_plugin;
+
 mod dummy;

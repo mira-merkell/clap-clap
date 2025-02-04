@@ -1,9 +1,6 @@
-use std::{hash::Hasher, pin::Pin, ptr::NonNull};
+use std::{pin::Pin, ptr::NonNull};
 
-use clap_clap::{
-    plugin::{AudioThread, Plugin},
-    process::Process,
-};
+use clap_clap::process::Process;
 
 use crate::{TestProcess, TestProcessConfig};
 

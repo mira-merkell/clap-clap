@@ -2,12 +2,18 @@ use std::{ffi::CStr, ptr::null};
 
 use clap_clap::entry::{CLAP_PLUGIN_FACTORY_ID, clap_plugin_factory};
 
-mod dummy;
+#[path = "../plugin/dummy.rs"]
+mod dummy_plugin;
 
-use crate::dummy::{Dummy, DummyHost};
+#[path = "../host/dummy.rs"]
+mod dummy_host;
+
+use crate::dummy_plugin::Dummy;
 
 clap_clap::entry!(Dummy);
 use _clap_entry::clap_entry;
+
+use crate::dummy_host::DummyHost;
 
 #[test]
 fn export_clap_entry() {

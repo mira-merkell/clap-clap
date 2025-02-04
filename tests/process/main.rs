@@ -86,10 +86,6 @@ struct TestProcess {
 }
 
 impl TestProcess {
-    fn builder() -> TestProcessConfig {
-        TestProcessConfig::default()
-    }
-
     fn new(
         latency: u32,
         steady_time: i64,
