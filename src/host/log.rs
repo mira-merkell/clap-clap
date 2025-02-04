@@ -35,7 +35,7 @@ impl<'a> Log<'a> {
         // returns. So the call is safe.
         unsafe {
             callback(
-                &raw const *self.host.as_clap_host().as_ref(),
+                &raw const *self.host.as_ref(),
                 severity.into(),
                 msg.as_ptr(),
             )
