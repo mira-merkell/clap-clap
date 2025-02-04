@@ -24,9 +24,7 @@ macro_rules! entry {
                 FACTORY.get_or_init(|| Factory::new(vec![$(plugin_prototype::<$plug>(),)*]))
             }
 
-            /// Safety:
-            ///
-            /// CLAP requires this method to be thread safe.
+            /// SAFETY: CLAP requires this method to be thread safe.
             /// The function factory_init_once() is thread-safe and
             /// plugins_count() takes a shared reference to Factory.
             /// Together, they are thread-safe.
@@ -34,9 +32,7 @@ macro_rules! entry {
                 factory_init_once().plugins_count()
             }
 
-            /// Safety:
-            ///
-            /// CLAP requires this method to be thread safe.
+            /// SAFETY: CLAP requires this method to be thread safe.
             /// The function factory_init_once() is thread-safe and
             /// descriptor() takes a shared reference to Factory.
             /// Together, they are thread-safe.
@@ -48,9 +44,7 @@ macro_rules! entry {
                     .unwrap_or(std::ptr::null())
             }
 
-            /// Safety:
-            ///
-            /// CLAP requires this method to be thread safe.
+            /// SAFETY: CLAP requires this method to be thread safe.
             /// The function factory_init_once() is thread-safe and
             /// boxed_clap_plugin() takes a shared reference to Factory.
             /// Together, they are thread-safe.
@@ -63,9 +57,9 @@ macro_rules! entry {
                     return std::ptr::null();
                 }
 
-                // Safety: We just checked that host is non-null.
+                // SAFETY: We just checked that host is non-null.
                 let host = unsafe { FactoryHost::new(host) };
-                // Safety: We checked if plug_id is non-null.
+                // SAFETY: We checked if plug_id is non-null.
                 // The host guarantees that this is a valid C string now.
                 let plugin_id = unsafe { std::ffi::CStr::from_ptr(plugin_id) };
                 factory_init_once()
@@ -85,14 +79,12 @@ macro_rules! entry {
 
             extern "C" fn deinit() {}
 
-            /// Safety:
-            ///
-            /// CLAP requires this method to be thread safe.
+            /// SAFETY: CLAP requires this method to be thread safe.
             extern "C" fn get_factory(factory_id: *const std::ffi::c_char) -> *const std::ffi::c_void {
                 if factory_id.is_null() {
                     return std::ptr::null();
                 }
-                // Safety: we cheched if factory_id is non-null.
+                // SAFETY: we cheched if factory_id is non-null.
                 // The host guarantees that this is a valid C string.
                 let id = unsafe { std::ffi::CStr::from_ptr(factory_id) };
                 if id == CLAP_PLUGIN_FACTORY_ID {

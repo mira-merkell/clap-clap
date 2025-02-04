@@ -1,9 +1,9 @@
-use std::{ffi::CStr, ptr::null};
+use std::ffi::CStr;
 
 use clap_clap::{
     Error,
     factory::{
-        Error::{CreateHost, IndexOutOfBounds, PluginIdNotFound},
+        Error::{IndexOutOfBounds, PluginIdNotFound},
         Factory, FactoryHost, FactoryPluginDescriptor,
     },
     plugin::Plugin,
@@ -45,24 +45,6 @@ fn dummy_desc() {
     let desc = factory.descriptor(0).unwrap();
 
     assert_eq!(unsafe { CStr::from_ptr((*desc).id) }, c"dummy");
-}
-
-#[test]
-fn dummy_create_bad() {
-    let factory = dummy(1);
-
-    assert_eq!(
-        factory
-            .create_plugin(c"", unsafe { FactoryHost::new(null()) })
-            .unwrap_err(),
-        PluginIdNotFound
-    );
-    matches!(
-        factory
-            .create_plugin(c"dummy", unsafe { FactoryHost::new(null()) })
-            .unwrap_err(),
-        CreateHost(_)
-    );
 }
 
 static DUMMY_HOST: DummyHost = DummyHost::new();

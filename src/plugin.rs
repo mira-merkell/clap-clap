@@ -150,8 +150,9 @@ impl<P: Plugin> ClapPlugin<P> {
         Self(clap_plugin, PhantomData)
     }
 
-    const fn as_ref(&self) -> &clap_plugin {
-        // SAFETY: ClapPlugin constructor guarantees
+    const unsafe fn as_ref<'a>(&self) -> &'a clap_plugin {
+        // SAFETY: ClapPlugin constructor guarantees that dereferencing the inner
+        // pointer is safe.
         unsafe { &*self.0 }
     }
 

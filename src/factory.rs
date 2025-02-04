@@ -62,8 +62,7 @@ impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
         // The pointer unwrapped from FactoryHost is a valid pointer
         // to a CLAP host, obtained as the argument passed to plugin
         // factory's create_plugin().
-        let host =
-            unsafe { Host::try_from_factory(host.into_inner()) }.map_err(Error::CreateHost)?;
+        let host = unsafe { Host::new(host.into_inner()) };
         Ok(Runtime::<P>::initialize(Arc::new(host))
             .map_err(Error::PluginDescriptor)?
             .into_clap_plugin()
