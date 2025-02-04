@@ -488,19 +488,68 @@ fn frames_input_data32(mut test_process: Pin<Box<TestProcess>>) {
 
 macro_rules! case_frames_input_data32 {
     ($name:ident, $num_ins:literal, $num_chan:literal) => {
-        #[test]
-        fn $name() {
-            let test_process = TestProcessConfig {
-                latency: 0,
-                steady_time: 0,
-                frames_count: 1024,
-                channel_count: $num_chan,
-                audio_inputs_count: $num_ins,
-                audio_outputs_count: 0,
-            }
-            .build();
+        mod $name {
+            use super::*;
 
-            frames_input_data32(test_process);
+            #[test]
+            fn outputs0() {
+                let test_process = TestProcessConfig {
+                    latency: 0,
+                    steady_time: 0,
+                    frames_count: 10,
+                    channel_count: $num_chan,
+                    audio_inputs_count: $num_ins,
+                    audio_outputs_count: 0,
+                }
+                .build();
+
+                frames_input_data32(test_process);
+            }
+
+            #[test]
+            fn outputs0_noframe() {
+                let test_process = TestProcessConfig {
+                    latency: 0,
+                    steady_time: 0,
+                    frames_count: 0,
+                    channel_count: $num_chan,
+                    audio_inputs_count: $num_ins,
+                    audio_outputs_count: 0,
+                }
+                .build();
+
+                frames_input_data32(test_process);
+            }
+
+            #[test]
+            fn outputs1() {
+                let test_process = TestProcessConfig {
+                    latency: 0,
+                    steady_time: 0,
+                    frames_count: 10,
+                    channel_count: $num_chan,
+                    audio_inputs_count: $num_ins,
+                    audio_outputs_count: 1,
+                }
+                .build();
+
+                frames_input_data32(test_process);
+            }
+
+            #[test]
+            fn outputs1_long_frames() {
+                let test_process = TestProcessConfig {
+                    latency: 0,
+                    steady_time: 0,
+                    frames_count: 65536,
+                    channel_count: $num_chan,
+                    audio_inputs_count: $num_ins,
+                    audio_outputs_count: 1,
+                }
+                .build();
+
+                frames_input_data32(test_process);
+            }
         }
     };
 }
@@ -545,19 +594,68 @@ fn frames_output_data32(mut test_process: Pin<Box<TestProcess>>) {
 
 macro_rules! case_frames_output_data32 {
     ($name:ident, $num_outs:literal, $num_chan:literal) => {
-        #[test]
-        fn $name() {
-            let test_process = TestProcessConfig {
-                latency: 0,
-                steady_time: 0,
-                frames_count: 1024,
-                channel_count: $num_chan,
-                audio_inputs_count: 0,
-                audio_outputs_count: $num_outs,
-            }
-            .build();
+        mod $name {
+            use super::*;
 
-            frames_output_data32(test_process);
+            #[test]
+            fn inputs0() {
+                let test_process = TestProcessConfig {
+                    latency: 0,
+                    steady_time: 0,
+                    frames_count: 10,
+                    channel_count: $num_chan,
+                    audio_inputs_count: 0,
+                    audio_outputs_count: $num_outs,
+                }
+                .build();
+
+                frames_output_data32(test_process);
+            }
+
+            #[test]
+            fn inputs0_noframe() {
+                let test_process = TestProcessConfig {
+                    latency: 0,
+                    steady_time: 0,
+                    frames_count: 0,
+                    channel_count: $num_chan,
+                    audio_inputs_count: 0,
+                    audio_outputs_count: $num_outs,
+                }
+                .build();
+
+                frames_output_data32(test_process);
+            }
+
+            #[test]
+            fn inputs1() {
+                let test_process = TestProcessConfig {
+                    latency: 0,
+                    steady_time: 0,
+                    frames_count: 1024,
+                    channel_count: $num_chan,
+                    audio_inputs_count: 1,
+                    audio_outputs_count: $num_outs,
+                }
+                .build();
+
+                frames_output_data32(test_process);
+            }
+
+            #[test]
+            fn inputs1_long_frames() {
+                let test_process = TestProcessConfig {
+                    latency: 0,
+                    steady_time: 0,
+                    frames_count: 65536,
+                    channel_count: $num_chan,
+                    audio_inputs_count: 1,
+                    audio_outputs_count: $num_outs,
+                }
+                .build();
+
+                frames_output_data32(test_process);
+            }
         }
     };
 }
