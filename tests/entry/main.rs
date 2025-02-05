@@ -1,19 +1,29 @@
-use std::{ffi::CStr, ptr::null};
+use std::{ffi::CStr, pin::Pin, ptr::null};
 
 use clap_clap::entry::{CLAP_PLUGIN_FACTORY_ID, clap_plugin_factory};
 
 #[path = "../plugin/dummy.rs"]
 mod dummy_plugin;
 
-#[path = "../host/dummy.rs"]
-mod dummy_host;
+#[path = "../host/test_host.rs"]
+mod test_host;
 
 use crate::dummy_plugin::Dummy;
 
 clap_clap::entry!(Dummy);
 use _clap_entry::clap_entry;
 
-use crate::dummy_host::DummyHost;
+use crate::test_host::{TestHost, TestHostConfig};
+
+fn dummy_host() -> Pin<Box<TestHost>> {
+    TestHostConfig {
+        name: "",
+        vendor: "",
+        url: "",
+        version: "",
+    }
+    .build()
+}
 
 #[test]
 fn export_clap_entry() {
@@ -43,7 +53,7 @@ fn export_clap_entry() {
     assert_eq!(id, c"dummy");
 
     let create_plugin = unsafe { *factory }.create_plugin.unwrap();
-    let host = DummyHost::new();
+    let host = dummy_host();
     let plug = unsafe { create_plugin(factory, host.as_clap_host(), id.as_ptr()) };
     assert!(!plug.is_null());
 

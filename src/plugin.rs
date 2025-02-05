@@ -122,7 +122,7 @@ impl<P: Plugin> Runtime<P> {
     /// This can requirement can be met during plugin initialization and
     /// destruction.
     unsafe fn from_clap_plugin(clap_plugin: ClapPlugin<P>) -> Self {
-        let plugin_data = clap_plugin.as_ref().plugin_data as *mut _;
+        let plugin_data = unsafe { clap_plugin.as_ref() }.plugin_data as *mut _;
         // Safety:
         // We can transmute the pointer to plugin_data like this, because:
         // 1. We have exclusive reference to it.

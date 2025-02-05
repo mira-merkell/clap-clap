@@ -1,4 +1,4 @@
-use std::ffi::CStr;
+use std::{ffi::CStr, pin::Pin};
 
 use clap_clap::{
     Error,
@@ -9,13 +9,16 @@ use clap_clap::{
     plugin::Plugin,
 };
 
-use crate::{dummy_host::DummyHost, dummy_plugin::Dummy};
+use crate::{
+    dummy_plugin::Dummy,
+    test_host::{TestHost, TestHostConfig},
+};
 
 #[path = "../plugin/dummy.rs"]
 mod dummy_plugin;
 
-#[path = "../host/dummy.rs"]
-mod dummy_host;
+#[path = "../host/test_host.rs"]
+mod test_host;
 
 #[test]
 pub fn empty() {
@@ -47,15 +50,24 @@ fn dummy_desc() {
     assert_eq!(unsafe { CStr::from_ptr((*desc).id) }, c"dummy");
 }
 
-static DUMMY_HOST: DummyHost = DummyHost::new();
+fn dummy_host() -> Pin<Box<TestHost>> {
+    TestHostConfig {
+        name: "",
+        vendor: "",
+        url: "",
+        version: "",
+    }
+    .build()
+}
 
 #[test]
 fn dummy_create() {
     let factory = dummy(1);
+    let test_host = dummy_host();
 
     let plugin = factory
         .create_plugin(c"dummy", unsafe {
-            FactoryHost::new(DUMMY_HOST.as_clap_host())
+            FactoryHost::new(test_host.as_clap_host())
         })
         .unwrap();
 
@@ -123,10 +135,11 @@ fn two_dummies_desc1() {
 #[test]
 fn two_dummies_create0() {
     let factory = two_dummies();
+    let test_host = dummy_host();
 
     let plugin = factory
         .create_plugin(c"dummy", unsafe {
-            FactoryHost::new(DUMMY_HOST.as_clap_host())
+            FactoryHost::new(test_host.as_clap_host())
         })
         .unwrap();
 
@@ -139,10 +152,11 @@ fn two_dummies_create0() {
 #[test]
 fn two_dummies_create1() {
     let factory = two_dummies();
+    let test_host = dummy_host();
 
     let plugin = factory
         .create_plugin(c"also dummy", unsafe {
-            FactoryHost::new(DUMMY_HOST.as_clap_host())
+            FactoryHost::new(test_host.as_clap_host())
         })
         .unwrap();
 
@@ -155,10 +169,11 @@ fn two_dummies_create1() {
 #[test]
 fn two_dummies_create_badid() {
     let factory = two_dummies();
+    let test_host = dummy_host();
 
     let err = factory
         .create_plugin(c"noname", unsafe {
-            FactoryHost::new(DUMMY_HOST.as_clap_host())
+            FactoryHost::new(test_host.as_clap_host())
         })
         .unwrap_err();
 
