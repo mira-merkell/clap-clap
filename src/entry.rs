@@ -24,18 +24,16 @@ macro_rules! entry {
                 FACTORY.get_or_init(|| Factory::new(vec![$(plugin_prototype::<$plug>(),)*]))
             }
 
-            /// SAFETY: CLAP requires this method to be thread safe.
+            /// SAFETY: CLAP requires this method to be thread-safe.
             /// The function factory_init_once() is thread-safe and
             /// plugins_count() takes a shared reference to Factory.
-            /// Together, they are thread-safe.
             extern "C" fn get_plugin_count(_: *const clap_plugin_factory) -> u32 {
                 factory_init_once().plugins_count()
             }
 
-            /// SAFETY: CLAP requires this method to be thread safe.
+            /// SAFETY: CLAP requires this method to be thread-safe.
             /// The function factory_init_once() is thread-safe and
             /// descriptor() takes a shared reference to Factory.
-            /// Together, they are thread-safe.
             extern "C" fn get_plugin_descriptor(
                 _: *const clap_plugin_factory,
                 index: u32,
@@ -44,10 +42,9 @@ macro_rules! entry {
                     .unwrap_or(std::ptr::null())
             }
 
-            /// SAFETY: CLAP requires this method to be thread safe.
+            /// SAFETY: CLAP requires this method to be thread-safe.
             /// The function factory_init_once() is thread-safe and
             /// boxed_clap_plugin() takes a shared reference to Factory.
-            /// Together, they are thread-safe.
             extern "C" fn create_plugin(
                 _: *const clap_plugin_factory,
                 host: *const clap_host,
@@ -56,7 +53,6 @@ macro_rules! entry {
                 if plugin_id.is_null() || host.is_null() {
                     return std::ptr::null();
                 }
-
                 // SAFETY: We just checked that host is non-null.
                 let host = unsafe { FactoryHost::new(host) };
                 // SAFETY: We checked if plug_id is non-null.
@@ -79,7 +75,7 @@ macro_rules! entry {
 
             extern "C" fn deinit() {}
 
-            /// SAFETY: CLAP requires this method to be thread safe.
+            /// SAFETY: CLAP requires this method to be thread-safe.
             extern "C" fn get_factory(factory_id: *const std::ffi::c_char) -> *const std::ffi::c_void {
                 if factory_id.is_null() {
                     return std::ptr::null();
@@ -95,7 +91,7 @@ macro_rules! entry {
             #[allow(non_upper_case_globals)]
             #[allow(warnings, unused)]
             #[unsafe(no_mangle)]
-            // Make this symbor pub(crate), so that tests cat access it.
+            // Make this symbor pub(crate), so that plugin's own tests can access it.
             pub(crate) static clap_entry: clap_plugin_entry = clap_plugin_entry {
                 clap_version: CLAP_VERSION,
                 init: Some(init),
