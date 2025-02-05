@@ -1,6 +1,6 @@
 use std::{
     pin::Pin,
-    ptr::{NonNull, null},
+    ptr::{null, NonNull},
 };
 
 use clap_clap::process::Process;
@@ -33,6 +33,7 @@ impl<T: Float> TestChannel<T> {
 #[derive(Debug)]
 struct TestAudioBuffer {
     data32: Vec<TestChannel<f32>>,
+    #[allow(unused)]
     data64: Vec<TestChannel<f64>>,
     channel_count: u32,
     latency: u32,

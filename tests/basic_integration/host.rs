@@ -4,7 +4,7 @@ use std::{
     ptr::{null, null_mut},
 };
 
-use clap_clap::version::CLAP_VERSION;
+use clap_clap::{host::Host, version::CLAP_VERSION};
 use clap_sys::clap_host;
 
 pub struct TestHostConfig<'a> {
@@ -20,6 +20,7 @@ impl TestHostConfig<'_> {
     }
 }
 
+#[allow(unused)]
 pub struct TestHost {
     name: CString,
     vendor: CString,
@@ -68,4 +69,22 @@ impl TestHost {
     pub const fn as_clap_host(&self) -> &clap_host {
         &self.clap_host
     }
+}
+
+#[test]
+fn host_new() {
+    let test_host = TestHostConfig {
+        name: "test_host",
+        url: "test_url",
+        vendor: "test_vendor",
+        version: "test_version",
+    }
+    .build();
+
+    let host = unsafe { Host::new(test_host.as_clap_host()) };
+
+    assert_eq!(host.name(), "test_host");
+    assert_eq!(host.url(), "test_url");
+    assert_eq!(host.vendor(), "test_vendor");
+    assert_eq!(host.version(), "test_version");
 }

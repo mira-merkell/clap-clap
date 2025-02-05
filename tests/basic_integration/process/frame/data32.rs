@@ -2,7 +2,7 @@ use std::{pin::Pin, ptr::NonNull};
 
 use clap_clap::process::Process;
 
-use crate::TestProcess;
+use crate::process::{TestProcess, TestProcessConfig};
 
 fn frames_input_data32(mut test_process: Pin<Box<TestProcess>>) {
     let num_in = test_process.audio_inputs_count;
@@ -36,7 +36,6 @@ macro_rules! case_frames_input_data32 {
     ($name:ident, $num_ins:literal, $num_chan:literal) => {
         mod $name {
             use super::*;
-            use crate::TestProcessConfig;
 
             #[test]
             fn outputs0() {
@@ -112,7 +111,6 @@ macro_rules! case_frames_output_data32 {
     ($name:ident, $num_outs:literal, $num_chan:literal) => {
         mod $name {
             use super::*;
-            use crate::TestProcessConfig;
 
             #[test]
             fn inputs0() {

@@ -2,7 +2,7 @@ use std::{pin::Pin, ptr::NonNull};
 
 use clap_clap::process::Process;
 
-use crate::{TestProcess, TestProcessConfig};
+use crate::process::{TestProcess, TestProcessConfig};
 
 mod data32;
 
