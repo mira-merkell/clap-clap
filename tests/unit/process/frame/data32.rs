@@ -3,7 +3,6 @@ use std::{pin::Pin, ptr::NonNull};
 use clap_clap::process::Process;
 
 use crate::process::TestProcess;
-
 #[allow(unused)]
 use crate::process::TestProcessConfig;
 

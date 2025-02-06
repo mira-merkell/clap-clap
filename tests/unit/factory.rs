@@ -9,8 +9,10 @@ use clap_clap::{
     plugin::Plugin,
 };
 
-use crate::plugin::Dummy;
-use crate::host::{TestHost,TestHostConfig};
+use crate::{
+    host::{TestHost, TestHostConfig},
+    plugin::Dummy,
+};
 
 #[test]
 pub fn empty() {
