@@ -1,8 +1,9 @@
-//! Plugin extensions.
+use plugin::audio_ports::AudioPortInfo;
 
-use crate::{ext::audio_ports::AudioPortInfo, plugin::Plugin};
+use crate::plugin::Plugin;
 
-pub mod audio_ports;
+pub mod host;
+pub mod plugin;
 
 /// Extensions implemented by the plugin.
 pub trait Extensions<P: Plugin> {

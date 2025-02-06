@@ -4,11 +4,11 @@ use std::{
 };
 
 use clap_sys::{CLAP_EXT_LOG, clap_host, clap_host_log};
-use log::Log;
 
-use crate::version::ClapVersion;
-
-pub mod log;
+use crate::{
+    ext::host::{log, log::Log},
+    version::ClapVersion,
+};
 
 #[derive(Debug, PartialEq)]
 pub struct Host {
@@ -31,7 +31,7 @@ impl Host {
         Self { clap_host }
     }
 
-    const fn as_ref(&self) -> &clap_host {
+    pub(crate) const fn as_ref(&self) -> &clap_host {
         // SAFETY: by construction, we can obtain a shared reference to clap_host for
         // the lifetime of self.
         unsafe { &*self.clap_host }

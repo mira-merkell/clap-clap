@@ -8,7 +8,7 @@ use clap_sys::{
 };
 
 use crate::{
-    ext::{AudioPorts, audio_ports::ffi::clap_plugin_audio_ports},
+    ext::{AudioPorts, plugin::audio_ports::ffi::clap_plugin_audio_ports},
     id::ClapId,
     plugin::Plugin,
 };

@@ -8,7 +8,7 @@ use std::{
 use clap_sys::clap_plugin;
 
 use crate::{
-    ext::{Extensions, audio_ports::ClapPluginAudioPorts},
+    ext::Extensions,
     host::Host,
     process,
     process::{Process, Status::Continue},
@@ -17,6 +17,8 @@ use crate::{
 mod desc;
 
 pub(crate) use desc::{PluginDescriptor, build_plugin_descriptor};
+
+use crate::ext::plugin::audio_ports::ClapPluginAudioPorts;
 
 mod ffi;
 
