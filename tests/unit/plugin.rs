@@ -17,7 +17,10 @@ use clap_clap::{
     process::{Process, Status, Status::Continue},
 };
 
-use crate::host::{TestHost, TestHostConfig};
+use crate::{
+    host::{TestHost, TestHostConfig},
+    process::TestProcessConfig,
+};
 
 #[derive(Default)]
 pub struct TestPlugin {
@@ -110,6 +113,7 @@ impl AudioThread<TestPlugin> for TestAudioThread {
 
     fn process(&mut self, process: &mut Process) -> Result<Status, Error> {
         let mut frames = process.frames();
+        #[allow(clippy::redundant_pattern_matching)]
         while let Some(_) = frames.next() {
             self.frames_processed += 1;
         }
@@ -282,6 +286,7 @@ fn call_activate() {
 
     let clap_plugin = unsafe { wrap.as_ref() };
     unsafe { clap_plugin.init.unwrap()(clap_plugin) };
+
     unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.1, 1, 7) };
 
     let plugin = unsafe { wrap.plugin() };
@@ -295,9 +300,84 @@ fn call_deactivate() {
     let clap_plugin = unsafe { wrap.as_ref() };
     unsafe { clap_plugin.init.unwrap()(clap_plugin) };
     unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.1, 1, 7) };
+
     unsafe { clap_plugin.deactivate.unwrap()(clap_plugin) };
 
     let plugin = unsafe { wrap.plugin() };
     assert!(plugin.return_id.is_some());
     assert_eq!(plugin.id, plugin.return_id);
+}
+
+#[test]
+fn call_start_processing() {
+    let mut wrap = TestWrapper::build();
+
+    let clap_plugin = unsafe { wrap.as_ref() };
+    unsafe { clap_plugin.init.unwrap()(clap_plugin) };
+    unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.0, 2, 3) };
+
+    unsafe { clap_plugin.start_processing.unwrap()(clap_plugin) };
+
+    let audio_thread = unsafe { wrap.audio_thread() }.unwrap();
+    assert!(audio_thread.call_start_processing.is_some());
+
+    unsafe { clap_plugin.deactivate.unwrap()(clap_plugin) };
+}
+
+#[test]
+fn call_stop_processing() {
+    let mut wrap = TestWrapper::build();
+
+    let clap_plugin = unsafe { wrap.as_ref() };
+    unsafe { clap_plugin.init.unwrap()(clap_plugin) };
+    unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.0, 2, 3) };
+
+    unsafe { clap_plugin.stop_processing.unwrap()(clap_plugin) };
+
+    let audio_thread = unsafe { wrap.audio_thread() }.unwrap();
+    assert!(audio_thread.call_stop_processing.is_some());
+
+    unsafe { clap_plugin.deactivate.unwrap()(clap_plugin) };
+}
+
+#[test]
+fn call_reset() {
+    let mut wrap = TestWrapper::build();
+
+    let clap_plugin = unsafe { wrap.as_ref() };
+    unsafe { clap_plugin.init.unwrap()(clap_plugin) };
+    unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.0, 2, 3) };
+
+    unsafe { clap_plugin.reset.unwrap()(clap_plugin) };
+
+    let audio_thread = unsafe { wrap.audio_thread() }.unwrap();
+    assert!(audio_thread.call_reset.is_some());
+
+    unsafe { clap_plugin.deactivate.unwrap()(clap_plugin) };
+}
+
+#[test]
+fn call_process() {
+    let mut wrap = TestWrapper::build();
+
+    let clap_plugin = unsafe { wrap.as_ref() };
+    unsafe { clap_plugin.init.unwrap()(clap_plugin) };
+    unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.0, 2, 3) };
+
+    let mut process = TestProcessConfig {
+        latency: 0,
+        steady_time: 0,
+        frames_count: 3,
+        channel_count: 0,
+        audio_inputs_count: 0,
+        audio_outputs_count: 0,
+    }
+    .build();
+    let clap_process = process.clap_process();
+    unsafe { clap_plugin.process.unwrap()(clap_plugin, &clap_process) };
+
+    let audio_thread = unsafe { wrap.audio_thread() }.unwrap();
+    assert_eq!(audio_thread.frames_processed, 3);
+
+    unsafe { clap_plugin.deactivate.unwrap()(clap_plugin) };
 }

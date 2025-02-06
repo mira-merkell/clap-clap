@@ -73,7 +73,7 @@ impl TestAudioBuffer {
 }
 
 #[derive(Debug)]
-struct TestProcess {
+pub struct TestProcess {
     steady_time: i64,
     frames_count: u32,
     transport: *const clap_event_transport, // not implemented
@@ -121,7 +121,7 @@ impl TestProcess {
         })
     }
 
-    fn clap_process(self: &mut Pin<Box<Self>>) -> clap_process {
+    pub fn clap_process(self: &mut Pin<Box<Self>>) -> clap_process {
         clap_process {
             steady_time: self.steady_time,
             frames_count: self.frames_count,
@@ -137,17 +137,17 @@ impl TestProcess {
 }
 
 #[derive(Copy, Clone, Debug, Default)]
-struct TestProcessConfig {
-    latency: u32,
-    steady_time: i64,
-    frames_count: u32,
-    channel_count: u32,
-    audio_inputs_count: u32,
-    audio_outputs_count: u32,
+pub struct TestProcessConfig {
+    pub latency: u32,
+    pub steady_time: i64,
+    pub frames_count: u32,
+    pub channel_count: u32,
+    pub audio_inputs_count: u32,
+    pub audio_outputs_count: u32,
 }
 
 impl TestProcessConfig {
-    fn build(self) -> Pin<Box<TestProcess>> {
+    pub fn build(self) -> Pin<Box<TestProcess>> {
         TestProcess::new(self)
     }
 }
