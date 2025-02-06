@@ -23,11 +23,7 @@ where
     // safe.
     let plugin = unsafe { clap_plugin.plugin() };
 
-    if is_input {
-        A::inputs(plugin)
-    } else {
-        A::outputs(plugin)
-    }
+    A::count(plugin, is_input)
 }
 
 extern "C" fn get<A, P>(
@@ -58,11 +54,8 @@ where
     // is safe.
     let info = unsafe { &mut *info };
 
-    is_input
-        .then(|| A::input_info(plugin, index))
-        .flatten()
-        .or_else(|| A::output_info(plugin, index))
-        .map(|q| q.fill_clap_audio_port_info(info))
+    A::get(plugin, index, is_input)
+        .map(|x| x.fill_clap_audio_port_info(info))
         .is_some()
 }
 

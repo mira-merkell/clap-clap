@@ -134,7 +134,10 @@ impl<P: Plugin> Runtime<P> {
 }
 
 /// Safe wrapper around clap_plugin.
-pub(crate) struct ClapPlugin<P: Plugin>(*const clap_plugin, PhantomData<P>);
+pub(crate) struct ClapPlugin<P: Plugin> {
+    clap_plugin: *const clap_plugin,
+    _marker: PhantomData<P>,
+}
 
 impl<P: Plugin> ClapPlugin<P> {
     /// # Safety
@@ -147,17 +150,20 @@ impl<P: Plugin> ClapPlugin<P> {
     /// Typically, a valid pointer comes from the host calling the plugin's
     /// methods, or from Runtime::into_clap_plugin()
     pub(crate) const unsafe fn new(clap_plugin: *const clap_plugin) -> Self {
-        Self(clap_plugin, PhantomData)
+        Self {
+            clap_plugin,
+            _marker: PhantomData,
+        }
     }
 
     const unsafe fn as_ref<'a>(&self) -> &'a clap_plugin {
         // SAFETY: ClapPlugin constructor guarantees that dereferencing the inner
         // pointer is safe.
-        unsafe { &*self.0 }
+        unsafe { &*self.clap_plugin }
     }
 
     pub(crate) const fn into_inner(self) -> *const clap_plugin {
-        self.0
+        self.clap_plugin
     }
 
     /// Obtain a mutable reference to the entire runtime.
@@ -166,7 +172,7 @@ impl<P: Plugin> ClapPlugin<P> {
     ///
     /// The caller must assure they're the only ones who access the runtime.
     pub(crate) const unsafe fn runtime(&mut self) -> &mut Runtime<P> {
-        let runtime: *mut Runtime<P> = unsafe { *self.0 }.plugin_data as *mut _;
+        let runtime: *mut Runtime<P> = unsafe { *self.clap_plugin }.plugin_data as *mut _;
         unsafe { &mut *runtime }
     }
 
@@ -176,7 +182,7 @@ impl<P: Plugin> ClapPlugin<P> {
     ///
     /// The caller must assure they're the only ones who access the plugin.
     pub(crate) const unsafe fn plugin(&mut self) -> &mut P {
-        let runtime: *mut Runtime<P> = unsafe { *self.0 }.plugin_data as *mut _;
+        let runtime: *mut Runtime<P> = unsafe { *self.clap_plugin }.plugin_data as *mut _;
         unsafe { &mut (*runtime).plugin }
     }
 
@@ -187,13 +193,13 @@ impl<P: Plugin> ClapPlugin<P> {
     /// The caller must assure they're the only ones who access the
     /// audio_thread.
     pub(crate) const unsafe fn audio_thread(&mut self) -> Option<&mut P::AudioThread> {
-        let runtime: *mut Runtime<P> = unsafe { *self.0 }.plugin_data as *mut _;
+        let runtime: *mut Runtime<P> = unsafe { *self.clap_plugin }.plugin_data as *mut _;
         unsafe { &mut (*runtime).audio_thread }.as_mut()
     }
 
     /// Obtain a mutex to plugin extensions.
     pub(crate) const fn plugin_extensions(&mut self) -> &Mutex<ClapPluginExtensions<P>> {
-        let runtime: *mut Runtime<P> = unsafe { *self.0 }.plugin_data as *mut _;
+        let runtime: *mut Runtime<P> = unsafe { *self.clap_plugin }.plugin_data as *mut _;
         unsafe { &(*runtime).plugin_extensions }
     }
 }
