@@ -2,7 +2,10 @@ use std::{pin::Pin, ptr::NonNull};
 
 use clap_clap::process::Process;
 
-use crate::process::{TestProcess, TestProcessConfig};
+use crate::process::TestProcess;
+
+#[allow(unused)]
+use crate::process::TestProcessConfig;
 
 fn frames_input_data32(mut test_process: Pin<Box<TestProcess>>) {
     let num_in = test_process.audio_inputs_count;
@@ -107,6 +110,37 @@ case_frames_input_data32!(frames_input_data32_04, 2, 2);
 case_frames_input_data32!(frames_input_data32_05, 3, 1);
 case_frames_input_data32!(frames_input_data32_06, 1, 3);
 
+fn frames_output_data32(mut test_process: Pin<Box<TestProcess>>) {
+    let num_out = test_process.audio_outputs_count;
+    let num_ch = test_process.audio_outputs[0].channel_count;
+
+    let mut clap_process = test_process.clap_process();
+    let mut process =
+        unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
+
+    let mut i = 0;
+    let mut frames = process.frames();
+    while let Some(frame) = frames.next() {
+        for pt in 0..num_out {
+            for ch in 0..num_ch {
+                *frame.audio_output(pt).data32(ch) = (pt * ch * i) as f32;
+            }
+        }
+        i += 1;
+    }
+
+    for pt in 0..num_out as usize {
+        for ch in 0..num_ch as usize {
+            for i in 0..test_process.frames_count as usize {
+                assert_eq!(
+                    test_process.audio_outputs[pt].data32[ch].0[i],
+                    (pt * ch * i) as f32
+                );
+            }
+        }
+    }
+}
+
 macro_rules! case_frames_output_data32 {
     ($name:ident, $num_outs:literal, $num_chan:literal) => {
         mod $name {
@@ -173,37 +207,6 @@ macro_rules! case_frames_output_data32 {
             }
         }
     };
-}
-
-fn frames_output_data32(mut test_process: Pin<Box<TestProcess>>) {
-    let num_out = test_process.audio_outputs_count;
-    let num_ch = test_process.audio_outputs[0].channel_count;
-
-    let mut clap_process = test_process.clap_process();
-    let mut process =
-        unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
-
-    let mut i = 0;
-    let mut frames = process.frames();
-    while let Some(frame) = frames.next() {
-        for pt in 0..num_out {
-            for ch in 0..num_ch {
-                *frame.audio_output(pt).data32(ch) = (pt * ch * i) as f32;
-            }
-        }
-        i += 1;
-    }
-
-    for pt in 0..num_out as usize {
-        for ch in 0..num_ch as usize {
-            for i in 0..test_process.frames_count as usize {
-                assert_eq!(
-                    test_process.audio_outputs[pt].data32[ch].0[i],
-                    (pt * ch * i) as f32
-                );
-            }
-        }
-    }
 }
 
 case_frames_output_data32!(frames_output_data32_01, 1, 1);

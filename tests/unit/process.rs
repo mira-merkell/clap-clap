@@ -1,6 +1,6 @@
 use std::{
     pin::Pin,
-    ptr::{null, NonNull},
+    ptr::{NonNull, null},
 };
 
 use clap_clap::process::Process;
@@ -87,24 +87,21 @@ struct TestProcess {
 }
 
 impl TestProcess {
-    fn new(
-        latency: u32,
-        steady_time: i64,
-        frames_count: u32,
-        channel_count: u32,
-        audio_inputs_count: u32,
-        audio_outputs_count: u32,
-    ) -> Pin<Box<Self>> {
-        let mut audio_inputs: Vec<_> = (0..audio_inputs_count)
-            .map(|_| TestAudioBuffer::new(frames_count, channel_count, latency))
+    fn new(config: TestProcessConfig) -> Pin<Box<Self>> {
+        let mut audio_inputs: Vec<_> = (0..config.audio_inputs_count)
+            .map(|_| {
+                TestAudioBuffer::new(config.frames_count, config.channel_count, config.latency)
+            })
             .collect();
         let raw_audio_inputs = audio_inputs
             .iter_mut()
             .map(|ai| ai.clap_audio_buffer())
             .collect();
 
-        let mut audio_outputs: Vec<_> = (0..audio_outputs_count)
-            .map(|_| TestAudioBuffer::new(frames_count, channel_count, latency))
+        let mut audio_outputs: Vec<_> = (0..config.audio_outputs_count)
+            .map(|_| {
+                TestAudioBuffer::new(config.frames_count, config.channel_count, config.latency)
+            })
             .collect();
         let raw_audio_outputs = audio_outputs
             .iter_mut()
@@ -112,13 +109,13 @@ impl TestProcess {
             .collect();
 
         Box::pin(Self {
-            steady_time,
-            frames_count,
+            steady_time: config.steady_time,
+            frames_count: config.frames_count,
             transport: null(),
             audio_inputs,
             audio_outputs,
-            audio_inputs_count,
-            audio_outputs_count,
+            audio_inputs_count: config.audio_inputs_count,
+            audio_outputs_count: config.audio_outputs_count,
             raw_audio_inputs,
             raw_audio_outputs,
         })
@@ -150,15 +147,8 @@ struct TestProcessConfig {
 }
 
 impl TestProcessConfig {
-    fn build(&self) -> Pin<Box<TestProcess>> {
-        TestProcess::new(
-            self.latency,
-            self.steady_time,
-            self.frames_count,
-            self.channel_count,
-            self.audio_inputs_count,
-            self.audio_outputs_count,
-        )
+    fn build(self) -> Pin<Box<TestProcess>> {
+        TestProcess::new(self)
     }
 }
 
