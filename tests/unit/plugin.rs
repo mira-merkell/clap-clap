@@ -1,6 +1,7 @@
 use std::{
+    pin::Pin,
     sync::{
-        Arc,
+        Arc, LazyLock,
         atomic::{AtomicU32, Ordering},
     },
     time::SystemTime,
@@ -8,10 +9,14 @@ use std::{
 
 use clap_clap::{
     Error,
+    factory::{Factory, FactoryHost, FactoryPluginDescriptor},
     host::Host,
     plugin::{AudioThread, Plugin},
     process::{Process, Status, Status::Continue},
 };
+use clap_sys::clap_plugin;
+
+use crate::host::{TestHost, TestHostConfig};
 
 #[derive(Default)]
 pub struct TestPlugin {
@@ -20,6 +25,14 @@ pub struct TestPlugin {
     call_init: Option<Arc<Host>>,
     call_activate: Option<(f64, u32, u32)>,
     call_on_main_thread: AtomicU32,
+}
+
+static CALL_PLUGIN_DESTRUCTOR: AtomicU32 = AtomicU32::new(0);
+
+impl Drop for TestPlugin {
+    fn drop(&mut self) {
+        CALL_PLUGIN_DESTRUCTOR.fetch_add(1, Ordering::Release);
+    }
 }
 
 impl Plugin for TestPlugin {
@@ -64,6 +77,14 @@ pub struct TestAudioThread {
     frames_processed: u64,
 }
 
+static CALL_AUDIO_THREAD_DESTRUCTOR: AtomicU32 = AtomicU32::new(0);
+
+impl Drop for TestAudioThread {
+    fn drop(&mut self) {
+        CALL_AUDIO_THREAD_DESTRUCTOR.fetch_add(1, Ordering::Release);
+    }
+}
+
 impl TestAudioThread {
     fn new(plugin_id: SystemTime) -> Self {
         Self {
@@ -101,4 +122,58 @@ impl AudioThread<TestPlugin> for TestAudioThread {
     fn deactivate(self, plugin: &mut TestPlugin) {
         plugin.returned_id = Some(self.plugin_id)
     }
+}
+
+static FACTORY: LazyLock<Factory> = LazyLock::new(|| {
+    Factory::new(vec![Box::new(
+        FactoryPluginDescriptor::<TestPlugin>::build().unwrap(),
+    )])
+});
+
+static HOST: LazyLock<Pin<Box<TestHost>>> = LazyLock::new(|| {
+    TestHostConfig {
+        name: "test_host",
+        vendor: "mira-merkell",
+        url: "none",
+        version: "0.0.0",
+    }
+    .build()
+});
+
+struct ClapPlugin(*const clap_plugin);
+
+impl ClapPlugin {
+    fn build() -> Self {
+        let plugin = FACTORY
+            .create_plugin(c"clap.plugin.test", unsafe {
+                FactoryHost::new(HOST.as_clap_host())
+            })
+            .unwrap();
+
+        assert!(unsafe { (*plugin).init.unwrap()(plugin) });
+        ClapPlugin(plugin)
+    }
+}
+
+impl Drop for ClapPlugin {
+    fn drop(&mut self) {
+        unsafe { (*self.0).destroy.unwrap()(self.0) };
+    }
+}
+
+#[test]
+fn call_plugin_destructor() {
+    drop(ClapPlugin::build());
+
+    assert!(CALL_PLUGIN_DESTRUCTOR.load(Ordering::Acquire) > 0);
+}
+
+#[test]
+fn call_audio_thread_destructor() {
+    let plugin = ClapPlugin::build();
+
+    assert!(unsafe { (*plugin.0).activate.unwrap()(plugin.0, 0.0, 0, 0) });
+    unsafe { (*plugin.0).deactivate.unwrap()(plugin.0) };
+
+    assert!(CALL_AUDIO_THREAD_DESTRUCTOR.load(Ordering::Acquire) > 0);
 }

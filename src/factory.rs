@@ -35,7 +35,7 @@ impl FactoryHost {
 pub struct FactoryPluginDescriptor<P>(PluginDescriptor<P>);
 
 impl<P: Plugin> FactoryPluginDescriptor<P> {
-    pub fn build_plugin_descriptor() -> Result<Self, Error> {
+    pub fn build() -> Result<Self, Error> {
         build_plugin_descriptor()
             .map(Self)
             .map_err(Error::PluginDescriptor)

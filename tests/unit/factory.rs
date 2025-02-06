@@ -26,10 +26,7 @@ pub fn empty() {
 fn dummy(n: usize) -> Factory {
     Factory::new(
         (0..n)
-            .map(|_| {
-                Box::new(FactoryPluginDescriptor::<TestPlugin>::build_plugin_descriptor().unwrap())
-                    as _
-            })
+            .map(|_| Box::new(FactoryPluginDescriptor::<TestPlugin>::build().unwrap()) as _)
             .collect(),
     )
 }
@@ -88,8 +85,8 @@ impl Plugin for Dummy {
 
 fn two_dummies() -> Factory {
     Factory::new(vec![
-        Box::new(FactoryPluginDescriptor::<TestPlugin>::build_plugin_descriptor().unwrap()),
-        Box::new(FactoryPluginDescriptor::<Dummy>::build_plugin_descriptor().unwrap()),
+        Box::new(FactoryPluginDescriptor::<TestPlugin>::build().unwrap()),
+        Box::new(FactoryPluginDescriptor::<Dummy>::build().unwrap()),
     ])
 }
 

@@ -14,7 +14,7 @@ macro_rules! entry {
             use super::*; // Access the types supplied as macro arguments.
 
             fn plugin_prototype<P: Plugin>() -> Box<FactoryPluginDescriptor<P>> {
-                Box::new(FactoryPluginDescriptor::build_plugin_descriptor()
+                Box::new(FactoryPluginDescriptor::build()
                             .expect("cannot build factory plugin descriptor"))
             }
 

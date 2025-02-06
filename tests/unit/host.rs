@@ -71,6 +71,9 @@ impl TestHost {
     }
 }
 
+unsafe impl Send for TestHost {}
+unsafe impl Sync for TestHost {}
+
 #[test]
 fn host_new() {
     let test_host = TestHostConfig {
