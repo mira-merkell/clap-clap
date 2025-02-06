@@ -11,7 +11,7 @@ use clap_clap::{
 
 use crate::{
     host::{TestHost, TestHostConfig},
-    plugin::Dummy,
+    plugin::TestPlugin,
 };
 
 #[test]
@@ -27,7 +27,8 @@ fn dummy(n: usize) -> Factory {
     Factory::new(
         (0..n)
             .map(|_| {
-                Box::new(FactoryPluginDescriptor::<Dummy>::build_plugin_descriptor().unwrap()) as _
+                Box::new(FactoryPluginDescriptor::<TestPlugin>::build_plugin_descriptor().unwrap())
+                    as _
             })
             .collect(),
     )
@@ -41,7 +42,7 @@ fn dummy_desc() {
     assert_eq!(factory.descriptor(1).unwrap_err(), IndexOutOfBounds(1));
     let desc = factory.descriptor(0).unwrap();
 
-    assert_eq!(unsafe { CStr::from_ptr((*desc).id) }, c"dummy");
+    assert_eq!(unsafe { CStr::from_ptr((*desc).id) }, c"clap.plugin.test");
 }
 
 fn dummy_host() -> Pin<Box<TestHost>> {
@@ -60,40 +61,35 @@ fn dummy_create() {
     let test_host = dummy_host();
 
     let plugin = factory
-        .create_plugin(c"dummy", unsafe {
+        .create_plugin(c"clap.plugin.test", unsafe {
             FactoryHost::new(test_host.as_clap_host())
         })
         .unwrap();
 
     let id = unsafe { CStr::from_ptr((*(*plugin).desc).id) };
-    assert_eq!(id, c"dummy");
+    assert_eq!(id, c"clap.plugin.test");
 
     unsafe { (*plugin).destroy.unwrap()(plugin) }
 }
 
 #[derive(Default)]
-struct DummyToo(Dummy);
+struct Dummy;
 
-impl Plugin for DummyToo {
+impl Plugin for Dummy {
     type AudioThread = ();
     type Extensions = ();
-    const ID: &'static str = "also dummy";
-    const NAME: &'static str = "Dummy II";
+    const ID: &'static str = "dummy";
+    const NAME: &'static str = "Dummy";
 
-    fn activate(
-        &mut self,
-        sample_rate: f64,
-        min_frames: u32,
-        max_frames: u32,
-    ) -> Result<Self::AudioThread, Error> {
-        self.0.activate(sample_rate, min_frames, max_frames)
+    fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread, Error> {
+        Ok(())
     }
 }
 
 fn two_dummies() -> Factory {
     Factory::new(vec![
+        Box::new(FactoryPluginDescriptor::<TestPlugin>::build_plugin_descriptor().unwrap()),
         Box::new(FactoryPluginDescriptor::<Dummy>::build_plugin_descriptor().unwrap()),
-        Box::new(FactoryPluginDescriptor::<DummyToo>::build_plugin_descriptor().unwrap()),
     ])
 }
 
@@ -112,7 +108,7 @@ fn two_dummies_desc0() {
     let desc = factory.descriptor(0).unwrap();
     let id = unsafe { *desc }.id;
     let id = unsafe { CStr::from_ptr(id) };
-    assert_eq!(id, c"dummy");
+    assert_eq!(id, c"clap.plugin.test");
 }
 
 #[test]
@@ -123,7 +119,7 @@ fn two_dummies_desc1() {
     let desc = factory.descriptor(1).unwrap();
     let id = unsafe { *desc }.id;
     let id = unsafe { CStr::from_ptr(id) };
-    assert_eq!(id, c"also dummy");
+    assert_eq!(id, c"dummy");
 }
 
 #[test]
@@ -149,13 +145,13 @@ fn two_dummies_create1() {
     let test_host = dummy_host();
 
     let plugin = factory
-        .create_plugin(c"also dummy", unsafe {
+        .create_plugin(c"dummy", unsafe {
             FactoryHost::new(test_host.as_clap_host())
         })
         .unwrap();
 
     let id = unsafe { CStr::from_ptr((*(*plugin).desc).id) };
-    assert_eq!(id, c"also dummy");
+    assert_eq!(id, c"dummy");
 
     unsafe { (*plugin).destroy.unwrap()(plugin) }
 }
