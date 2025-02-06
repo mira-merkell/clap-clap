@@ -133,8 +133,9 @@ impl<P: Plugin> Runtime<P> {
     }
 }
 
-/// Safe wrapper around clap_plugin.
-pub(crate) struct ClapPlugin<P: Plugin> {
+#[doc(hidden)]
+/// Safe wrapper around a pointer to clap_plugin.
+pub struct ClapPlugin<P: Plugin> {
     clap_plugin: *const clap_plugin,
     _marker: PhantomData<P>,
 }
@@ -149,14 +150,18 @@ impl<P: Plugin> ClapPlugin<P> {
     ///
     /// Typically, a valid pointer comes from the host calling the plugin's
     /// methods, or from Runtime::into_clap_plugin()
-    pub(crate) const unsafe fn new(clap_plugin: *const clap_plugin) -> Self {
+    pub const unsafe fn new(clap_plugin: *const clap_plugin) -> Self {
         Self {
             clap_plugin,
             _marker: PhantomData,
         }
     }
 
-    const unsafe fn as_ref<'a>(&self) -> &'a clap_plugin {
+    /// # Safety
+    ///
+    /// The caller must ensure that the wrapped pointer to clap_plugin is
+    /// dereferencable and that Rust aliasing rules of shared references hold.
+    pub const unsafe fn as_ref<'a>(&self) -> &'a clap_plugin {
         // SAFETY: ClapPlugin constructor guarantees that dereferencing the inner
         // pointer is safe.
         unsafe { &*self.clap_plugin }
@@ -181,7 +186,7 @@ impl<P: Plugin> ClapPlugin<P> {
     /// # Safety
     ///
     /// The caller must assure they're the only ones who access the plugin.
-    pub(crate) const unsafe fn plugin(&mut self) -> &mut P {
+    pub const unsafe fn plugin(&mut self) -> &mut P {
         let runtime: *mut Runtime<P> = unsafe { *self.clap_plugin }.plugin_data as *mut _;
         unsafe { &mut (*runtime).plugin }
     }
@@ -192,7 +197,7 @@ impl<P: Plugin> ClapPlugin<P> {
     ///
     /// The caller must assure they're the only ones who access the
     /// audio_thread.
-    pub(crate) const unsafe fn audio_thread(&mut self) -> Option<&mut P::AudioThread> {
+    pub const unsafe fn audio_thread(&mut self) -> Option<&mut P::AudioThread> {
         let runtime: *mut Runtime<P> = unsafe { *self.clap_plugin }.plugin_data as *mut _;
         unsafe { &mut (*runtime).audio_thread }.as_mut()
     }

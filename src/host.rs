@@ -10,7 +10,7 @@ use crate::version::ClapVersion;
 
 pub mod log;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Host {
     clap_host: *const clap_host,
 }

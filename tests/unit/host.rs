@@ -20,6 +20,7 @@ impl TestHostConfig<'_> {
     }
 }
 
+#[derive(Debug)]
 #[allow(unused)]
 pub struct TestHost {
     name: CString,

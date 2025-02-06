@@ -1,4 +1,6 @@
 use std::{
+    ffi::CStr,
+    ops::{Deref, DerefMut},
     pin::Pin,
     sync::{
         Arc, LazyLock,
@@ -11,17 +13,16 @@ use clap_clap::{
     Error,
     factory::{Factory, FactoryHost, FactoryPluginDescriptor},
     host::Host,
-    plugin::{AudioThread, Plugin},
+    plugin::{AudioThread, ClapPlugin, Plugin},
     process::{Process, Status, Status::Continue},
 };
-use clap_sys::clap_plugin;
 
 use crate::host::{TestHost, TestHostConfig};
 
 #[derive(Default)]
 pub struct TestPlugin {
     id: Option<SystemTime>,
-    returned_id: Option<SystemTime>,
+    return_id: Option<SystemTime>,
     call_init: Option<Arc<Host>>,
     call_activate: Option<(f64, u32, u32)>,
     call_on_main_thread: AtomicU32,
@@ -44,9 +45,9 @@ impl Plugin for TestPlugin {
     const URL: &'static str = "none";
     const MANUAL_URL: &'static str = "manual none";
     const SUPPORT_URL: &'static str = "support none";
-    const VERSION: &'static str = "0.0.0";
+    const VERSION: &'static str = "0.0.099";
     const DESCRIPTION: &'static str = "test plugin";
-    const FEATURES: &'static str = "test audio Allpass";
+    const FEATURES: &'static str = "test audio Allpass other features too: ⧉⧉⧉";
 
     fn init(&mut self, host: Arc<Host>) -> Result<(), Error> {
         self.id = Some(SystemTime::now());
@@ -120,7 +121,7 @@ impl AudioThread<TestPlugin> for TestAudioThread {
     }
 
     fn deactivate(self, plugin: &mut TestPlugin) {
-        plugin.returned_id = Some(self.plugin_id)
+        plugin.return_id = Some(self.plugin_id)
     }
 }
 
@@ -140,40 +141,163 @@ static HOST: LazyLock<Pin<Box<TestHost>>> = LazyLock::new(|| {
     .build()
 });
 
-struct ClapPlugin(*const clap_plugin);
+unsafe fn build_plugin<P: Plugin>() -> ClapPlugin<P> {
+    let plugin = FACTORY
+        .create_plugin(c"clap.plugin.test", unsafe {
+            FactoryHost::new(HOST.as_clap_host())
+        })
+        .unwrap();
 
-impl ClapPlugin {
-    fn build() -> Self {
-        let plugin = FACTORY
-            .create_plugin(c"clap.plugin.test", unsafe {
-                FactoryHost::new(HOST.as_clap_host())
-            })
-            .unwrap();
-
-        assert!(unsafe { (*plugin).init.unwrap()(plugin) });
-        ClapPlugin(plugin)
-    }
+    unsafe { ClapPlugin::new(plugin) }
 }
 
-impl Drop for ClapPlugin {
-    fn drop(&mut self) {
-        unsafe { (*self.0).destroy.unwrap()(self.0) };
-    }
+unsafe fn destroy_plugin<P: Plugin>(plugin: ClapPlugin<P>) {
+    unsafe { plugin.as_ref().destroy.unwrap()(plugin.as_ref()) };
 }
 
 #[test]
 fn call_plugin_destructor() {
-    drop(ClapPlugin::build());
+    let plugin = unsafe { build_plugin::<TestPlugin>() };
+
+    unsafe { plugin.as_ref().destroy.unwrap()(plugin.as_ref()) };
 
     assert!(CALL_PLUGIN_DESTRUCTOR.load(Ordering::Acquire) > 0);
 }
 
+struct TestWrapper(Option<ClapPlugin<TestPlugin>>);
+
+impl TestWrapper {
+    fn build() -> Self {
+        Self(Some(unsafe { build_plugin() }))
+    }
+}
+
+impl Drop for TestWrapper {
+    fn drop(&mut self) {
+        unsafe { destroy_plugin(self.0.take().unwrap()) }
+    }
+}
+
+impl Deref for TestWrapper {
+    type Target = ClapPlugin<TestPlugin>;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref().unwrap()
+    }
+}
+
+impl DerefMut for TestWrapper {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut().unwrap()
+    }
+}
+
 #[test]
 fn call_audio_thread_destructor() {
-    let plugin = ClapPlugin::build();
+    let plugin = TestWrapper::build();
+    let plugin = unsafe { plugin.as_ref() };
 
-    assert!(unsafe { (*plugin.0).activate.unwrap()(plugin.0, 0.0, 0, 0) });
-    unsafe { (*plugin.0).deactivate.unwrap()(plugin.0) };
+    assert!(unsafe { plugin.init.unwrap()(plugin) });
+    assert!(unsafe { plugin.activate.unwrap()(plugin, 0.0, 0, 0) });
+    unsafe { plugin.deactivate.unwrap()(plugin) };
 
     assert!(CALL_AUDIO_THREAD_DESTRUCTOR.load(Ordering::Acquire) > 0);
+}
+
+macro_rules! test_plugin_descriptor {
+    ($($desc:tt, $plugin_desc:ident);* ) => {
+
+        #[cfg(test)]
+        mod plugin_descriptor {
+            use super::*;
+            use std::ffi::CStr;
+
+            $(
+                #[test]
+                fn $desc() {
+                    let plugin = TestWrapper::build();
+
+                    let name = unsafe { CStr::from_ptr((*(plugin.as_ref().desc)).$desc) };
+                    assert_eq!(TestPlugin::$plugin_desc, name.to_str().unwrap());
+                }
+            )*
+        }
+    };
+}
+
+test_plugin_descriptor!(
+    id, ID;
+    name, NAME;
+    vendor, VENDOR;
+    url, URL;
+    manual_url, MANUAL_URL;
+    support_url, SUPPORT_URL;
+    description, DESCRIPTION;
+    version, VERSION
+);
+
+#[test]
+fn plugin_descriptor_features() {
+    let wrap = TestWrapper::build();
+    let plugin = unsafe { wrap.as_ref() };
+    let mut feat = unsafe { (*plugin.desc).features };
+
+    let mut features = Vec::new();
+    while !unsafe { *feat }.is_null() {
+        features.push(unsafe { CStr::from_ptr(*feat).to_str().unwrap() });
+        feat = unsafe { feat.add(1) };
+    }
+
+    let plugin_features: Vec<_> = TestPlugin::FEATURES.split_whitespace().collect();
+
+    assert_eq!(features, plugin_features);
+}
+
+#[test]
+fn call_init() {
+    let mut wrap = TestWrapper::build();
+
+    let clap_plugin = unsafe { wrap.as_ref() };
+    assert!(unsafe { clap_plugin.init.unwrap()(clap_plugin) });
+
+    let plugin = unsafe { wrap.plugin() };
+    let host = plugin.call_init.as_ref().unwrap();
+    assert_eq!(host.name(), "test_host");
+}
+
+#[test]
+fn call_on_main_thread() {
+    let mut wrap = TestWrapper::build();
+
+    let clap_plugin = unsafe { wrap.as_ref() };
+    unsafe { clap_plugin.on_main_thread.unwrap()(clap_plugin) };
+
+    let plugin = unsafe { wrap.plugin() };
+    assert_eq!(plugin.call_on_main_thread.load(Ordering::Acquire), 1);
+}
+
+#[test]
+fn call_activate() {
+    let mut wrap = TestWrapper::build();
+
+    let clap_plugin = unsafe { wrap.as_ref() };
+    unsafe { clap_plugin.init.unwrap()(clap_plugin) };
+    unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.1, 1, 7) };
+
+    let plugin = unsafe { wrap.plugin() };
+    assert_eq!(plugin.call_activate, Some((1.1, 1, 7)));
+}
+
+#[test]
+fn call_deactivate() {
+    let mut wrap = TestWrapper::build();
+
+    let clap_plugin = unsafe { wrap.as_ref() };
+    unsafe { clap_plugin.init.unwrap()(clap_plugin) };
+    unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.1, 1, 7) };
+    unsafe { clap_plugin.deactivate.unwrap()(clap_plugin) };
+
+    let plugin = unsafe { wrap.plugin() };
+    assert!(plugin.return_id.is_some());
+    assert_eq!(plugin.id, plugin.return_id);
 }
