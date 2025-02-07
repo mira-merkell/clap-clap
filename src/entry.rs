@@ -26,7 +26,7 @@
 /// ```
 ///
 /// The crate that invokes the macro should be a dynamic library with C ABI.
-/// Put in `Cargo.toml`:
+/// Specify the ABI in your crate's `Cargo.toml`:
 ///
 /// ```toml
 /// [lib]
@@ -120,7 +120,6 @@ macro_rules! entry {
             }
 
             #[allow(non_upper_case_globals)]
-            #[allow(unused)]
             #[unsafe(no_mangle)]
             #[used]
             // Make this symbor public, so that plugin's own tests can access it.
