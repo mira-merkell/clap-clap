@@ -121,10 +121,11 @@ macro_rules! entry {
             }
 
             #[allow(non_upper_case_globals)]
-            #[allow(warnings, unused)]
+            #[allow(unused)]
             #[unsafe(no_mangle)]
-            // Make this symbor pub(crate), so that plugin's own tests can access it.
-            pub(crate) static clap_entry: clap_plugin_entry = clap_plugin_entry {
+            #[used]
+            // Make this symbor public, so that plugin's own tests can access it.
+            pub static clap_entry: clap_plugin_entry = clap_plugin_entry {
                 clap_version: CLAP_VERSION,
                 init: Some(init),
                 deinit: Some(deinit),
