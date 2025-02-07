@@ -26,6 +26,7 @@ impl Host {
     ///
     /// The function will panic if host description strings aren't properly
     /// validated UTF-8 strings.
+    #[doc(hidden)]
     pub const unsafe fn new(clap_host: *const clap_host) -> Self {
         Self { clap_host }
     }

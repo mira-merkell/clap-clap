@@ -3,6 +3,40 @@ pub use crate::ffi::{
     clap_plugin_entry, clap_plugin_factory,
 };
 
+/// Export `clap_entry` symbols and build a plugin factory.
+///
+/// Use this macro to build a CLAP plugin bundle from types that implement
+/// the [`Plugin`] trait.
+///
+/// [`Plugin`]: crate::plugin::Plugin
+///
+/// # Example
+///
+/// ```no_compile
+/// #[derive(Default)]
+/// struct MyPlugin;
+///
+/// impl Plugin for MyPlugin {
+///     ...
+/// }
+///
+/// #[derive(Default)]
+/// struct MyPluginToo;
+///
+/// impl Plugin for MyPluginToo {
+///     ...
+/// }
+///
+/// clap_clap::entry!(MyPlugin, MyPluginToo);
+/// ```
+///
+/// The crate that invokes the macro should be a dynamic library with C ABI.
+/// Put in `Cargo.toml`:
+///
+/// ```toml
+/// [lib]
+/// crate-type = ["cdylib"]
+/// ```
 #[macro_export]
 macro_rules! entry {
     ($($plug:ty),*) => {

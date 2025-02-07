@@ -80,7 +80,7 @@ impl<'a: 'b, 'b> FrameInput<'a, 'b> {
 
     /// # Safety
     ///
-    /// 1. n must be less than self.channel_count()
+    /// `channel` must be less than `self.channel_count()`
     pub const unsafe fn data32_unchecked(&mut self, channel: u32) -> f32 {
         // SAFETY: The caller guarantees this dereferencing is safe.
         unsafe { self.audio_input().data32_unchecked(channel)[self.frame.index as usize] }
@@ -98,7 +98,7 @@ impl<'a: 'b, 'b> FrameInput<'a, 'b> {
 
     /// # Safety
     ///
-    /// 1. n must be less than self.channel_count()
+    /// `channel` must be less than `self.channel_count()`
     pub const unsafe fn data64_unchecked(&mut self, channel: u32) -> f64 {
         // SAFETY: The caller guarantees this dereferencing is safe.
         unsafe { self.audio_input().data64_unchecked(channel)[self.frame.index as usize] }

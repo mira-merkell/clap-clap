@@ -28,6 +28,7 @@ impl Process {
     ///    `clap_plugin.process()`, as the pointer represents valid data only
     ///    within that function scope.
     /// 3. There must be only one Process that wraps around the given pointer.
+    #[doc(hidden)]
     pub const unsafe fn new_unchecked(clap_process: NonNull<clap_process>) -> Self {
         Self(clap_process)
     }
@@ -311,7 +312,7 @@ impl<'a> AudioBufferMut<'a> {
         self.as_clap_audio_buffer().latency
     }
 
-    pub fn constant_mask(&self) -> u64 {
+    pub const fn constant_mask(&self) -> u64 {
         self.as_clap_audio_buffer().constant_mask
     }
 }
