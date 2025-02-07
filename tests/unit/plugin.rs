@@ -4,18 +4,20 @@ use std::{
     pin::Pin,
     sync::{
         Arc, LazyLock,
-        atomic::{AtomicU32, Ordering},
+        atomic::{AtomicU32, AtomicU64, Ordering},
     },
     time::SystemTime,
 };
 
 use clap_clap::{
     Error,
+    ext::{AudioPorts, Extensions, plugin::audio_ports::AudioPortInfo},
     factory::{Factory, FactoryHost, FactoryPluginDescriptor},
     host::Host,
     plugin::{AudioThread, ClapPlugin, Plugin},
     process::{Process, Status, Status::Continue},
 };
+use clap_sys::{CLAP_EXT_AUDIO_PORTS, clap_plugin_audio_ports};
 
 use crate::{
     host::{TestHost, TestHostConfig},
@@ -29,6 +31,7 @@ pub struct TestPlugin {
     call_init: Option<Arc<Host>>,
     call_activate: Option<(f64, u32, u32)>,
     call_on_main_thread: AtomicU32,
+    call_get_extension: AtomicU64,
 }
 
 static CALL_PLUGIN_DESTRUCTOR: AtomicU32 = AtomicU32::new(0);
@@ -41,7 +44,7 @@ impl Drop for TestPlugin {
 
 impl Plugin for TestPlugin {
     type AudioThread = TestAudioThread;
-    type Extensions = ();
+    type Extensions = Self;
     const ID: &'static str = "clap.plugin.test";
     const NAME: &'static str = "Test Plugin";
     const VENDOR: &'static str = "⧉⧉⧉";
@@ -70,6 +73,12 @@ impl Plugin for TestPlugin {
 
     fn on_main_thread(&mut self) {
         self.call_on_main_thread.fetch_add(1, Ordering::Release);
+    }
+}
+
+impl Extensions<Self> for TestPlugin {
+    fn audio_ports() -> Option<impl AudioPorts<Self>> {
+        Some(TestAudioPorts)
     }
 }
 
@@ -380,4 +389,42 @@ fn call_process() {
     assert_eq!(audio_thread.frames_processed, 3);
 
     unsafe { clap_plugin.deactivate.unwrap()(clap_plugin) };
+}
+
+pub struct TestAudioPorts;
+
+impl AudioPorts<TestPlugin> for TestAudioPorts {
+    fn count(plugin: &TestPlugin, _: bool) -> u32 {
+        // As a signature, set the first bit of plugin's call_get_extension field.
+        plugin.call_get_extension.fetch_or(1, Ordering::Release);
+        11
+    }
+
+    fn get(_: &TestPlugin, _: u32, _: bool) -> Option<AudioPortInfo> {
+        None
+    }
+}
+
+#[test]
+fn call_get_extension_audio_ports() {
+    let mut wrap = TestWrapper::build();
+    let audio_ins = TestAudioPorts::count(unsafe { wrap.plugin() }, true);
+
+    let clap_plugin = unsafe { wrap.as_ref() };
+
+    // Fetch clap_plugin_audio_ports extension.
+    let ext =
+        unsafe { clap_plugin.get_extension.unwrap()(clap_plugin, CLAP_EXT_AUDIO_PORTS.as_ptr()) };
+    assert!(!ext.is_null());
+    let ext = ext as *const clap_plugin_audio_ports;
+
+    assert_eq!(
+        unsafe { (*ext).count.unwrap()(clap_plugin, true) },
+        audio_ins
+    );
+
+    // Check  if was actually this plugin that was called.
+    // TestAudioPorts sets the first bit of plugin.call_get_extensions.
+    let plugin = unsafe { wrap.plugin() };
+    assert_eq!(plugin.call_get_extension.load(Ordering::Acquire) & 1, 1);
 }
