@@ -1,4 +1,4 @@
-//! Export ffi bindings to CLAP C API, version 1.2.3.
+//! Raw bindings to CLAP 1.2.3.
 
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]
@@ -8,6 +8,21 @@ use std::ffi::{CStr, c_char, c_int, c_uint, c_ulong, c_void};
 pub const CLAP_VERSION_MAJOR: u32 = 1;
 pub const CLAP_VERSION_MINOR: u32 = 2;
 pub const CLAP_VERSION_REVISION: u32 = 3;
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct clap_version {
+    pub major: u32,
+    pub minor: u32,
+    pub revision: u32,
+}
+
+pub const CLAP_VERSION: clap_version = clap_version {
+    major: CLAP_VERSION_MAJOR,
+    minor: CLAP_VERSION_MINOR,
+    revision: CLAP_VERSION_REVISION,
+};
+
 pub const CLAP_PLUGIN_FEATURE_INSTRUMENT: &CStr = c"instrument";
 pub const CLAP_PLUGIN_FEATURE_AUDIO_EFFECT: &CStr = c"audio-effect";
 pub const CLAP_PLUGIN_FEATURE_NOTE_EFFECT: &CStr = c"note-effect";
@@ -47,20 +62,6 @@ pub const CLAP_PLUGIN_FEATURE_MONO: &CStr = c"mono";
 pub const CLAP_PLUGIN_FEATURE_STEREO: &CStr = c"stereo";
 pub const CLAP_PLUGIN_FEATURE_SURROUND: &CStr = c"surround";
 pub const CLAP_PLUGIN_FEATURE_AMBISONIC: &CStr = c"ambisonic";
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct clap_version {
-    pub major: u32,
-    pub minor: u32,
-    pub revision: u32,
-}
-
-pub const CLAP_VERSION: clap_version = clap_version {
-    major: CLAP_VERSION_MAJOR,
-    minor: CLAP_VERSION_MINOR,
-    revision: CLAP_VERSION_REVISION,
-};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -107,22 +108,24 @@ pub struct clap_event_header {
 }
 
 pub const CLAP_CORE_EVENT_SPACE_ID: u16 = 0;
-pub const clap_event_flags_CLAP_EVENT_IS_LIVE: clap_event_flags = 1;
-pub const clap_event_flags_CLAP_EVENT_DONT_RECORD: clap_event_flags = 2;
+
+pub const CLAP_EVENT_IS_LIVE: clap_event_flags = 1;
+pub const CLAP_EVENT_DONT_RECORD: clap_event_flags = 2;
 pub type clap_event_flags = c_uint;
-pub const CLAP_EVENT_NOTE_ON: clap_event_flags = 0;
-pub const CLAP_EVENT_NOTE_OFF: clap_event_flags = 1;
-pub const CLAP_EVENT_NOTE_CHOKE: clap_event_flags = 2;
-pub const CLAP_EVENT_NOTE_END: clap_event_flags = 3;
-pub const CLAP_EVENT_NOTE_EXPRESSION: clap_event_flags = 4;
-pub const CLAP_EVENT_PARAM_VALUE: clap_event_flags = 5;
-pub const CLAP_EVENT_PARAM_MOD: clap_event_flags = 6;
-pub const CLAP_EVENT_PARAM_GESTURE_BEGIN: clap_event_flags = 7;
-pub const CLAP_EVENT_PARAM_GESTURE_END: clap_event_flags = 8;
-pub const CLAP_EVENT_TRANSPORT: clap_event_flags = 9;
-pub const CLAP_EVENT_MIDI: clap_event_flags = 10;
-pub const CLAP_EVENT_MIDI_SYSEX: clap_event_flags = 11;
-pub const CLAP_EVENT_MIDI2: clap_event_flags = 12;
+
+pub const CLAP_EVENT_NOTE_ON: c_uint = 0;
+pub const CLAP_EVENT_NOTE_OFF: c_uint = 1;
+pub const CLAP_EVENT_NOTE_CHOKE: c_uint = 2;
+pub const CLAP_EVENT_NOTE_END: c_uint = 3;
+pub const CLAP_EVENT_NOTE_EXPRESSION: c_uint = 4;
+pub const CLAP_EVENT_PARAM_VALUE: c_uint = 5;
+pub const CLAP_EVENT_PARAM_MOD: c_uint = 6;
+pub const CLAP_EVENT_PARAM_GESTURE_BEGIN: c_uint = 7;
+pub const CLAP_EVENT_PARAM_GESTURE_END: c_uint = 8;
+pub const CLAP_EVENT_TRANSPORT: c_uint = 9;
+pub const CLAP_EVENT_MIDI: c_uint = 10;
+pub const CLAP_EVENT_MIDI_SYSEX: c_uint = 11;
+pub const CLAP_EVENT_MIDI2: c_uint = 12;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -189,14 +192,14 @@ pub struct clap_event_param_gesture {
     pub param_id: clap_id,
 }
 
-pub const clap_transport_flags_CLAP_TRANSPORT_HAS_TEMPO: clap_transport_flags = 1;
-pub const clap_transport_flags_CLAP_TRANSPORT_HAS_BEATS_TIMELINE: clap_transport_flags = 2;
-pub const clap_transport_flags_CLAP_TRANSPORT_HAS_SECONDS_TIMELINE: clap_transport_flags = 4;
-pub const clap_transport_flags_CLAP_TRANSPORT_HAS_TIME_SIGNATURE: clap_transport_flags = 8;
-pub const clap_transport_flags_CLAP_TRANSPORT_IS_PLAYING: clap_transport_flags = 16;
-pub const clap_transport_flags_CLAP_TRANSPORT_IS_RECORDING: clap_transport_flags = 32;
-pub const clap_transport_flags_CLAP_TRANSPORT_IS_LOOP_ACTIVE: clap_transport_flags = 64;
-pub const clap_transport_flags_CLAP_TRANSPORT_IS_WITHIN_PRE_ROLL: clap_transport_flags = 128;
+pub const CLAP_TRANSPORT_HAS_TEMPO: clap_transport_flags = 1;
+pub const CLAP_TRANSPORT_HAS_BEATS_TIMELINE: clap_transport_flags = 2;
+pub const CLAP_TRANSPORT_HAS_SECONDS_TIMELINE: clap_transport_flags = 4;
+pub const CLAP_TRANSPORT_HAS_TIME_SIGNATURE: clap_transport_flags = 8;
+pub const CLAP_TRANSPORT_IS_PLAYING: clap_transport_flags = 16;
+pub const CLAP_TRANSPORT_IS_RECORDING: clap_transport_flags = 32;
+pub const CLAP_TRANSPORT_IS_LOOP_ACTIVE: clap_transport_flags = 64;
+pub const CLAP_TRANSPORT_IS_WITHIN_PRE_ROLL: clap_transport_flags = 128;
 pub type clap_transport_flags = c_uint;
 
 #[repr(C)]
@@ -378,19 +381,15 @@ pub struct clap_universal_plugin_id {
 
 pub const CLAP_PRESET_DISCOVERY_FACTORY_ID: &CStr = c"clap.preset-discovery-factory/2";
 pub const CLAP_PRESET_DISCOVERY_FACTORY_ID_COMPAT: &CStr = c"clap.preset-discovery-factory/draft-2";
-pub const clap_preset_discovery_location_kind_CLAP_PRESET_DISCOVERY_LOCATION_FILE:
-    clap_preset_discovery_location_kind = 0;
-pub const clap_preset_discovery_location_kind_CLAP_PRESET_DISCOVERY_LOCATION_PLUGIN:
-    clap_preset_discovery_location_kind = 1;
+
+pub const CLAP_PRESET_DISCOVERY_LOCATION_FILE: clap_preset_discovery_location_kind = 0;
+pub const CLAP_PRESET_DISCOVERY_LOCATION_PLUGIN: clap_preset_discovery_location_kind = 1;
 pub type clap_preset_discovery_location_kind = c_uint;
-pub const clap_preset_discovery_flags_CLAP_PRESET_DISCOVERY_IS_FACTORY_CONTENT:
-    clap_preset_discovery_flags = 1;
-pub const clap_preset_discovery_flags_CLAP_PRESET_DISCOVERY_IS_USER_CONTENT:
-    clap_preset_discovery_flags = 2;
-pub const clap_preset_discovery_flags_CLAP_PRESET_DISCOVERY_IS_DEMO_CONTENT:
-    clap_preset_discovery_flags = 4;
-pub const clap_preset_discovery_flags_CLAP_PRESET_DISCOVERY_IS_FAVORITE:
-    clap_preset_discovery_flags = 8;
+
+pub const CLAP_PRESET_DISCOVERY_IS_FACTORY_CONTENT: clap_preset_discovery_flags = 1;
+pub const CLAP_PRESET_DISCOVERY_IS_USER_CONTENT: clap_preset_discovery_flags = 2;
+pub const CLAP_PRESET_DISCOVERY_IS_DEMO_CONTENT: clap_preset_discovery_flags = 4;
+pub const CLAP_PRESET_DISCOVERY_IS_FAVORITE: clap_preset_discovery_flags = 8;
 pub type clap_preset_discovery_flags = c_uint;
 
 #[repr(C)]
@@ -579,19 +578,16 @@ pub struct clap_preset_discovery_factory {
 pub const CLAP_EXT_AMBISONIC: &CStr = c"clap.ambisonic/3";
 pub const CLAP_EXT_AMBISONIC_COMPAT: &CStr = c"clap.ambisonic.draft/3";
 pub const CLAP_PORT_AMBISONIC: &CStr = c"ambisonic";
-pub const clap_ambisonic_ordering_CLAP_AMBISONIC_ORDERING_FUMA: clap_ambisonic_ordering = 0;
-pub const clap_ambisonic_ordering_CLAP_AMBISONIC_ORDERING_ACN: clap_ambisonic_ordering = 1;
+
+pub const CLAP_AMBISONIC_ORDERING_FUMA: clap_ambisonic_ordering = 0;
+pub const CLAP_AMBISONIC_ORDERING_ACN: clap_ambisonic_ordering = 1;
 pub type clap_ambisonic_ordering = c_uint;
-pub const clap_ambisonic_normalization_CLAP_AMBISONIC_NORMALIZATION_MAXN:
-    clap_ambisonic_normalization = 0;
-pub const clap_ambisonic_normalization_CLAP_AMBISONIC_NORMALIZATION_SN3D:
-    clap_ambisonic_normalization = 1;
-pub const clap_ambisonic_normalization_CLAP_AMBISONIC_NORMALIZATION_N3D:
-    clap_ambisonic_normalization = 2;
-pub const clap_ambisonic_normalization_CLAP_AMBISONIC_NORMALIZATION_SN2D:
-    clap_ambisonic_normalization = 3;
-pub const clap_ambisonic_normalization_CLAP_AMBISONIC_NORMALIZATION_N2D:
-    clap_ambisonic_normalization = 4;
+
+pub const CLAP_AMBISONIC_NORMALIZATION_MAXN: clap_ambisonic_normalization = 0;
+pub const CLAP_AMBISONIC_NORMALIZATION_SN3D: clap_ambisonic_normalization = 1;
+pub const CLAP_AMBISONIC_NORMALIZATION_N3D: clap_ambisonic_normalization = 2;
+pub const CLAP_AMBISONIC_NORMALIZATION_SN2D: clap_ambisonic_normalization = 3;
+pub const CLAP_AMBISONIC_NORMALIZATION_N2D: clap_ambisonic_normalization = 4;
 pub type clap_ambisonic_normalization = c_uint;
 
 #[repr(C)]
@@ -932,12 +928,12 @@ pub type clap_xwnd = c_ulong;
 #[derive(Copy, Clone)]
 pub struct clap_window {
     pub api: *const c_char,
-    pub __bindgen_anon_1: clap_window__bindgen_ty_1,
+    pub clap_window__: clap_window__,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub union clap_window__bindgen_ty_1 {
+pub union clap_window__ {
     pub cocoa: clap_nsview,
     pub x11: clap_xwnd,
     pub win32: clap_hwnd,
@@ -1083,10 +1079,10 @@ pub struct clap_host_note_name {
 #[doc = " @page Note Ports\n\n This extension provides a way for the plugin to describe its current note ports.\n If the plugin does not implement this extension, it won't have note input or output.\n The plugin is only allowed to change its note ports configuration while it is deactivated."]
 pub const CLAP_EXT_NOTE_PORTS: &CStr = c"clap.note-ports";
 
-pub const clap_note_dialect_CLAP_NOTE_DIALECT_CLAP: clap_note_dialect = 1;
-pub const clap_note_dialect_CLAP_NOTE_DIALECT_MIDI: clap_note_dialect = 2;
-pub const clap_note_dialect_CLAP_NOTE_DIALECT_MIDI_MPE: clap_note_dialect = 4;
-pub const clap_note_dialect_CLAP_NOTE_DIALECT_MIDI2: clap_note_dialect = 8;
+pub const CLAP_NOTE_DIALECT_CLAP: clap_note_dialect = 1;
+pub const CLAP_NOTE_DIALECT_MIDI: clap_note_dialect = 2;
+pub const CLAP_NOTE_DIALECT_MIDI_MPE: clap_note_dialect = 4;
+pub const CLAP_NOTE_DIALECT_MIDI2: clap_note_dialect = 8;
 pub type clap_note_dialect = c_uint;
 
 #[repr(C)]
@@ -1411,12 +1407,9 @@ pub struct clap_ostream {
 
 pub const CLAP_EXT_STATE_CONTEXT: &CStr = c"clap.state-context/2";
 
-pub const clap_plugin_state_context_type_CLAP_STATE_CONTEXT_FOR_PRESET:
-    clap_plugin_state_context_type = 1;
-pub const clap_plugin_state_context_type_CLAP_STATE_CONTEXT_FOR_DUPLICATE:
-    clap_plugin_state_context_type = 2;
-pub const clap_plugin_state_context_type_CLAP_STATE_CONTEXT_FOR_PROJECT:
-    clap_plugin_state_context_type = 3;
+pub const CLAP_STATE_CONTEXT_FOR_PRESET: clap_plugin_state_context_type = 1;
+pub const CLAP_STATE_CONTEXT_FOR_DUPLICATE: clap_plugin_state_context_type = 2;
+pub const CLAP_STATE_CONTEXT_FOR_PROJECT: clap_plugin_state_context_type = 3;
 pub type clap_plugin_state_context_type = c_uint;
 
 #[repr(C)]
