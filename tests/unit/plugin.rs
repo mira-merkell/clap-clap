@@ -426,7 +426,7 @@ fn call_get_extension_audio_ports() {
         audio_ins
     );
 
-    // Check  if was actually this plugin that was called.
+    // Check if it was actually this plugin that was called.
     // TestAudioPorts sets the first bit of plugin.call_get_extensions.
     let plugin = unsafe { wrap.plugin() };
     assert_eq!(plugin.call_get_extension.load(Ordering::Acquire) & 1, 1);

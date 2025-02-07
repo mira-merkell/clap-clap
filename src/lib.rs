@@ -15,6 +15,20 @@ pub mod process;
 pub mod string_sizes;
 pub mod version;
 
+pub mod prelude {
+    #[doc(inline)]
+    pub use crate::{
+        Error, entry,
+        ext::plugin::{
+            Extensions,
+            audio_ports::{AudioPorts, MonoPorts, StereoPorts},
+        },
+        host::Host,
+        plugin::{AudioThread, Plugin},
+        process::{Process, Status},
+    };
+}
+
 #[derive(Debug, Clone)]
 pub enum Error {
     Factory(factory::Error),
@@ -34,7 +48,7 @@ impl std::fmt::Display for Error {
             Host(e) => write!(f, "host module: {e}"),
             Process(e) => write!(f, "process module: {e}"),
             Id(e) => write!(f, "id: {e}"),
-            User(ec) => write!(f, "user error, error code: {ec}"),
+            User(ec) => write!(f, "user error: {ec}"),
         }
     }
 }

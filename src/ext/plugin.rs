@@ -4,7 +4,7 @@ use crate::{ext::plugin::audio_ports::AudioPorts, plugin::Plugin};
 
 pub mod audio_ports;
 
-/// Extensions implemented by the plugin.
+/// Plugin extensions.
 pub trait Extensions<P: Plugin> {
     fn audio_ports() -> Option<impl AudioPorts<P>> {
         None::<()>

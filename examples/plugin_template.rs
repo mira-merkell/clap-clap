@@ -19,36 +19,27 @@
 
 use std::sync::Arc;
 
-use clap_clap::{
-    Error,
-    ext::plugin::{
-        Extensions,
-        audio_ports::{AudioPorts, StereoPorts},
-    },
-    host::Host,
-    plugin::{AudioThread, Plugin},
-    process::{Process, Status, Status::Continue},
-};
+use clap_clap::prelude as clap;
 
 // A plugin must implement `Default` trait.  The plugin instance will be created
 // by the host with the call to `MyPlug::default()`.
 #[derive(Default)]
 struct MyPlug {
-    host: Option<Arc<Host>>,
+    host: Option<Arc<clap::Host>>,
 }
 
-impl Extensions<Self> for MyPlug {
+impl clap::Extensions<Self> for MyPlug {
     // Provide CLAP "plugin_audio_ports" extension: for example,
     // a static layout of stereo ports, one in and one out.
     // If the plugin needs to dynamically control the port layout,
     // you might want to implement the AudioPorts trait yourself.
-    fn audio_ports() -> Option<impl AudioPorts<Self>> {
-        Some(StereoPorts::<1, 1>)
+    fn audio_ports() -> Option<impl clap::AudioPorts<Self>> {
+        Some(clap::StereoPorts::<1, 1>)
     }
 }
 
-impl Plugin for MyPlug {
-    type AudioThread = ChannelSwap;
+impl clap::Plugin for MyPlug {
+    type AudioThread = AudioThread;
     type Extensions = Self;
 
     const ID: &'static str = "com.your-company.YourPlugin";
@@ -61,7 +52,7 @@ impl Plugin for MyPlug {
     const DESCRIPTION: &'static str = "The plugin description.";
     const FEATURES: &'static str = "instrument stereo";
 
-    fn init(&mut self, host: Arc<Host>) -> Result<(), Error> {
+    fn init(&mut self, host: Arc<clap::Host>) -> Result<(), clap::Error> {
         // Store the reference to the host.
         self.host = Some(host.clone());
 
@@ -71,17 +62,20 @@ impl Plugin for MyPlug {
     }
 
     /// Start the audio thread.
-    fn activate(&mut self, _sample_rate: f64, _: u32, _: u32) -> Result<ChannelSwap, Error> {
-        Ok(ChannelSwap {})
+    fn activate(&mut self, sample_rate: f64, _: u32, _: u32) -> Result<AudioThread, clap::Error> {
+        Ok(AudioThread { sample_rate })
     }
 }
 
-/// Declare the audio processor.
-/// Instances of this type will live on the audio thread.
-struct ChannelSwap {}
+/// Declare the audio processor. Instances of this type will live on the audio
+/// thread.
+struct AudioThread {
+    #[allow(unused)]
+    sample_rate: f64,
+}
 
-impl AudioThread<MyPlug> for ChannelSwap {
-    fn process(&mut self, process: &mut Process) -> Result<Status, Error> {
+impl clap::AudioThread<MyPlug> for AudioThread {
+    fn process(&mut self, process: &mut clap::Process) -> Result<clap::Status, clap::Error> {
         // Generate a lending iterator over frames of audio samples and events.
         // The entire `Process` API, together with its derived types, is `const`.
         // The methods are cheap to call in a loop on the audio thread.
@@ -99,9 +93,9 @@ impl AudioThread<MyPlug> for ChannelSwap {
             *frame.audio_output(0).data32(0) = out_l;
             *frame.audio_output(0).data32(1) = out_r;
         }
-        Ok(Continue)
+        Ok(clap::Status::Continue)
     }
 }
 
 // Export clap_entry symbols and build a plugin factory.
-clap_clap::entry!(MyPlug);
+clap::entry!(MyPlug);
