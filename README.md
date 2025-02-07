@@ -6,7 +6,7 @@ A [CLAP] plugin runtime. Very much WIP. 🚧
 
 ## Goals
 
-* Provide a dynamical runtime environment to access safe-Rust [CLAP API].
+* Provide a dynamical runtime environment to access [CLAP API] from safe Rust.
 * Follow CLAP terminology and the framework of CLAP extension modules.
 * Build a testing and debugging platform for plugin authors.
 
