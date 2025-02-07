@@ -4,6 +4,9 @@
 
 A [CLAP] plugin runtime. Very much WIP. 🚧
 
+Documentation available
+at [docs.rs](https://docs.rs/clap-clap/latest/clap_clap/).
+
 ## Goals
 
 * Provide a dynamical runtime environment to access [CLAP API] from safe Rust.

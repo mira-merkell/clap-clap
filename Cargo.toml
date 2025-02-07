@@ -5,7 +5,9 @@ rust-version = "1.85.0"
 edition = "2024"
 description = "CLAP plugin runtime"
 license = "MIT"
+homepage = "https://crates.io/crates/clap-clap"
 repository = "https://github.com/mira-merkell/clap-clap"
+documentation = "https://docs.rs/clap-clap/latest/clap_clap/"
 authors = ["⧉⧉⧉"]
 
 [lib]
