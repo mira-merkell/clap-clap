@@ -34,8 +34,11 @@ pub trait Plugin: Default {
     const VERSION: &'static str = "";
     const DESCRIPTION: &'static str = "";
 
-    /// Arbitrary keywords separated by whitespace.
-    /// For example: `"fx stereo distortion"`.
+    /// Arbitrary keywords separated by whitespace. For example: `"filter stereo
+    /// distortion"`. See the module [`plugin_features`] for a list of
+    /// standard feature names.
+    ///
+    /// [`plugin_features`]: crate::plugin_features
     const FEATURES: &'static str = "";
 
     #[allow(unused_variables)]
