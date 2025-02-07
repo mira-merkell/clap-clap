@@ -4,7 +4,7 @@ use std::{
     ptr::{null, null_mut},
 };
 
-use clap_clap::{clap_sys::clap_host, host::Host, version::CLAP_VERSION};
+use clap_clap::{clap::clap_host, host::Host, version::CLAP_VERSION};
 
 pub struct TestHostConfig<'a> {
     pub name: &'a str,

@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    clap_sys::clap_plugin,
+    clap::clap_plugin,
     ext::Extensions,
     host::Host,
     process,

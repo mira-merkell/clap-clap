@@ -11,7 +11,7 @@ use std::{
 
 use clap_clap::{
     Error,
-    clap_sys::{CLAP_EXT_AUDIO_PORTS, clap_plugin_audio_ports},
+    clap::{CLAP_EXT_AUDIO_PORTS, clap_plugin_audio_ports},
     ext::{AudioPorts, Extensions, plugin::audio_ports::AudioPortInfo},
     factory::{Factory, FactoryHost, FactoryPluginDescriptor},
     host::Host,

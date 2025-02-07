@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    clap_sys::{CLAP_EXT_LOG, clap_host, clap_host_log},
+    clap::{CLAP_EXT_LOG, clap_host, clap_host_log},
     ext::host::{log, log::Log},
     version::ClapVersion,
 };

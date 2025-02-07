@@ -4,7 +4,7 @@
 compile_error!("target's pointer width must be at least 32");
 
 #[doc(hidden)]
-pub mod clap_sys;
+pub mod clap;
 pub mod entry;
 pub mod ext;
 pub mod factory;

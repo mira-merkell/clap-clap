@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    clap_sys::{CLAP_VERSION, clap_plugin_descriptor},
+    clap::{CLAP_VERSION, clap_plugin_descriptor},
     plugin::{Error, Plugin, desc::PluginDescriptorKey::*},
 };
 

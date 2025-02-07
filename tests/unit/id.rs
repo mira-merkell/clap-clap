@@ -1,8 +1,8 @@
-use clap_clap::{clap_sys, id::ClapId};
+use clap_clap::{clap, id::ClapId};
 
 #[test]
 fn clap_sys_invalid_id_more_than_u16max() {
-    assert!(clap_sys::CLAP_INVALID_ID > u16::MAX as clap_sys::clap_id);
+    assert!(clap::CLAP_INVALID_ID > u16::MAX as clap::clap_id);
 }
 
 #[test]
@@ -35,6 +35,6 @@ fn is_valid() {
 
 #[test]
 fn invalid_is_max() {
-    assert_eq!(clap_sys::CLAP_INVALID_ID, ClapId::invalid_id().into());
+    assert_eq!(clap::CLAP_INVALID_ID, ClapId::invalid_id().into());
     assert_eq!(u32::MAX, ClapId::invalid_id().into());
 }

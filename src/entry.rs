@@ -1,4 +1,4 @@
-pub use crate::clap_sys::{
+pub use crate::clap::{
     CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, clap_host, clap_plugin, clap_plugin_descriptor,
     clap_plugin_entry, clap_plugin_factory,
 };
