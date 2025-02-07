@@ -12,6 +12,5 @@ authors = ["⧉⧉⧉"]
 crate-type = ["rlib"]
 
 [[example]]
-name = "ping-pong"
+name = "plugin_template"
 crate-type = ["cdylib"]
-path = "examples/ping_pong.rs"
