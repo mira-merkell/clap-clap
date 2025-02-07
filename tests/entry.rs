@@ -35,7 +35,7 @@ impl_dummy_plugin!(Dummier, "dummier");
 
 clap_clap::entry!(Dummy, Dummier);
 use _clap_entry::clap_entry;
-use clap_clap::clap::{CLAP_VERSION, clap_host};
+use clap_clap::ffi::{CLAP_VERSION, clap_host};
 
 struct DummyHost(clap_host);
 

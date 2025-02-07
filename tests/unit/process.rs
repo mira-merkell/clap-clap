@@ -4,7 +4,7 @@ use std::{
 };
 
 use clap_clap::{
-    clap::{clap_audio_buffer, clap_event_transport, clap_process},
+    ffi::{clap_audio_buffer, clap_event_transport, clap_process},
     process::Process,
 };
 

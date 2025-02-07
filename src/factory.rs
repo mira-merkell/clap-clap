@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    clap::{clap_host, clap_plugin, clap_plugin_descriptor},
+    ffi::{clap_host, clap_plugin, clap_plugin_descriptor},
     host,
     host::Host,
     plugin,

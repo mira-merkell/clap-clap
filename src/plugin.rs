@@ -6,8 +6,8 @@ use std::{
 };
 
 use crate::{
-    clap::clap_plugin,
     ext::Extensions,
+    ffi::clap_plugin,
     host::Host,
     process,
     process::{Process, Status::Continue},
