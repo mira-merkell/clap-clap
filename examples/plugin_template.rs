@@ -21,7 +21,10 @@ use std::sync::Arc;
 
 use clap_clap::{
     Error,
-    ext::{AudioPorts, Extensions, plugin::audio_ports::StereoPorts},
+    ext::plugin::{
+        Extensions,
+        audio_ports::{AudioPorts, StereoPorts},
+    },
     host::Host,
     plugin::{AudioThread, Plugin},
     process::{Process, Status, Status::Continue},

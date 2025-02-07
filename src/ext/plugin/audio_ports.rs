@@ -1,7 +1,7 @@
 use std::{marker::PhantomData, ptr::null};
 
 use crate::{
-    ext::{AudioPorts, plugin::audio_ports::ffi::clap_plugin_audio_ports},
+    ext::plugin::audio_ports::ffi::clap_plugin_audio_ports,
     ffi::{
         CLAP_AUDIO_PORT_IS_MAIN, CLAP_AUDIO_PORT_PREFERS_64BITS,
         CLAP_AUDIO_PORT_REQUIRES_COMMON_SAMPLE_SIZE, CLAP_AUDIO_PORT_SUPPORTS_64BITS,
@@ -11,6 +11,14 @@ use crate::{
     id::ClapId,
     plugin::Plugin,
 };
+
+pub trait AudioPorts<P>
+where
+    P: Plugin,
+{
+    fn count(plugin: &P, is_input: bool) -> u32;
+    fn get(plugin: &P, index: u32, is_input: bool) -> Option<AudioPortInfo>;
+}
 
 mod ffi;
 

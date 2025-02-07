@@ -1,5 +1,5 @@
 use crate::{
-    ext::AudioPorts,
+    ext::plugin::audio_ports::AudioPorts,
     ffi::{clap_audio_port_info, clap_plugin, clap_plugin_audio_ports},
     plugin::{ClapPlugin, Plugin},
 };

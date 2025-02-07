@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    ext::Extensions,
+    ext::plugin::{Extensions, audio_ports::ClapPluginAudioPorts},
     ffi::clap_plugin,
     host::Host,
     process,
@@ -16,8 +16,6 @@ use crate::{
 mod desc;
 
 pub(crate) use desc::{PluginDescriptor, build_plugin_descriptor};
-
-use crate::ext::plugin::audio_ports::ClapPluginAudioPorts;
 
 mod ffi;
 
