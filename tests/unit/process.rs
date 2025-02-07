@@ -3,8 +3,10 @@ use std::{
     ptr::{NonNull, null},
 };
 
-use clap_clap::process::Process;
-use clap_sys::{clap_audio_buffer, clap_event_transport, clap_process};
+use clap_clap::{
+    clap::{clap_audio_buffer, clap_event_transport, clap_process},
+    process::Process,
+};
 
 mod frame;
 

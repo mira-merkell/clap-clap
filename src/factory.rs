@@ -5,9 +5,8 @@ use std::{
     sync::Arc,
 };
 
-use clap_sys::{clap_host, clap_plugin, clap_plugin_descriptor};
-
 use crate::{
+    clap::{clap_host, clap_plugin, clap_plugin_descriptor},
     host,
     host::Host,
     plugin,

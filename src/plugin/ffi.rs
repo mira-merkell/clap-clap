@@ -4,11 +4,10 @@ use std::{
     ptr::{NonNull, null},
 };
 
-use clap_sys::{
-    CLAP_EXT_AUDIO_PORTS, CLAP_PROCESS_ERROR, clap_plugin, clap_process, clap_process_status,
-};
-
 use crate::{
+    clap::{
+        CLAP_EXT_AUDIO_PORTS, CLAP_PROCESS_ERROR, clap_plugin, clap_process, clap_process_status,
+    },
     plugin::{AudioThread, ClapPlugin, Plugin, Runtime},
     process::Process,
 };

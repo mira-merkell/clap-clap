@@ -7,16 +7,10 @@ edition = "2024"
 [lib]
 crate-type = ["rlib"]
 
-[dependencies]
-clap-sys = { path = "./clap-sys" }
+[build-dependencies]
+bindgen = "0.71.1"
 
 [[example]]
 name = "ping-pong"
 crate-type = ["cdylib"]
 path = "examples/ping_pong.rs"
-
-[workspace]
-resolver = "3"
-members = [
-    "clap-sys",
-]

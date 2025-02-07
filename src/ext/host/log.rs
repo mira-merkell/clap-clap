@@ -3,12 +3,14 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use clap_sys::{
-    CLAP_LOG_DEBUG, CLAP_LOG_ERROR, CLAP_LOG_FATAL, CLAP_LOG_HOST_MISBEHAVING, CLAP_LOG_INFO,
-    CLAP_LOG_PLUGIN_MISBEHAVING, CLAP_LOG_WARNING, clap_host_log, clap_log_severity,
+use crate::{
+    clap::{
+        CLAP_LOG_DEBUG, CLAP_LOG_ERROR, CLAP_LOG_FATAL, CLAP_LOG_HOST_MISBEHAVING, CLAP_LOG_INFO,
+        CLAP_LOG_PLUGIN_MISBEHAVING, CLAP_LOG_WARNING, clap_host_log, clap_log_severity,
+    },
+    host,
+    host::Host,
 };
-
-use crate::{host, host::Host};
 
 pub struct Log<'a> {
     host: &'a Host,

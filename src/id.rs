@@ -1,5 +1,7 @@
 use std::fmt::{Display, Formatter};
 
+use crate::clap::{self, CLAP_INVALID_ID};
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Error {
     InvalidId,
@@ -51,7 +53,7 @@ impl TryFrom<u32> for ClapId {
     type Error = Error;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
-        (value != clap_sys::CLAP_INVALID_ID)
+        (value != CLAP_INVALID_ID)
             .then_some(Self(Some(value)))
             .ok_or(Error::InvalidId)
     }
@@ -86,8 +88,8 @@ impl TryFrom<usize> for ClapId {
     }
 }
 
-impl From<ClapId> for clap_sys::clap_id {
+impl From<ClapId> for clap::clap_id {
     fn from(value: ClapId) -> Self {
-        value.0.unwrap_or(clap_sys::CLAP_INVALID_ID)
+        value.0.unwrap_or(clap::CLAP_INVALID_ID)
     }
 }

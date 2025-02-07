@@ -1,4 +1,0 @@
-# bindgen's output format breaks if we add `.generate_cstr(true)` to the builder.
-# This is a workaround adapted from:
-# https://github.com/rust-lang/rust-bindgen/issues/3047#issuecomment-2529909128
-edition = "2024"

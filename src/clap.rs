@@ -1,3 +1,5 @@
+//! Export bindings to CLAP C API.
+
 mod ffi {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]
@@ -26,10 +28,9 @@ macro_rules! cast_const_as_usize {
 cast_const_as_usize!(CLAP_NAME_SIZE, CLAP_PATH_SIZE);
 
 // CLAP id
-pub use crate::ffi::{CLAP_INVALID_ID, clap_id};
-
+pub use ffi::{CLAP_INVALID_ID, clap_id};
 // CLAP version
-pub use crate::ffi::{CLAP_VERSION_MAJOR, CLAP_VERSION_MINOR, CLAP_VERSION_REVISION, clap_version};
+pub use ffi::{CLAP_VERSION_MAJOR, CLAP_VERSION_MINOR, CLAP_VERSION_REVISION, clap_version};
 
 pub const CLAP_VERSION: clap_version = clap_version {
     major: CLAP_VERSION_MAJOR,
@@ -38,12 +39,11 @@ pub const CLAP_VERSION: clap_version = clap_version {
 };
 
 // CLAP entry
-pub use crate::ffi::{
-    clap_host, clap_plugin, clap_plugin_descriptor, clap_plugin_entry, clap_plugin_factory,
-};
-
 // CLAP process
-pub use crate::ffi::{clap_audio_buffer, clap_process, clap_process_status};
+pub use ffi::{
+    clap_audio_buffer, clap_host, clap_plugin, clap_plugin_descriptor, clap_plugin_entry,
+    clap_plugin_factory, clap_process, clap_process_status,
+};
 
 // Export CLAP_PROCESS_* enum as clap_process_status
 macro_rules! clap_process_status_const {
@@ -78,7 +78,6 @@ clap_process_status_const!(
 
 // CLAP plugin factory
 pub use ffi::CLAP_PLUGIN_FACTORY_ID;
-
 // CLAP plugin extension: audio_ports
 pub use ffi::{clap_audio_port_info, clap_plugin_audio_ports};
 
@@ -108,10 +107,11 @@ cast_flags_as_u32!(
     CLAP_AUDIO_PORT_SUPPORTS_64BITS
 );
 
+// clap_log
 pub use ffi::{
-    CLAP_EXT_AUDIO_PORTS, CLAP_PORT_AMBISONIC, CLAP_PORT_MONO, CLAP_PORT_STEREO, CLAP_PORT_SURROUND,
+    CLAP_EXT_AUDIO_PORTS, CLAP_PORT_AMBISONIC, CLAP_PORT_MONO, CLAP_PORT_STEREO,
+    CLAP_PORT_SURROUND, clap_host_log, clap_log_severity,
 };
-
 // CLAP_PLUGIN_FEATURE_*
 pub use ffi::{
     CLAP_PLUGIN_FEATURE_AMBISONIC, CLAP_PLUGIN_FEATURE_ANALYZER, CLAP_PLUGIN_FEATURE_AUDIO_EFFECT,
@@ -129,11 +129,6 @@ pub use ffi::{
     CLAP_PLUGIN_FEATURE_STEREO, CLAP_PLUGIN_FEATURE_SURROUND, CLAP_PLUGIN_FEATURE_SYNTHESIZER,
     CLAP_PLUGIN_FEATURE_TRANSIENT_SHAPER, CLAP_PLUGIN_FEATURE_TREMOLO, CLAP_PLUGIN_FEATURE_UTILITY,
 };
-
-// clap_log
-
-pub use ffi::clap_host_log;
-pub use ffi::clap_log_severity;
 
 macro_rules! cast_const_as_clap_log_severity {
     ($($name:ident),*) => {
@@ -164,6 +159,5 @@ cast_const_as_clap_log_severity!(
     CLAP_LOG_PLUGIN_MISBEHAVING
 );
 pub use ffi::CLAP_EXT_LOG;
-
 // CLAP event transport
 pub use ffi::clap_event_transport;
