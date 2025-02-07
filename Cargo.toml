@@ -11,9 +11,6 @@ authors = ["⧉⧉⧉"]
 [lib]
 crate-type = ["rlib"]
 
-[build-dependencies]
-bindgen = "0.71.1"
-
 [[example]]
 name = "ping-pong"
 crate-type = ["cdylib"]
