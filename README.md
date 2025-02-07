@@ -121,11 +121,10 @@ clap_clap::entry!(PingPong);
 ```
 
 To compile the source code, install Rust `>=1.85.0` (for the 2024 edition,
-available on *nightly* and *beta* channels) and clone this repository together
-with its submodules:
+available on *nightly* and *beta* channels) and clone the repository:
 
 ```bash
-git clone --recurse-submodules https://github.com/mira-merkell/clap-clap
+git clone https://github.com/mira-merkell/clap-clap
 ```
 
 Build the example plugin with:
