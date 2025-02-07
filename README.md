@@ -44,4 +44,4 @@ name of the library is OS-specific:
 Copy the file to where your DAW can find it and rename it to:
 `plugin_template.clap`.
 
-[here]: https://github.com/mira-merkell/clap-clap/examples/plugin_template.rs
+[here]: ./examples/plugin_template.rs
