@@ -1,8 +1,3 @@
-pub use crate::ffi::{
-    CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, clap_host, clap_plugin, clap_plugin_descriptor,
-    clap_plugin_entry, clap_plugin_factory,
-};
-
 /// Export `clap_entry` symbols and build a plugin factory.
 ///
 /// Use this macro to build a CLAP plugin bundle from types that implement
@@ -41,7 +36,11 @@ pub use crate::ffi::{
 macro_rules! entry {
     ($($plug:ty),*) => {
         mod _clap_entry {
-            use $crate::entry::*;
+            use $crate::ffi::{
+                CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION,
+                clap_plugin, clap_plugin_descriptor, clap_plugin_entry,
+                clap_plugin_factory, clap_host
+            };
             use $crate::factory::{Factory, FactoryHost, FactoryPluginDescriptor};
             use $crate::plugin::Plugin;
 

@@ -3,10 +3,7 @@ use std::{
     ptr::{null, null_mut},
 };
 
-use clap_clap::{
-    entry::{CLAP_PLUGIN_FACTORY_ID, clap_plugin_factory},
-    plugin::Plugin,
-};
+use clap_clap::plugin::Plugin;
 
 macro_rules! impl_dummy_plugin {
     ($plug:tt, $id:literal) => {
@@ -35,7 +32,7 @@ impl_dummy_plugin!(Dummier, "dummier");
 
 clap_clap::entry!(Dummy, Dummier);
 use _clap_entry::clap_entry;
-use clap_clap::ffi::{CLAP_VERSION, clap_host};
+use clap_clap::ffi::{CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, clap_host, clap_plugin_factory};
 
 struct DummyHost(clap_host);
 
