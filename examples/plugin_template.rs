@@ -7,7 +7,7 @@
 //! repository, and is meant to resemble that code as much as possible.
 //!
 //! The plugin should be compiled as a dynamical library with C ABI.  You can
-//! specify the library type in `Cargo.toml` of your crate:
+//! specify the library type in your crate's `Cargo.toml`:
 //!
 //! ```toml
 //! [lib]
@@ -35,7 +35,7 @@ struct MyPlug {
 }
 
 impl Extensions<Self> for MyPlug {
-    // Provide CLAP "audio_ports" extension: for example,
+    // Provide CLAP "plugin_audio_ports" extension: for example,
     // a static layout of stereo ports, one in and one out.
     // If the plugin needs to dynamically control the port layout,
     // you might want to implement the AudioPorts trait yourself.
@@ -59,7 +59,7 @@ impl Plugin for MyPlug {
     const FEATURES: &'static str = "instrument stereo";
 
     fn init(&mut self, host: Arc<Host>) -> Result<(), Error> {
-        // Store a reference to the host.
+        // Store the reference to the host.
         self.host = Some(host.clone());
 
         // We can retrieve host extensions here. E.g., the logging facility:
@@ -73,14 +73,14 @@ impl Plugin for MyPlug {
     }
 }
 
-/// Declare an audio processor.
+/// Declare the audio processor.
 /// Instances of this type will live on the audio thread.
 struct ChannelSwap {}
 
 impl AudioThread<MyPlug> for ChannelSwap {
     fn process(&mut self, process: &mut Process) -> Result<Status, Error> {
         // Generate a lending iterator over frames of audio samples and events.
-        // The entire Process API, together with its derived types, is `const`.
+        // The entire `Process` API, together with its derived types, is `const`.
         // The methods are cheap to call in a loop on the audio thread.
         let mut frames = process.frames();
         while let Some(frame) = frames.next() {
