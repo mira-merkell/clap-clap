@@ -29,6 +29,9 @@ jobs:
       - name: Build
         run: |
           cargo build --verbose --workspace --profile ${{ matrix.profile }}
+      - name: Build examples
+        run: |
+          cargo build --examples --profile ${{ matrix.profile }}
       - name: Test
         run: |
           cargo test --verbose --workspace --profile ${{ matrix.profile }}
