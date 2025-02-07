@@ -1,13 +1,13 @@
 use std::{marker::PhantomData, ptr::null};
 
 use crate::{
-    clap::{
+    ext::{AudioPorts, plugin::audio_ports::ffi::clap_plugin_audio_ports},
+    ffi::{
         CLAP_AUDIO_PORT_IS_MAIN, CLAP_AUDIO_PORT_PREFERS_64BITS,
         CLAP_AUDIO_PORT_REQUIRES_COMMON_SAMPLE_SIZE, CLAP_AUDIO_PORT_SUPPORTS_64BITS,
         CLAP_INVALID_ID, CLAP_PORT_AMBISONIC, CLAP_PORT_MONO, CLAP_PORT_STEREO, CLAP_PORT_SURROUND,
         clap_audio_port_info, clap_plugin_audio_ports,
     },
-    ext::{AudioPorts, plugin::audio_ports::ffi::clap_plugin_audio_ports},
     id::ClapId,
     plugin::Plugin,
 };
