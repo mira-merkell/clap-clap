@@ -33,7 +33,6 @@ impl<T: Float> TestChannel<T> {
 #[derive(Debug)]
 struct TestAudioBuffer {
     data32: Vec<TestChannel<f32>>,
-    #[allow(unused)]
     data64: Vec<TestChannel<f64>>,
     channel_count: u32,
     latency: u32,
@@ -196,7 +195,7 @@ fn self_test_02() {
 }
 
 #[test]
-fn self_test_03() {
+fn self_test_03_32() {
     let mut process = TestProcessConfig {
         latency: 0,
         steady_time: 1,
@@ -219,6 +218,34 @@ fn self_test_03() {
 
     let out2 = unsafe { *clap_process.audio_outputs.add(2) };
     let out2_ch2 = unsafe { *out2.data32.add(2) };
+    let sample = unsafe { *out2_ch2.add(1) };
+    assert_eq!(sample, 0.777);
+}
+
+#[test]
+fn self_test_04_64() {
+    let mut process = TestProcessConfig {
+        latency: 0,
+        steady_time: 1,
+        frames_count: 2,
+        channel_count: 3,
+        audio_inputs_count: 4,
+        audio_outputs_count: 5,
+    }
+    .build();
+
+    process.audio_inputs[0].data64[0].data()[0] = 11.13;
+    process.audio_outputs[2].data64[2].data()[1] = 0.777;
+
+    let clap_process = process.clap_process();
+
+    let in0 = unsafe { *clap_process.audio_inputs.add(0) };
+    let in0_ch0 = unsafe { *in0.data64.add(0) };
+    let sample = unsafe { *in0_ch0.add(0) };
+    assert_eq!(sample, 11.13);
+
+    let out2 = unsafe { *clap_process.audio_outputs.add(2) };
+    let out2_ch2 = unsafe { *out2.data64.add(2) };
     let sample = unsafe { *out2_ch2.add(1) };
     assert_eq!(sample, 0.777);
 }
@@ -313,6 +340,29 @@ fn audio_input_data32() {
 }
 
 #[test]
+fn audio_input_data64() {
+    let mut test_process = TestProcessConfig {
+        latency: 0,
+        steady_time: 0,
+        frames_count: 2,
+        channel_count: 1,
+        audio_inputs_count: 1,
+        audio_outputs_count: 0,
+    }
+    .build();
+
+    test_process.audio_inputs[0].data64[0].data()[0] = 0.1;
+    test_process.audio_inputs[0].data64[0].data()[1] = 0.2;
+
+    let mut clap_process = test_process.clap_process();
+    let process = unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
+
+    let in0 = process.audio_inputs(0);
+    assert_eq!(in0.data64(0)[0], 0.1);
+    assert_eq!(in0.data64(0)[1], 0.2);
+}
+
+#[test]
 #[should_panic(
     expected = "audio output number must be less than the number of available output ports"
 )]
@@ -361,6 +411,32 @@ fn audio_output_data32() {
 }
 
 #[test]
+fn audio_output_data64() {
+    let mut test_process = TestProcessConfig {
+        latency: 0,
+        steady_time: 0,
+        frames_count: 2,
+        channel_count: 1,
+        audio_inputs_count: 0,
+        audio_outputs_count: 1,
+    }
+    .build();
+
+    {
+        let mut clap_process = test_process.clap_process();
+        let mut process =
+            unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
+
+        let mut out0 = process.audio_outputs(0);
+        out0.data64(0)[0] = 0.1;
+        out0.data64(0)[1] = 0.2;
+    }
+
+    assert_eq!(test_process.audio_outputs[0].data64[0].data()[0], 0.1);
+    assert_eq!(test_process.audio_outputs[0].data64[0].data()[1], 0.2);
+}
+
+#[test]
 fn audio_input_output_map_data32() {
     const NUM_FRAMES: u32 = 1024;
     let mut test_process = TestProcessConfig {
@@ -394,5 +470,42 @@ fn audio_input_output_map_data32() {
     for i in 0..NUM_FRAMES as usize {
         assert_eq!(test_process.audio_inputs[2].data32[3].0[i], i as f32);
         assert_eq!(test_process.audio_outputs[1].data32[6].0[i], i as f32);
+    }
+}
+
+#[test]
+fn audio_input_output_map_data64() {
+    const NUM_FRAMES: u32 = 1024;
+    let mut test_process = TestProcessConfig {
+        latency: 0,
+        steady_time: 0,
+        frames_count: NUM_FRAMES,
+        channel_count: 7,
+        audio_inputs_count: 3,
+        audio_outputs_count: 2,
+    }
+    .build();
+
+    let mut buf = vec![];
+    for i in 0..NUM_FRAMES {
+        test_process.audio_inputs[2].data64[3].0[i as usize] = i as f64;
+    }
+
+    {
+        let mut clap_process = test_process.clap_process();
+        let mut process =
+            unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
+
+        for sample in process.audio_inputs(2).data64(3) {
+            buf.push(*sample)
+        }
+        for (out, sample) in process.audio_outputs(1).data64(6).iter_mut().zip(buf) {
+            *out = sample;
+        }
+    }
+
+    for i in 0..NUM_FRAMES as usize {
+        assert_eq!(test_process.audio_inputs[2].data64[3].0[i], i as f64);
+        assert_eq!(test_process.audio_outputs[1].data64[6].0[i], i as f64);
     }
 }

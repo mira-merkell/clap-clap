@@ -178,6 +178,32 @@ impl<'a> AudioBuffer<'a> {
         }
     }
 
+    /// # Safety
+    ///
+    /// 1. `channel` must be less than `self.channel_count()`,
+    /// 2. `process.frames_count()` must fit into `usize` (cast).
+    const unsafe fn data64_unchecked(&self, channel: u32) -> &[f64] {
+        // SAFETY: The caller guarantees this dereferencing is safe.
+        let chan = unsafe { *self.as_clap_audio_buffer().data64.add(channel as usize) };
+
+        // SAFETY: The CLAP host guarantees that the channel is at
+        // least process.frames_count() long.
+        unsafe { &*slice_from_raw_parts(chan, self.process.frames_count() as usize) }
+    }
+
+    /// # Panic
+    ///
+    /// This function will panic if `channel` is larger or equal to
+    /// `self.channel.count()`.
+    pub const fn data64(&self, channel: u32) -> &[f64] {
+        if channel < self.channel_count() {
+            // SAFETY: we just checked if `channel < self.channel_count()`
+            unsafe { self.data64_unchecked(channel) }
+        } else {
+            panic!("channel number must be less that the number of available channels")
+        }
+    }
+
     pub const fn channel_count(&self) -> u32 {
         self.as_clap_audio_buffer().channel_count
     }
@@ -245,6 +271,32 @@ impl<'a> AudioBufferMut<'a> {
         // SAFETY: We just checked if `n < channel_count()`
         if n < self.channel_count() {
             unsafe { self.data32_unchecked(n) }
+        } else {
+            panic!("channel number must be less that the number of available channels")
+        }
+    }
+
+    /// # Safety
+    ///
+    /// 1. The number of channels  must be less than `self.channel_count()`
+    /// 2. `process.frames_count()` must fit into `usize` (cast)
+    const unsafe fn data64_unchecked(&mut self, channel: u32) -> &mut [f64] {
+        // SAFETY: The caller guarantees this dereferencing is safe.
+        let chan = unsafe { *self.as_clap_audio_buffer_mut().data64.add(channel as usize) };
+
+        // SAFETY: The CLAP host guarantees that the channel is at
+        // least process.frames_count() long.
+        unsafe { &mut *slice_from_raw_parts_mut(chan, self.process.frames_count() as usize) }
+    }
+
+    /// # Panic
+    ///
+    /// This function will panic if `channel` is greater or equal to
+    /// `self.channel.count()`.
+    pub const fn data64(&mut self, n: u32) -> &mut [f64] {
+        // SAFETY: We just checked if `n < channel_count()`
+        if n < self.channel_count() {
+            unsafe { self.data64_unchecked(n) }
         } else {
             panic!("channel number must be less that the number of available channels")
         }

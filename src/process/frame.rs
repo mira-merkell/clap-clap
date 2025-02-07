@@ -95,6 +95,24 @@ impl<'a: 'b, 'b> FrameInput<'a, 'b> {
             panic!("channel number must be less that the number of available channels")
         }
     }
+
+    /// # Safety
+    ///
+    /// 1. n must be less than self.channel_count()
+    pub const unsafe fn data64_unchecked(&mut self, channel: u32) -> f64 {
+        // SAFETY: The caller guarantees this dereferencing is safe.
+        unsafe { self.audio_input().data64_unchecked(channel)[self.frame.index as usize] }
+    }
+
+    pub const fn data64(&mut self, channel: u32) -> f64 {
+        if channel < self.channel_count() {
+            // Safety:
+            // We just checked if n < channel_count()
+            unsafe { self.data64_unchecked(channel) }
+        } else {
+            panic!("channel number must be less that the number of available channels")
+        }
+    }
 }
 
 pub struct FrameOutput<'a: 'b, 'b> {
@@ -145,6 +163,37 @@ impl<'a: 'b, 'b> FrameOutput<'a, 'b> {
         if channel < self.channel_count() {
             // SAFETY: We just checked if `channel < self.channel_count()`
             unsafe { self.data32_unchecked(channel) }
+        } else {
+            panic!("channel number must be less that the number of available channels")
+        }
+    }
+
+    /// # Safety
+    ///
+    /// 1. `channel` must be less than self.channel_count().
+    /// 2. `channel` must fit into usize (cast).
+    const unsafe fn data64_unchecked(&mut self, channel: u32) -> &mut f64 {
+        let index = self.frame.index;
+        // SAFETY: We hold a mutable reference to Frame, and hence a mutable
+        // reference to process as well.  Hence, in is guaranteed that we are
+        // the only ones accessing the audio buffer.  Hence, we can create
+        // safely a mutable reference to one of the samples in the buffer for
+        // the lifetime of self.
+        let channel = unsafe {
+            *self
+                .audio_output()
+                .clap_audio_buffer
+                .as_mut()
+                .data64
+                .add(channel as usize)
+        };
+        unsafe { &mut *channel.add(index as usize) }
+    }
+
+    pub const fn data64(&mut self, channel: u32) -> &mut f64 {
+        if channel < self.channel_count() {
+            // SAFETY: We just checked if `channel < self.channel_count()`
+            unsafe { self.data64_unchecked(channel) }
         } else {
             panic!("channel number must be less that the number of available channels")
         }

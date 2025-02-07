@@ -5,6 +5,7 @@ use clap_clap::process::Process;
 use crate::process::{TestProcess, TestProcessConfig};
 
 mod data32;
+mod data64;
 
 fn frames_init(mut test_process: Pin<Box<TestProcess>>) {
     let num_frames = test_process.frames_count;
