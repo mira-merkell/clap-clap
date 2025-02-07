@@ -5,9 +5,10 @@ use std::{
     ptr::null,
 };
 
-use clap_sys::{CLAP_VERSION, clap_plugin_descriptor};
-
-use crate::plugin::{Error, Plugin, desc::PluginDescriptorKey::*};
+use crate::{
+    clap_sys::{CLAP_VERSION, clap_plugin_descriptor},
+    plugin::{Error, Plugin, desc::PluginDescriptorKey::*},
+};
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 enum PluginDescriptorKey {

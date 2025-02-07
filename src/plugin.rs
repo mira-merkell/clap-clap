@@ -5,9 +5,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use clap_sys::clap_plugin;
-
 use crate::{
+    clap_sys::clap_plugin,
     ext::Extensions,
     host::Host,
     process,

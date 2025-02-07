@@ -11,13 +11,13 @@ use std::{
 
 use clap_clap::{
     Error,
+    clap_sys::{CLAP_EXT_AUDIO_PORTS, clap_plugin_audio_ports},
     ext::{AudioPorts, Extensions, plugin::audio_ports::AudioPortInfo},
     factory::{Factory, FactoryHost, FactoryPluginDescriptor},
     host::Host,
     plugin::{AudioThread, ClapPlugin, Plugin},
     process::{Process, Status, Status::Continue},
 };
-use clap_sys::{CLAP_EXT_AUDIO_PORTS, clap_plugin_audio_ports};
 
 use crate::{
     host::{TestHost, TestHostConfig},

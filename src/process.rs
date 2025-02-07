@@ -7,12 +7,13 @@ use std::{
     ptr::{NonNull, slice_from_raw_parts, slice_from_raw_parts_mut},
 };
 
-use clap_sys::{
-    CLAP_PROCESS_CONTINUE, CLAP_PROCESS_CONTINUE_IF_NOT_QUIET, CLAP_PROCESS_SLEEP,
-    CLAP_PROCESS_TAIL, clap_audio_buffer, clap_process, clap_process_status,
+use crate::{
+    clap_sys::{
+        CLAP_PROCESS_CONTINUE, CLAP_PROCESS_CONTINUE_IF_NOT_QUIET, CLAP_PROCESS_SLEEP,
+        CLAP_PROCESS_TAIL, clap_audio_buffer, clap_process, clap_process_status,
+    },
+    process::frame::FramesMut,
 };
-
-use crate::process::frame::FramesMut;
 
 pub mod frame;
 
