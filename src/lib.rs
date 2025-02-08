@@ -6,6 +6,7 @@ pub mod events;
 pub mod ext;
 #[doc(hidden)]
 pub mod factory;
+#[doc(hidden)]
 pub mod ffi;
 pub mod fixedpoint;
 pub mod host;
@@ -14,7 +15,6 @@ pub mod plugin;
 pub mod plugin_features;
 pub mod process;
 pub mod string_sizes;
-pub mod timestamp;
 pub mod version;
 
 pub mod prelude {

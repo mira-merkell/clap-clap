@@ -8,7 +8,7 @@ use std::{
 };
 
 use crate::{
-    events::{InputEvents, OutputEvents},
+    events::{Header, InputEvents, OutputEvents, Transport},
     ffi::{
         CLAP_PROCESS_CONTINUE, CLAP_PROCESS_CONTINUE_IF_NOT_QUIET, CLAP_PROCESS_SLEEP,
         CLAP_PROCESS_TAIL, clap_audio_buffer, clap_process, clap_process_status,
@@ -82,8 +82,23 @@ impl Process {
         FramesMut::new(self)
     }
 
-    pub fn transport(&self) {
-        todo!()
+    /// Transport info at sample 0.
+    ///
+    /// If None, then this is a free running host and no transport events will
+    /// be provided.
+    pub const fn transport(&self) -> Option<Transport<'_>> {
+        if self.clap_process().transport.is_null() {
+            return None;
+        }
+        // SAFETY: We just checked if transport is non-null. We know that
+        // clap_event_transfer is constant and valid for the duration of self,
+        // so it's safe to create a shared reference to it for the lifetime of self.
+        let header = unsafe { &(*self.clap_process().transport).header };
+        // SAFETY: We just crated a reference to clap_event_header from a valid
+        // clap_event_transport.
+        let header = unsafe { Header::new(header) };
+        // SAFETY: We know that header is a header of a clap_event_transport.
+        Some(unsafe { Transport::new_unchecked(header) })
     }
 
     pub const fn audio_inputs_count(&self) -> u32 {
