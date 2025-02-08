@@ -8,6 +8,10 @@ use clap_clap::{
     process::Process,
 };
 
+use crate::shims::events::{
+    input_events::SHIM_CLAP_INPUT_EVENTS, output_events::SHIM_CLAP_OUTPUT_EVENTS,
+};
+
 mod frame;
 
 trait Float: Copy + Clone + Default + PartialEq {}
@@ -131,8 +135,8 @@ impl TestProcess {
             audio_outputs: self.raw_audio_outputs.as_mut_ptr(),
             audio_inputs_count: self.audio_inputs_count,
             audio_outputs_count: self.audio_outputs_count,
-            in_events: null(),
-            out_events: null(),
+            in_events: SHIM_CLAP_INPUT_EVENTS.as_ref(),
+            out_events: SHIM_CLAP_OUTPUT_EVENTS.as_ref(),
         }
     }
 }

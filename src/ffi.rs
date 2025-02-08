@@ -102,12 +102,12 @@ pub type clap_id = u32;
 pub const CLAP_INVALID_ID: clap_id = u32::MAX;
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct clap_event_header {
     pub size: u32,
     pub time: u32,
     pub space_id: u16,
-    pub type_: u16,
+    pub r#type: u16,
     pub flags: u32,
 }
 
@@ -132,7 +132,7 @@ pub const CLAP_EVENT_MIDI_SYSEX: c_uint = 11;
 pub const CLAP_EVENT_MIDI2: c_uint = 12;
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct clap_event_note {
     pub header: clap_event_header,
     pub note_id: i32,
@@ -152,7 +152,7 @@ pub const CLAP_NOTE_EXPRESSION_BRIGHTNESS: clap_note_expression = 5;
 pub const CLAP_NOTE_EXPRESSION_PRESSURE: clap_note_expression = 6;
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct clap_event_note_expression {
     pub header: clap_event_header,
     pub expression_id: clap_note_expression,
@@ -164,7 +164,7 @@ pub struct clap_event_note_expression {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct clap_event_param_value {
     pub header: clap_event_header,
     pub param_id: clap_id,
@@ -177,7 +177,7 @@ pub struct clap_event_param_value {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct clap_event_param_mod {
     pub header: clap_event_header,
     pub param_id: clap_id,
@@ -190,7 +190,7 @@ pub struct clap_event_param_mod {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct clap_event_param_gesture {
     pub header: clap_event_header,
     pub param_id: clap_id,
@@ -207,7 +207,7 @@ pub const CLAP_TRANSPORT_IS_WITHIN_PRE_ROLL: clap_transport_flags = 128;
 pub type clap_transport_flags = c_uint;
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct clap_event_transport {
     pub header: clap_event_header,
     pub flags: u32,
@@ -226,7 +226,7 @@ pub struct clap_event_transport {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct clap_event_midi {
     pub header: clap_event_header,
     pub port_index: u16,
@@ -234,7 +234,7 @@ pub struct clap_event_midi {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct clap_event_midi_sysex {
     pub header: clap_event_header,
     pub port_index: u16,
@@ -243,7 +243,7 @@ pub struct clap_event_midi_sysex {
 }
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct clap_event_midi2 {
     pub header: clap_event_header,
     pub port_index: u16,
