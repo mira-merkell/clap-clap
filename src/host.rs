@@ -65,6 +65,7 @@ impl Host {
     /// # Safety
     ///
     /// It is unsafe to use this method.
+    #[doc(hidden)]
     pub const unsafe fn _raw_clap_host(&self) -> *const clap_host {
         self.clap_host
     }
@@ -90,6 +91,7 @@ impl Host {
     /// # Safety
     ///
     /// It is unsafe to use this method.
+    #[doc(hidden)]
     pub const unsafe fn _raw_clap_plugin(&self) -> *const clap_plugin {
         unsafe { *self.clap_plugin.get() }
     }
