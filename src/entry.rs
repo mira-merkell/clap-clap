@@ -59,14 +59,14 @@ macro_rules! entry {
             /// SAFETY: CLAP requires this method to be thread-safe.
             /// The LazyLock guarding FACTORY is thread-safe and
             /// plugins_count() takes a shared reference to Factory.
-            extern "C" fn get_plugin_count(_: *const clap_plugin_factory) -> u32 {
+            extern "C-unwind" fn get_plugin_count(_: *const clap_plugin_factory) -> u32 {
                 FACTORY.plugins_count()
             }
 
             /// SAFETY: CLAP requires this method to be thread-safe.
             /// The LazyLock guarding FACTORY is thread-safe and
             /// descriptor() takes a shared reference to Factory.
-            extern "C" fn get_plugin_descriptor(
+            extern "C-unwind" fn get_plugin_descriptor(
                 _: *const clap_plugin_factory,
                 index: u32,
             ) -> *const clap_plugin_descriptor {
@@ -76,7 +76,7 @@ macro_rules! entry {
             /// SAFETY: CLAP requires this method to be thread-safe.
             /// The LazyLock guarding FACTORY is thread-safe and
             /// boxed_clap_plugin() takes a shared reference to Factory.
-            extern "C" fn create_plugin(
+            extern "C-unwind" fn create_plugin(
                 _: *const clap_plugin_factory,
                 host: *const clap_host,
                 plugin_id: *const std::ffi::c_char,
@@ -100,14 +100,14 @@ macro_rules! entry {
                 create_plugin: Some(create_plugin),
             };
 
-            extern "C" fn init(plugin_path: *const std::ffi::c_char) -> bool {
+            extern "C-unwind" fn init(plugin_path: *const std::ffi::c_char) -> bool {
                 !plugin_path.is_null()
             }
 
-            extern "C" fn deinit() {}
+            extern "C-unwind" fn deinit() {}
 
             /// SAFETY: CLAP requires this method to be thread-safe.
-            extern "C" fn get_factory(factory_id: *const std::ffi::c_char) -> *const std::ffi::c_void {
+            extern "C-unwind" fn get_factory(factory_id: *const std::ffi::c_char) -> *const std::ffi::c_void {
                 if factory_id.is_null() {
                     return std::ptr::null();
                 }

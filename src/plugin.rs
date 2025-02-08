@@ -19,6 +19,8 @@ pub(crate) use desc::{PluginDescriptor, build_plugin_descriptor};
 
 mod ffi;
 
+pub(crate) use ffi::plugin_ptr_unmoved;
+
 pub trait Plugin: Default {
     type AudioThread: AudioThread<Self>;
     type Extensions: Extensions<Self>;

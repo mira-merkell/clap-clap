@@ -464,3 +464,37 @@ fn obtain_raw_ptr_to_plugin() {
     let plugin_name = plugin_name.to_str().unwrap();
     assert_eq!(plugin_name, TestPlugin::NAME);
 }
+
+macro_rules! plugin_ptr_has_moved {
+    ($($method:tt),*) => {
+        #[cfg(debug_assertions)]
+        mod plugin_ptr_has_moved {
+            use super::TestWrapper;
+            $(
+                // This should panic if debug_assertions are on. We unwind through FFI boundary
+                // because CLAP function pointers are defined as `extern "C-unwind"`.
+                #[test]
+                #[cfg_attr(debug_assertions, should_panic)]
+                fn $method() {
+                    let wrap = TestWrapper::build();
+                    let clap_plugin = unsafe { wrap.as_ref() };
+
+                    let moved_plugin = *clap_plugin;
+                    assert_ne!(clap_plugin as *const _, &moved_plugin as *const _);
+
+                    // Panic here.
+                    let _ = unsafe { clap_plugin.$method.unwrap()(&moved_plugin) };
+                }
+            )*
+        }
+    };
+}
+
+plugin_ptr_has_moved!(
+    init,
+    deactivate,
+    start_processing,
+    stop_processing,
+    reset,
+    on_main_thread
+);
