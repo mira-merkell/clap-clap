@@ -14,13 +14,14 @@ You can find the documentation at [docs.rs][documentation].
 
 * Provide a dynamical runtime environment to access [CLAP API] from safe Rust.
 * Follow CLAP terminology and the framework of CLAP extension modules.
-* Build a testing and debugging platform for plugin authors.
+* Build a plugin testbed and a debugging platform.
 
 [CLAP API]: https://github.com/free-audio/clap/tree/main/include/clap
 
 # Example (plugin template)
 
-You can find the source code of a simple plugin template [here].
+You can find the source code of a simple plugin template in [
+`examples/plugin_template.rs`].
 
 To compile the sources, install Rust `1.85.0` or later (for the Rust 2024
 edition) and clone the repository:
@@ -45,7 +46,7 @@ name of the library is OS-specific:
 Copy the file to where your DAW can find it and rename it to:
 `plugin_template.clap`.
 
-[here]: ./examples/plugin_template.rs
+[`examples/plugin_template.rs`]: ./examples/plugin_template.rs
 
 # Installation
 
@@ -55,7 +56,7 @@ You can install this library like any other dependency of your crate:
 cargo add clap-clap
 ```
 
-A CLAP plugin is a dynamical library with C ABI and a symbol `clap_entry`
+A CLAP plugin is a dynamical library with C ABI and a symbol: `clap_entry`
 visible to the host that would load the plugin. To compile your plugin with the
 right ABI, specify the crate type in your `Cargo.toml`:
 
@@ -66,19 +67,21 @@ right ABI, specify the crate type in your `Cargo.toml`:
 crate-type = ["cdylib"]
 ```
 
-To export the entry symbols and build a plugin factory that the host can use to
-crate instances of your plugin use [`clap_clap::entry!`] macro. There macro can
-be invoked only once in the entire plugin code, but you can bundle multiple
-plugins into one compiled artefact. For example, assuming you have types
-`MyPlug`
+To export the entry symbols, use [`clap_clap::entry!`] macro. There macro can
+be invoked only once in the entire plugin code, but you can specify multiple
+types as macro arguments. For example, assuming you have types `MyPlug`
 and `MyPlugToo` that implement [`Plugin`], you can export them by:
 
 ```rust
+// Your crate's lib.rs:
+
 clap_clap::entry!(MyPlug, MyPlugToo);
 ```
 
-This will create one library that you can install as a `*.clap` plugin bundle of
-two plugins defined by `MyPlug` and `MyPlugToo`.
+This will also build a plugin factory that a CLAP host can use to crate
+instances
+of your plugins. The bundle will be a one compiled artefact that you can install
+as a `*.clap` file.
 
 [`clap_clap::entry!`]: https://docs.rs/clap-clap/latest/clap_clap/macro.entry.html
 
@@ -93,13 +96,13 @@ two plugins defined by `MyPlug` and `MyPlugToo`.
 Copyright (c) 2025 ⧉⧉⧉
 
 This software is distributed under the MIT License. See [LICENSE](./LICENSE)
-for more information. Online repository available at:
+for more information.
 
-> https://github.com/mira-merkell/clap-clap
+Online repository available at: https://github.com/mira-merkell/clap-clap
 
-Maintainers:
+## Maintainers
 
-* ⧉⧉⧉, github.com/mira-merkell
+* ⧉⧉⧉
 * Marek Miller <mlm@math.ku.dk>
 
 Report bugs or submit patches via [GitHub Issues].
