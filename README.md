@@ -10,7 +10,7 @@ You can find the documentation at [docs.rs][documentation].
 
 [documentation]: https://docs.rs/clap-clap/latest/clap_clap/
 
-# Goals
+## Goals
 
 * Provide a dynamical runtime environment to access [CLAP API] from safe Rust.
 * Follow CLAP terminology and the framework of CLAP extension modules.
@@ -18,7 +18,7 @@ You can find the documentation at [docs.rs][documentation].
 
 [CLAP API]: https://github.com/free-audio/clap/tree/main/include/clap
 
-# Example (plugin template)
+## Example (plugin template)
 
 You can find the source code of a simple plugin template in [
 `examples/plugin_template.rs`].
@@ -48,7 +48,7 @@ Copy the file to where your DAW can find it and rename it to:
 
 [`examples/plugin_template.rs`]: ./examples/plugin_template.rs
 
-# Installation
+## Installation
 
 You can install this library like any other dependency of your crate:
 
@@ -61,8 +61,7 @@ visible to the host that would load the plugin. To compile your plugin with the
 right ABI, specify the crate type in your `Cargo.toml`:
 
 ```toml
-# Cargo.toml
-
+# Your crate's Cargo.toml:
 [lib]
 crate-type = ["cdylib"]
 ```
@@ -74,7 +73,6 @@ and `MyPlugToo` that implement [`Plugin`], you can export them by:
 
 ```rust
 // Your crate's lib.rs:
-
 clap_clap::entry!(MyPlug, MyPlugToo);
 ```
 
@@ -87,11 +85,11 @@ as a `*.clap` file.
 
 [`Plugin`]: https://docs.rs/clap-clap/latest/clap_clap/plugin/trait.Plugin.html
 
-# Compatibility
+## Compatibility
 
-# Contributing
+## Contributing
 
-# Authors and Contact
+## Authors
 
 Copyright (c) 2025 ⧉⧉⧉
 
@@ -100,7 +98,7 @@ for more information.
 
 Online repository available at: https://github.com/mira-merkell/clap-clap
 
-## Maintainers
+### Maintainers
 
 * ⧉⧉⧉
 * Marek Miller <mlm@math.ku.dk>
