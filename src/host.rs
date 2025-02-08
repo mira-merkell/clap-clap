@@ -1,17 +1,23 @@
 use std::{
+    cell::UnsafeCell,
     ffi::{CStr, c_void},
     fmt::{Display, Formatter},
+    ptr::null,
 };
 
 use crate::{
     ext::host::{log, log::Log},
-    ffi::{CLAP_EXT_LOG, clap_host, clap_host_log},
+    ffi::{CLAP_EXT_LOG, clap_host, clap_host_log, clap_plugin},
     version::ClapVersion,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct Host {
     clap_host: *const clap_host,
+    // This pointer is stored as a backdoor way for the user to implement plugin
+    // functionality that isn't provided by the library.  It can be retrieved
+    // by calling unsafe `Host::_raw_clap_plugin()`.
+    clap_plugin: UnsafeCell<*const clap_plugin>,
 }
 
 impl Host {
@@ -28,7 +34,10 @@ impl Host {
     /// validated UTF-8 strings.
     #[doc(hidden)]
     pub const unsafe fn new(clap_host: *const clap_host) -> Self {
-        Self { clap_host }
+        Self {
+            clap_host,
+            clap_plugin: UnsafeCell::new(null()),
+        }
     }
 
     pub(crate) const fn as_ref(&self) -> &clap_host {
@@ -44,7 +53,50 @@ impl Host {
     pub const fn get_extension(&self) -> HostExtensions {
         HostExtensions::new(self)
     }
+
+    /// Get raw pointer to the CLAP host.
+    ///
+    /// This function is here to provide a workaround for users to access CLAP
+    /// host functionality that hasn't been implemented yet in this library.
+    /// Since it would be difficult to define safety requirements for this
+    /// method, it should be considered a last resort, and it's use is
+    /// discouraged.
+    ///
+    /// # Safety
+    ///
+    /// It is unsafe to use this method.
+    pub const unsafe fn _raw_clap_host(&self) -> *const clap_host {
+        self.clap_host
+    }
+
+    /// # Safety
+    ///
+    /// The caller must assure they're the only ones who can access the host
+    /// structure for the duration of self.
+    pub(crate) const unsafe fn _raw_update_clap_plugin(&self, clap_plugin: *const clap_plugin) {
+        // SAFETY: The safety requirements to access UnsafeCell here are upheld
+        // be the caller.
+        unsafe { *self.clap_plugin.get() = clap_plugin };
+    }
+
+    /// Get raw pointer to the calling CLAP plugin.
+    ///
+    /// This function is here to provide a workaround for users to access CLAP
+    /// plugin functionality that hasn't been implemented yet in this library.
+    /// Since it would be difficult to define safety requirements for this
+    /// method, it should be considered a last resort, and it's use is
+    /// discouraged.
+    ///
+    /// # Safety
+    ///
+    /// It is unsafe to use this method.
+    pub const unsafe fn _raw_clap_plugin(&self) -> *const clap_plugin {
+        unsafe { *self.clap_plugin.get() }
+    }
 }
+
+unsafe impl Send for Host {}
+unsafe impl Sync for Host {}
 
 macro_rules! impl_host_get_str {
     ($($description:tt),*) => {

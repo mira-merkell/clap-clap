@@ -149,7 +149,7 @@ static FACTORY: LazyLock<Factory> = LazyLock::new(|| {
 
 static HOST: LazyLock<Pin<Box<TestHost>>> = LazyLock::new(|| {
     TestHostConfig {
-        name: "test_host",
+        name: "test_hostAX#$2",
         vendor: "mira-merkell",
         url: "none",
         version: "0.0.0",
@@ -278,7 +278,7 @@ fn call_init() {
 
     let plugin = unsafe { wrap.plugin() };
     let host = plugin.call_init.as_ref().unwrap();
-    assert_eq!(host.name(), "test_host");
+    assert_eq!(host.name(), "test_hostAX#$2");
 }
 
 #[test]
@@ -430,4 +430,37 @@ fn call_get_extension_audio_ports() {
     // TestAudioPorts sets the first bit of plugin.call_get_extensions.
     let plugin = unsafe { wrap.plugin() };
     assert_eq!(plugin.call_get_extension.load(Ordering::Acquire) & 1, 1);
+}
+
+#[test]
+fn obtain_raw_ptr_to_host() {
+    let mut wrap = TestWrapper::build();
+    let clap_plugin = unsafe { wrap.as_ref() };
+    assert!(unsafe { clap_plugin.init.unwrap()(clap_plugin) });
+
+    let plugin = unsafe { wrap.plugin() };
+    let host = plugin.call_init.as_ref().unwrap();
+    let raw_clap_host = unsafe { host._raw_clap_host() };
+
+    // Assert this raw pointer is really our host.
+    assert!(!raw_clap_host.is_null());
+    let host_name = unsafe { CStr::from_ptr((*raw_clap_host).name) };
+    assert_eq!(host_name, HOST.name.as_c_str())
+}
+
+#[test]
+fn obtain_raw_ptr_to_plugin() {
+    let mut wrap = TestWrapper::build();
+    let clap_plugin = unsafe { wrap.as_ref() };
+    assert!(unsafe { clap_plugin.init.unwrap()(clap_plugin) });
+
+    let plugin = unsafe { wrap.plugin() };
+    let host = plugin.call_init.as_ref().unwrap();
+    let raw_clap_plugin = unsafe { host._raw_clap_plugin() };
+
+    // Assert this raw pointer is really our plugin.
+    assert!(!raw_clap_plugin.is_null());
+    let plugin_name = unsafe { CStr::from_ptr((*(*raw_clap_plugin).desc).name) };
+    let plugin_name = plugin_name.to_str().unwrap();
+    assert_eq!(plugin_name, TestPlugin::NAME);
 }

@@ -22,10 +22,10 @@ impl TestHostConfig<'_> {
 #[derive(Debug)]
 #[allow(unused)]
 pub struct TestHost {
-    name: CString,
-    vendor: CString,
-    url: CString,
-    version: CString,
+    pub name: CString,
+    pub vendor: CString,
+    pub url: CString,
+    pub version: CString,
 
     clap_host: clap_host,
 }
