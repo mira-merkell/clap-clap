@@ -1,4 +1,4 @@
-//! CLAP events and event lists.
+//! Events and event lists.
 
 use core::fmt::{Display, Formatter};
 use std::ffi::c_uint;
@@ -45,6 +45,7 @@ pub enum EventFlags {
 
 impl_flags_set_clear!(EventFlags, u32);
 
+/// CLAP event.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Event {
     NoteOn(Note),
@@ -68,49 +69,50 @@ impl Event {
     /// The pointer `header` must point to a full CLAP event of some type, i.e.
     /// it must be followed be the event 'body', so that the cast is safe.
     /// In particular, header must be non-null.
-    const unsafe fn cast_and_copy_clap_event(
+    #[doc(hidden)]
+    pub const unsafe fn cast_and_copy_clap_event(
         header: *const clap_event_header,
     ) -> Result<Self, Error> {
         let ev_type = unsafe { *header }.r#type;
 
+        macro_rules! cast_header_copy {
+            ($kind:ident, $event:tt) => {
+                Ok(Self::$kind($event(unsafe { *header.cast() })))
+            };
+        }
+
         match ev_type as c_uint {
-            ffi::CLAP_EVENT_NOTE_ON => Ok(Self::NoteOn(Note(unsafe { *header.cast() }))),
-            ffi::CLAP_EVENT_NOTE_OFF => Ok(Self::NoteOff(Note(unsafe { *header.cast() }))),
-            ffi::CLAP_EVENT_NOTE_CHOKE => Ok(Self::NoteChoke(Note(unsafe { *header.cast() }))),
-            ffi::CLAP_EVENT_NOTE_END => Ok(Self::NoteEnd(Note(unsafe { *header.cast() }))),
+            ffi::CLAP_EVENT_NOTE_ON => cast_header_copy!(NoteOn, Note),
+            ffi::CLAP_EVENT_NOTE_OFF => cast_header_copy!(NoteOff, Note),
+            ffi::CLAP_EVENT_NOTE_CHOKE => cast_header_copy!(NoteChoke, Note),
+            ffi::CLAP_EVENT_NOTE_END => cast_header_copy!(NoteEnd, Note),
 
-            ffi::CLAP_EVENT_NOTE_EXPRESSION => Ok(Event::NoteExpression(
-                // SAFETY: the header is valid, and we just checked if the event type is correct.
-                match unsafe { NoteExpression::cast_and_copy_clap_event(header) } {
-                    // We don't call `unwrap()` here because the function is `const`.
-                    Ok(note_expr) => note_expr,
-                    Err(e) => {
-                        return Err(e);
-                    }
-                },
-            )),
-
-            ffi::CLAP_EVENT_PARAM_VALUE => {
-                Ok(Self::ParamValue(ParamValue(unsafe { *header.cast() })))
+            ffi::CLAP_EVENT_NOTE_EXPRESSION => {
+                Ok(Event::NoteExpression(
+                    // SAFETY: the header is valid, and we just checked if the event type is
+                    // correct.
+                    match unsafe { NoteExpression::cast_and_copy_clap_event(header) } {
+                        // We don't call `unwrap()` here because the function is `const`.
+                        Ok(note_expr) => note_expr,
+                        Err(e) => {
+                            return Err(e);
+                        }
+                    },
+                ))
             }
 
-            ffi::CLAP_EVENT_PARAM_MOD => Ok(Self::ParamMod(ParamMod(unsafe { *header.cast() }))),
-
+            ffi::CLAP_EVENT_PARAM_VALUE => cast_header_copy!(ParamValue, ParamValue),
+            ffi::CLAP_EVENT_PARAM_MOD => cast_header_copy!(ParamMod, ParamMod),
             ffi::CLAP_EVENT_PARAM_GESTURE_BEGIN => {
-                Ok(Self::ParamGestureBegin(ParamGesture(unsafe {
-                    *header.cast()
-                })))
+                cast_header_copy!(ParamGestureBegin, ParamGesture)
             }
-            ffi::CLAP_EVENT_PARAM_GESTURE_END => Ok(Self::ParamGestureEnd(ParamGesture(unsafe {
-                *header.cast()
-            }))),
-
-            ffi::CLAP_EVENT_TRANSPORT => Ok(Self::Transport(Transport(unsafe { *header.cast() }))),
-
-            ffi::CLAP_EVENT_MIDI => Ok(Self::Midi(Midi(unsafe { *header.cast() }))),
-            ffi::CLAP_EVENT_MIDI2 => Ok(Self::Midi2(Midi2(unsafe { *header.cast() }))),
-            ffi::CLAP_EVENT_MIDI_SYSEX => Ok(Self::MidiSysex(MidiSysex(unsafe { *header.cast() }))),
-
+            ffi::CLAP_EVENT_PARAM_GESTURE_END => {
+                cast_header_copy!(ParamGestureEnd, ParamGesture)
+            }
+            ffi::CLAP_EVENT_TRANSPORT => cast_header_copy!(Transport, Transport),
+            ffi::CLAP_EVENT_MIDI => cast_header_copy!(Midi, Midi),
+            ffi::CLAP_EVENT_MIDI2 => cast_header_copy!(Midi2, Midi2),
+            ffi::CLAP_EVENT_MIDI_SYSEX => cast_header_copy!(MidiSysex, MidiSysex),
             _ => Err(Error::UnknownEvent(ev_type)),
         }
     }
@@ -165,6 +167,12 @@ pub struct Note(clap_event_note);
 impl_event_get_attr!(Note,
     note_id:i32, port_index:i16, channel:i16, key:i16, velocity:f64
 );
+
+impl From<clap_event_note> for Note {
+    fn from(value: clap_event_note) -> Self {
+        Self(value)
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum NoteExpression {
@@ -223,6 +231,12 @@ pub struct Expression(clap_event_note_expression);
 impl_event_get_attr!(Expression,
     note_id:i32, port_index:i16, channel:i16, key:i16, value:f64
 );
+
+impl From<clap_event_note_expression> for Expression {
+    fn from(value: clap_event_note_expression) -> Self {
+        Self(value)
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ParamValue(clap_event_param_value);
@@ -419,17 +433,20 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Null => write!(f, "null pointer"),
-            Error::UnknownEvent(id) => write!(f, "unknown event type: {id}"),
-            Error::UnknownExpression(id) => write!(f, "unknown note expression: {id}"),
+            Error::Null => {
+                write!(f, "null pointer")
+            }
+            Error::UnknownEvent(id) => {
+                write!(f, "unknown event type: {id}")
+            }
+            Error::UnknownExpression(id) => {
+                write!(f, "unknown note expression: {id}")
+            }
             Error::OutOfOrder(ev) => {
                 write!(f, "events must be inserted in the sample order: {ev:?}")
             }
             Error::TryPush(ev) => {
-                write!(
-                    f,
-                    "event could not be pushed to the queue (out of memory?): {ev:?}"
-                )
+                write!(f, "event could not be pushed to the queue: {ev:?}")
             }
         }
     }

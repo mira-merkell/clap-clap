@@ -31,7 +31,7 @@ pub mod prelude {
     };
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     Factory(factory::Error),
     Events(events::Error),
