@@ -8,6 +8,7 @@ use std::{
 };
 
 use crate::{
+    events::Transport,
     ffi::{
         CLAP_PROCESS_CONTINUE, CLAP_PROCESS_CONTINUE_IF_NOT_QUIET, CLAP_PROCESS_SLEEP,
         CLAP_PROCESS_TAIL, clap_audio_buffer, clap_process, clap_process_status,
@@ -57,8 +58,18 @@ impl Process {
         FramesMut::new(self)
     }
 
-    pub fn transport(&self) {
-        todo!()
+    /// Transport info at sample 0.
+    ///
+    /// If None, then this is a free running host and no transport events will
+    /// be provided.
+    pub const fn transport(&self) -> Option<Transport> {
+        let transport = self.as_clap_process().transport;
+        if !transport.is_null() {
+            // SAFETY: We just checked if the pointer is non-null.
+            Some(Transport(unsafe { *transport }))
+        } else {
+            None
+        }
     }
 
     pub const fn audio_inputs_count(&self) -> u32 {

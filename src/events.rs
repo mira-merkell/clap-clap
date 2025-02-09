@@ -285,7 +285,7 @@ pub enum TransportFlags {
 impl_flags_set_clear!(TransportFlags, u32);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Transport(clap_event_transport);
+pub struct Transport(pub(crate) clap_event_transport);
 
 impl_event_get_attr!(Transport,
     tempo:f64, tempo_inc:f64,
@@ -311,6 +311,12 @@ impl_transport_get_attr!(Transport,
     loop_start_seconds:SecTime, loop_end_seconds:SecTime,
     bar_start:BeatTime
 );
+
+impl From<clap_event_transport> for Transport {
+    fn from(value: clap_event_transport) -> Self {
+        Self(value)
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Midi(clap_event_midi);
