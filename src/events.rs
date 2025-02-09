@@ -141,6 +141,7 @@ macro_rules! impl_event_get_attr {
                 pub const fn $attr(&self) -> $attr_typ {
                     self.0.$attr
                 }
+
             )*
 
             pub const fn time(&self) -> u32 {
@@ -274,7 +275,7 @@ pub struct Transport(clap_event_transport);
 
 impl_event_get_attr!(Transport,
     tempo:f64, tempo_inc:f64,
-     bar_number:i32,
+    bar_number:i32,
     tsig_num:u16, tsig_denom:u16
 );
 
