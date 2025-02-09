@@ -137,25 +137,46 @@ impl Event {
 }
 
 macro_rules! impl_event_get_attr {
-    ($Typ:ty, $($attr:tt:$attr_typ:ty),*) => {
+    ($Typ:ty, $ClapTyp:ty, $($attr:tt:$attr_typ:ty),* $(,)?) => {
         impl $Typ {
+            const fn new(value: $ClapTyp) -> Self {
+                Self(value)
+            }
+
             $(
                 pub const fn $attr(&self) -> $attr_typ {
                     self.0.$attr
                 }
-
             )*
 
             pub const fn time(&self) -> u32 {
                 self.0.header.time
             }
 
+            pub const fn time_mut(&mut self) -> &mut u32 {
+                &mut self.0.header.time
+            }
+
             pub const fn space_id(&self) -> u16 {
                 self.0.header.space_id
             }
 
+            pub const fn space_id_mut(&mut self) -> &mut u16 {
+                &mut self.0.header.space_id
+            }
+
             pub const fn flags(&self) -> u32 {
                 self.0.header.flags
+            }
+
+            pub const fn flags_mut(&mut self) -> &mut u32 {
+                &mut self.0.header.flags
+            }
+        }
+
+        impl From<$ClapTyp> for $Typ {
+            fn from(value: $ClapTyp) -> Self {
+                Self::new(value)
             }
         }
     };
@@ -164,15 +185,9 @@ macro_rules! impl_event_get_attr {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Note(clap_event_note);
 
-impl_event_get_attr!(Note,
+impl_event_get_attr!(Note, clap_event_note,
     note_id:i32, port_index:i16, channel:i16, key:i16, velocity:f64
 );
-
-impl From<clap_event_note> for Note {
-    fn from(value: clap_event_note) -> Self {
-        Self(value)
-    }
-}
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum NoteExpression {
@@ -228,41 +243,23 @@ impl NoteExpression {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Expression(clap_event_note_expression);
 
-impl_event_get_attr!(Expression,
+impl_event_get_attr!(Expression, clap_event_note_expression,
     note_id:i32, port_index:i16, channel:i16, key:i16, value:f64
 );
-
-impl From<clap_event_note_expression> for Expression {
-    fn from(value: clap_event_note_expression) -> Self {
-        Self(value)
-    }
-}
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ParamValue(clap_event_param_value);
 
-impl_event_get_attr!(ParamValue,
+impl_event_get_attr!(ParamValue, clap_event_param_value,
     note_id:i32, port_index:i16, channel:i16, key:i16, value:f64
 );
-
-impl From<clap_event_param_value> for ParamValue {
-    fn from(value: clap_event_param_value) -> Self {
-        Self(value)
-    }
-}
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ParamMod(clap_event_param_mod);
 
-impl_event_get_attr!(ParamMod,
+impl_event_get_attr!(ParamMod, clap_event_param_mod,
     note_id:i32, port_index:i16, channel:i16, key:i16, amount:f64
 );
-
-impl From<clap_event_param_mod> for ParamMod {
-    fn from(value: clap_event_param_mod) -> Self {
-        Self(value)
-    }
-}
 
 impl ParamMod {
     pub fn param_id(&self) -> ClapId {
@@ -273,17 +270,11 @@ impl ParamMod {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ParamGesture(clap_event_param_gesture);
 
-impl_event_get_attr!(ParamGesture,);
+impl_event_get_attr!(ParamGesture, clap_event_param_gesture,);
 
 impl ParamGesture {
     pub fn param_id(&self) -> ClapId {
         self.0.param_id.try_into().unwrap_or(ClapId::invalid_id())
-    }
-}
-
-impl From<clap_event_param_gesture> for ParamGesture {
-    fn from(value: clap_event_param_gesture) -> Self {
-        Self(value)
     }
 }
 
@@ -305,7 +296,7 @@ impl_flags_set_clear!(TransportFlags, u32);
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Transport(clap_event_transport);
 
-impl_event_get_attr!(Transport,
+impl_event_get_attr!(Transport, clap_event_transport,
     tempo:f64, tempo_inc:f64,
     bar_number:i32,
     tsig_num:u16, tsig_denom:u16
@@ -330,16 +321,10 @@ impl_transport_get_attr!(Transport,
     bar_start:BeatTime
 );
 
-impl From<clap_event_transport> for Transport {
-    fn from(value: clap_event_transport) -> Self {
-        Self(value)
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Midi(clap_event_midi);
 
-impl_event_get_attr!(Midi, port_index:u16);
+impl_event_get_attr!(Midi,  clap_event_midi, port_index:u16);
 
 impl Midi {
     pub const fn data(&self) -> &[u8; 3] {
@@ -347,16 +332,10 @@ impl Midi {
     }
 }
 
-impl From<clap_event_midi> for Midi {
-    fn from(value: clap_event_midi) -> Self {
-        Self(value)
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Midi2(clap_event_midi2);
 
-impl_event_get_attr!(Midi2, port_index:u16);
+impl_event_get_attr!(Midi2, clap_event_midi2, port_index:u16);
 
 impl Midi2 {
     pub const fn data(&self) -> &[u32; 4] {
@@ -364,21 +343,12 @@ impl Midi2 {
     }
 }
 
-impl From<clap_event_midi2> for Midi2 {
-    fn from(value: clap_event_midi2) -> Self {
-        Self(value)
-    }
-}
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct MidiSysex(clap_event_midi_sysex);
 
-impl_event_get_attr!(MidiSysex, port_index:u16, size:u32, buffer:*const u8);
-
-impl From<clap_event_midi_sysex> for MidiSysex {
-    fn from(value: clap_event_midi_sysex) -> Self {
-        Self(value)
-    }
-}
+impl_event_get_attr!(MidiSysex,  clap_event_midi_sysex,
+    port_index:u16, size:u32, buffer:*const u8
+);
 
 #[derive(Debug)]
 pub struct InputEvents(*const clap_input_events);
