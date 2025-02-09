@@ -330,6 +330,12 @@ impl_transport_get_attr!(Transport,
     bar_start:BeatTime
 );
 
+impl From<clap_event_transport> for Transport {
+    fn from(value: clap_event_transport) -> Self {
+        Self(value)
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Midi(clap_event_midi);
 
@@ -338,6 +344,12 @@ impl_event_get_attr!(Midi, port_index:u16);
 impl Midi {
     pub const fn data(&self) -> &[u8; 3] {
         &self.0.data
+    }
+}
+
+impl From<clap_event_midi> for Midi {
+    fn from(value: clap_event_midi) -> Self {
+        Self(value)
     }
 }
 
@@ -352,8 +364,21 @@ impl Midi2 {
     }
 }
 
+impl From<clap_event_midi2> for Midi2 {
+    fn from(value: clap_event_midi2) -> Self {
+        Self(value)
+    }
+}
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct MidiSysex(clap_event_midi_sysex);
+
+impl_event_get_attr!(MidiSysex, port_index:u16, size:u32, buffer:*const u8);
+
+impl From<clap_event_midi_sysex> for MidiSysex {
+    fn from(value: clap_event_midi_sysex) -> Self {
+        Self(value)
+    }
+}
 
 #[derive(Debug)]
 pub struct InputEvents(*const clap_input_events);
