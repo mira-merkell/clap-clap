@@ -117,7 +117,8 @@ impl Event {
         }
     }
 
-    const fn clap_event_header(&self) -> &clap_event_header {
+    #[doc(hidden)]
+    pub const fn clap_event_header(&self) -> &clap_event_header {
         match self {
             Event::NoteOn(ev) => &ev.0.header,
             Event::NoteOff(ev) => &ev.0.header,
@@ -359,7 +360,8 @@ impl InputEvents {
     /// 1. `clap_input_events` must be non-null
     /// 2. `clap_input_events.size` must be non-null
     /// 3. `clap_input_events.get` must be non-null
-    pub(crate) const unsafe fn new(clap_input_events: *const clap_input_events) -> Self {
+    #[doc(hidden)]
+    pub const unsafe fn new(clap_input_events: *const clap_input_events) -> Self {
         Self(clap_input_events)
     }
 
@@ -387,9 +389,11 @@ impl InputEvents {
     ///
     /// This function will panic if `index >= self.size()`.
     pub fn get(&self, index: u32) -> Result<Event, Error> {
-        (index < self.size())
-            .then_some(unsafe { self.get_unchecked(index) })
-            .expect("index out of bound")
+        if index < self.size() {
+            unsafe { self.get_unchecked(index) }
+        } else {
+            panic!("index out of bounds")
+        }
     }
 }
 
