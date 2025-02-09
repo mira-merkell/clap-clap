@@ -1,6 +1,12 @@
-use clap_clap::ffi::{
-    CLAP_EVENT_NOTE_CHOKE, CLAP_EVENT_NOTE_END, CLAP_EVENT_NOTE_OFF, CLAP_EVENT_NOTE_ON,
-    clap_event_header, clap_event_note,
+use std::ptr::null_mut;
+
+use clap_clap::{
+    events::{Event, ParamMod, ParamValue},
+    ffi::{
+        CLAP_EVENT_NOTE_CHOKE, CLAP_EVENT_NOTE_END, CLAP_EVENT_NOTE_OFF, CLAP_EVENT_NOTE_ON,
+        CLAP_EVENT_PARAM_MOD, CLAP_EVENT_PARAM_VALUE, clap_event_header, clap_event_note,
+        clap_event_param_mod, clap_event_param_value,
+    },
 };
 
 mod cast_clap_event_note {
@@ -115,4 +121,112 @@ mod cast_clap_event_note_expression {
     cast_clap_note_expression!(expression, CLAP_NOTE_EXPRESSION_EXPRESSION, Expression);
     cast_clap_note_expression!(brightness, CLAP_NOTE_EXPRESSION_BRIGHTNESS, Brightness);
     cast_clap_note_expression!(pressure, CLAP_NOTE_EXPRESSION_PRESSURE, Pressure);
+}
+
+#[test]
+fn cast_clap_event_param_value() {
+    assert!(size_of::<clap_event_param_value>() < u32::MAX as usize);
+    assert!((CLAP_EVENT_PARAM_VALUE as u64) < u16::MAX as u64);
+    let pv = clap_event_param_value {
+        header: clap_event_header {
+            size: size_of::<clap_event_param_value>() as u32,
+            time: 1,
+            space_id: 2,
+            r#type: CLAP_EVENT_PARAM_VALUE as u16,
+            flags: 0,
+        },
+        param_id: 1,
+        cookie: null_mut(),
+        note_id: 2,
+        port_index: 3,
+        channel: 4,
+        key: 5,
+        value: 6.0,
+    };
+    let pv_exp = ParamValue::from(pv);
+
+    let ev = unsafe { Event::cast_and_copy_clap_event(&pv.header) }.unwrap();
+    let Event::ParamValue(pv) = ev else { panic!() };
+
+    assert_eq!(pv, pv_exp);
+}
+
+#[test]
+fn cast_clap_event_param_mod() {
+    assert!(size_of::<clap_event_param_mod>() < u32::MAX as usize);
+    assert!((CLAP_EVENT_PARAM_MOD as u64) < u16::MAX as u64);
+    let pm = clap_event_param_mod {
+        header: clap_event_header {
+            size: size_of::<clap_event_param_mod>() as u32,
+            time: 1,
+            space_id: 2,
+            r#type: CLAP_EVENT_PARAM_MOD as u16,
+            flags: 0,
+        },
+        param_id: 1,
+        cookie: null_mut(),
+        note_id: 2,
+        port_index: 3,
+        channel: 4,
+        key: 5,
+        amount: 6.0,
+    };
+    let pm_exp = ParamMod::from(pm);
+
+    let ev = unsafe { Event::cast_and_copy_clap_event(&pm.header) }.unwrap();
+    let Event::ParamMod(pm) = ev else { panic!() };
+
+    assert_eq!(pm, pm_exp);
+}
+
+mod cast_clap_event_param_gesture {
+    use clap_clap::{
+        events::{Event, ParamGesture},
+        ffi::{
+            CLAP_EVENT_PARAM_GESTURE_BEGIN, CLAP_EVENT_PARAM_GESTURE_END, clap_event_param_gesture,
+        },
+    };
+
+    use super::*;
+
+    fn build_clap_event_param_gesture(ev_type: u16) -> clap_event_param_gesture {
+        assert!(size_of::<clap_event_param_gesture>() < u32::MAX as usize);
+        clap_event_param_gesture {
+            header: clap_event_header {
+                size: size_of::<clap_event_param_gesture>() as u32,
+                time: 1,
+                space_id: 0,
+                r#type: ev_type,
+                flags: 3,
+            },
+            param_id: 55,
+        }
+    }
+
+    macro_rules! check_cast_clap_event_param_gesture {
+        ($name:tt, $clap_event:ident, $ev:ident) => {
+            #[test]
+            fn $name() {
+                assert_eq!($clap_event as u16 as u64, $clap_event as u64);
+                let gesture = build_clap_event_param_gesture($clap_event as u16);
+                let gesture_exp = ParamGesture::from(gesture);
+
+                let ev = unsafe { Event::cast_and_copy_clap_event(&gesture.header) }.unwrap();
+                let Event::$ev(gesture) = ev else { panic!() };
+
+                assert_eq!(gesture, gesture_exp);
+            }
+        };
+    }
+
+    check_cast_clap_event_param_gesture!(
+        gesture_begin,
+        CLAP_EVENT_PARAM_GESTURE_BEGIN,
+        ParamGestureBegin
+    );
+    check_cast_clap_event_param_gesture!(
+        gesture_end,
+        CLAP_EVENT_PARAM_GESTURE_END,
+        ParamGestureEnd
+    );
 }

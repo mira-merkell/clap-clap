@@ -245,12 +245,24 @@ impl_event_get_attr!(ParamValue,
     note_id:i32, port_index:i16, channel:i16, key:i16, value:f64
 );
 
+impl From<clap_event_param_value> for ParamValue {
+    fn from(value: clap_event_param_value) -> Self {
+        Self(value)
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ParamMod(clap_event_param_mod);
 
 impl_event_get_attr!(ParamMod,
     note_id:i32, port_index:i16, channel:i16, key:i16, amount:f64
 );
+
+impl From<clap_event_param_mod> for ParamMod {
+    fn from(value: clap_event_param_mod) -> Self {
+        Self(value)
+    }
+}
 
 impl ParamMod {
     pub fn param_id(&self) -> ClapId {
@@ -266,6 +278,12 @@ impl_event_get_attr!(ParamGesture,);
 impl ParamGesture {
     pub fn param_id(&self) -> ClapId {
         self.0.param_id.try_into().unwrap_or(ClapId::invalid_id())
+    }
+}
+
+impl From<clap_event_param_gesture> for ParamGesture {
+    fn from(value: clap_event_param_gesture) -> Self {
+        Self(value)
     }
 }
 
