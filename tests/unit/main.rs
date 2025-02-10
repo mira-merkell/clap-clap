@@ -1,4 +1,3 @@
-mod events;
 mod factory;
 mod host;
 mod id;
