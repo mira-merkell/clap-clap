@@ -5,59 +5,112 @@ use std::{
     ptr::slice_from_raw_parts,
 };
 
-use crate::ffi::{CLAP_EVENT_MIDI, clap_event_header, clap_event_midi, clap_input_events};
+use crate::ffi::{CLAP_EVENT_MIDI, clap_event_header, clap_event_midi};
 
-#[repr(transparent)]
-pub struct Event([u8]);
+#[derive(Debug, PartialEq)]
+pub struct Header([u8]);
 
-impl Event {
-    const unsafe fn new(header: &clap_event_header) -> &Self {
+impl Header {
+    pub const unsafe fn new(header: &clap_event_header) -> &Self {
         let len = header.size as usize;
         let data = &raw const *header as *const _;
         unsafe { &*(slice_from_raw_parts::<u8>(data, len) as *const _) }
     }
 
-    const fn as_clap_event_header(&self) -> &clap_event_header {
+    pub const fn as_clap_event_header(&self) -> &clap_event_header {
         unsafe { &*(self.0.as_ptr() as *const _) }
     }
 
+    const unsafe fn cast_unchecked<T>(&self) -> &T {
+        unsafe { &*self.0.as_ptr().cast() }
+    }
+
+    const fn to_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub const fn flags(&self) -> u32 {
+        self.as_clap_event_header().flags
+    }
+
+    pub const fn size(&self) -> u32 {
+        self.0.len() as u32
+    }
+
+    pub const fn space_id(&self) -> u16 {
+        self.as_clap_event_header().space_id
+    }
+
+    pub const fn time(&self) -> u32 {
+        self.as_clap_event_header().time
+    }
+
+    pub const fn r#type(&self) -> u16 {
+        self.as_clap_event_header().r#type
+    }
+
+    pub const unsafe fn midi_unchecked(&self) -> Midi {
+        unsafe { Midi::new_unchecked(self) }
+    }
+
     pub const fn midi(&self) -> Result<Midi, Error> {
-        let ev_type = self.as_clap_event_header().r#type;
-
-        if ev_type == CLAP_EVENT_MIDI as u16 {
-            let midi: &clap_event_midi = unsafe { &*(self.0.as_ptr() as *const _) };
-            Ok(Midi::from_clap_event(midi))
-        } else {
-            Err(Error::OtherType(ev_type))
-        }
+        Midi::try_new(self)
     }
 }
 
-pub struct Midi {
-    pub port_index: u16,
-    pub data: [u8; 3],
-}
+pub trait Event {
+    fn header(&self) -> &Header;
 
-impl Midi {
-    const fn from_clap_event(event: &clap_event_midi) -> Self {
-        Self {
-            port_index: event.port_index,
-            data: event.data,
-        }
+    fn to_bytes(&self) -> &[u8] {
+        self.header().to_bytes()
     }
 }
 
-pub struct InputEvents(*const clap_input_events);
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Midi<'a> {
+    header: &'a Header,
+}
 
-impl InputEvents {}
+impl<'a> Midi<'a> {
+    pub const unsafe fn new_unchecked(header: &'a Header) -> Self {
+        Self { header }
+    }
+
+    pub const fn try_new(header: &'a Header) -> Result<Self, Error> {
+        if header.size() != size_of::<clap_event_midi>() as u32 {
+            return Err(Error::PayloadSize(header.size()));
+        }
+        if header.r#type() != CLAP_EVENT_MIDI as u16 {
+            return Err(Error::OtherType(header.r#type()));
+        }
+        Ok(unsafe { Self::new_unchecked(header) })
+    }
+
+    const fn as_clap_event_midi(&self) -> &clap_event_midi {
+        unsafe { self.header.cast_unchecked() }
+    }
+
+    pub const fn port_index(&self) -> u16 {
+        self.as_clap_event_midi().port_index
+    }
+
+    pub const fn data(&self) -> &[u8; 3] {
+        &self.as_clap_event_midi().data
+    }
+}
+
+impl Event for Midi<'_> {
+    fn header(&self) -> &Header {
+        self.header
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Error {
     UnknownEvent(u16),
     UnknownExpression(i32),
-    OutOfOrder,
-    TryPush,
     OtherType(u16),
+    PayloadSize(u32),
 }
 
 impl Display for Error {
@@ -69,13 +122,9 @@ impl Display for Error {
             Error::UnknownExpression(id) => {
                 write!(f, "unknown note expression: {id}")
             }
-            Error::OutOfOrder => {
-                write!(f, "events must be inserted in the sample order")
+            Error::PayloadSize(size) => {
+                write!(f, "wrong payload size for the defined event type: {size}")
             }
-            Error::TryPush => {
-                write!(f, "event could not be pushed to the queue")
-            }
-
             Error::OtherType(_) => todo!(),
         }
     }
@@ -87,26 +136,4 @@ impl From<Error> for crate::Error {
     fn from(value: Error) -> Self {
         crate::Error::Events(value)
     }
-}
-
-#[test]
-fn cast_midi_event() {
-    let ev = clap_event_midi {
-        header: clap_event_header {
-            size: size_of::<clap_event_midi>() as u32,
-            time: 0,
-            space_id: 0,
-            r#type: CLAP_EVENT_MIDI as u16,
-            flags: 0,
-        },
-        port_index: 7,
-        data: [1, 2, 3],
-    };
-
-    let event = unsafe { Event::new(&ev.header) };
-
-    let midi = event.midi().unwrap();
-
-    assert_eq!(midi.port_index, ev.port_index);
-    assert_eq!(midi.data, ev.data);
 }
