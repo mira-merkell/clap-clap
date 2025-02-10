@@ -85,10 +85,6 @@ as a `*.clap` file.
 
 [`Plugin`]: https://docs.rs/clap-clap/latest/clap_clap/plugin/trait.Plugin.html
 
-## Compatibility
-
-## Contributing
-
 ## Authors
 
 Copyright (c) 2025 ⧉⧉⧉
