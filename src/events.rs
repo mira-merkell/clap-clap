@@ -77,16 +77,11 @@ pub trait EventBuilder {
     where
         Self: 'a;
 
-    fn time(&mut self, value: u32);
-    fn space_id(&mut self, value: u16);
-    fn flags(&mut self, value: u32);
+    fn time(self, value: u32) -> Self;
+    fn space_id(self, value: u16) -> Self;
+    fn flags(self, value: u32) -> Self;
 
     fn event(&self) -> Self::Event<'_>;
-
-    fn event_at(&mut self, time: u32) -> Self::Event<'_> {
-        self.time(time);
-        self.event()
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -115,8 +110,8 @@ impl<'a> Midi<'a> {
     ///
     /// ```rust
     /// # use clap_clap::events::{Event, EventBuilder,Midi};
-    /// let mut midi = Midi::build().port_index(1);
-    /// let event = midi.event_at(3);
+    /// let midi = Midi::build().port_index(1).time(3);
+    /// let event = midi.event();
     ///
     /// assert_eq!(event.port_index(), 1);
     /// assert_eq!(event.header().time(), 3);
@@ -175,15 +170,15 @@ impl MidiBuilder {
     }
 
     pub const fn port_index(self, value: u16) -> Self {
-        let mut builder = self;
-        builder.0.port_index = value;
-        builder
+        let mut build = self;
+        build.0.port_index = value;
+        build
     }
 
     pub const fn data(self, value: [u8; 3]) -> Self {
-        let mut builder = self;
-        builder.0.data = value;
-        builder
+        let mut build = self;
+        build.0.data = value;
+        build
     }
 }
 
@@ -199,16 +194,22 @@ impl EventBuilder for MidiBuilder {
     where
         Self: 'a;
 
-    fn time(&mut self, value: u32) {
-        self.0.header.time = value;
+    fn time(self, value: u32) -> Self {
+        let mut build = self;
+        build.0.header.time = value;
+        build
     }
 
-    fn space_id(&mut self, value: u16) {
-        self.0.header.space_id = value;
+    fn space_id(self, value: u16) -> Self {
+        let mut build = self;
+        build.0.header.space_id = value;
+        build
     }
 
-    fn flags(&mut self, value: u32) {
-        self.0.header.flags = value;
+    fn flags(self, value: u32) -> Self {
+        let mut build = self;
+        build.0.header.flags = value;
+        build
     }
 
     fn event(&self) -> Self::Event<'_> {
@@ -219,8 +220,6 @@ impl EventBuilder for MidiBuilder {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Error {
-    UnknownEvent(u16),
-    UnknownExpression(i32),
     OtherType(u16),
     PayloadSize(u32),
 }
@@ -228,16 +227,10 @@ pub enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::UnknownEvent(id) => {
-                write!(f, "unknown event type: {id}")
-            }
-            Error::UnknownExpression(id) => {
-                write!(f, "unknown note expression: {id}")
-            }
             Error::PayloadSize(size) => {
                 write!(f, "wrong payload size for the defined event type: {size}")
             }
-            Error::OtherType(_) => todo!(),
+            Error::OtherType(id) => write!(f, "other type, id: {id}"),
         }
     }
 }
