@@ -5,7 +5,10 @@ use std::{
     ptr::slice_from_raw_parts,
 };
 
-use crate::ffi::{CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, clap_event_header, clap_event_midi};
+use crate::ffi::{
+    CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, clap_event_header, clap_event_midi,
+    clap_input_events,
+};
 
 #[derive(Debug, PartialEq)]
 pub struct Header([u8]);
@@ -215,6 +218,37 @@ impl EventBuilder for MidiBuilder {
     fn event(&self) -> Self::Event<'_> {
         let header = unsafe { Header::new(&self.0.header) };
         unsafe { header.midi_unchecked() }
+    }
+}
+
+pub struct InputEvents(*const clap_input_events);
+
+impl InputEvents {
+    #[doc(hidden)]
+    pub const unsafe fn new(list: *const clap_input_events) -> Self {
+        Self(list)
+    }
+
+    pub fn size(&self) -> u32 {
+        unsafe { (*self.0).size.unwrap()(self.0) }
+    }
+
+    /// # Safety
+    ///
+    /// The value of `index` must be less than `self.size()`.
+    pub unsafe fn get_unchecked(&self, index: u32) -> &Header {
+        let header = unsafe { &*(*self.0).get.unwrap()(self.0, index) };
+        unsafe { Header::new(header) }
+    }
+
+    /// # Panic
+    ///
+    /// Panic if `index` greater or equal than `self.size()`.
+    pub fn get(&self, index: u32) -> &Header {
+        if index >= self.size() {
+            panic!("index out of bounds");
+        }
+        unsafe { self.get_unchecked(index) }
     }
 }
 
