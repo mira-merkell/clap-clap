@@ -1,7 +1,6 @@
 use std::{
     ffi::CStr,
     ops::{Deref, DerefMut},
-    pin::Pin,
     sync::{
         Arc, LazyLock,
         atomic::{AtomicU32, AtomicU64, Ordering},
@@ -147,7 +146,7 @@ static FACTORY: LazyLock<Factory> = LazyLock::new(|| {
     )])
 });
 
-static HOST: LazyLock<Pin<Box<TestHost>>> = LazyLock::new(|| {
+static HOST: LazyLock<TestHost> = LazyLock::new(|| {
     TestHostConfig {
         name: "test_host",
         vendor: "mira-merkell",

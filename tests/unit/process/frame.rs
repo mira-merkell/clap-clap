@@ -1,4 +1,4 @@
-use std::{pin::Pin, ptr::NonNull};
+use std::ptr::NonNull;
 
 use clap_clap::process::Process;
 
@@ -7,7 +7,7 @@ use crate::process::{TestProcess, TestProcessConfig};
 mod data32;
 mod data64;
 
-fn frames_init(mut test_process: Pin<Box<TestProcess>>) {
+fn frames_init(mut test_process: TestProcess) {
     let num_frames = test_process.frames_count;
     let audio_in = test_process.audio_inputs_count;
     let audio_out = test_process.audio_outputs_count;

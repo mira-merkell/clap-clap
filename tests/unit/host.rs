@@ -1,6 +1,5 @@
 use std::{
     ffi::{CString, c_char, c_void},
-    pin::Pin,
     ptr::{null, null_mut},
 };
 
@@ -14,7 +13,7 @@ pub struct TestHostConfig<'a> {
 }
 
 impl TestHostConfig<'_> {
-    pub fn build(self) -> Pin<Box<TestHost>> {
+    pub fn build(self) -> TestHost {
         TestHost::new(self)
     }
 }
@@ -31,7 +30,7 @@ pub struct TestHost {
 }
 
 impl TestHost {
-    fn new(config: TestHostConfig) -> Pin<Box<Self>> {
+    fn new(config: TestHostConfig) -> Self {
         extern "C" fn get_extension(_: *const clap_host, _: *const c_char) -> *const c_void {
             null()
         }
@@ -44,7 +43,7 @@ impl TestHost {
         let url = CString::new(config.url).unwrap();
         let version = CString::new(config.version).unwrap();
 
-        Box::pin(Self {
+        Self {
             clap_host: clap_host {
                 clap_version: CLAP_VERSION,
                 host_data: null_mut(),
@@ -63,7 +62,7 @@ impl TestHost {
             vendor,
             url,
             version,
-        })
+        }
     }
 
     pub const fn as_clap_host(&self) -> &clap_host {
