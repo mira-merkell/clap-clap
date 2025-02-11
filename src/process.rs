@@ -123,9 +123,14 @@ impl Process {
         }
     }
 
-    pub fn in_events(&self) -> InputEvents<'_> {
+    pub const fn in_events(&self) -> InputEvents<'_> {
         let in_events = unsafe { &*(*self.0.as_ptr()).in_events };
-        InputEvents::new(in_events)
+        assert!(
+            in_events.size.is_some() && in_events.get.is_some(),
+            "input events list invalid"
+        );
+        // SAFETY: We just checked if the pointers are Some.
+        unsafe { InputEvents::new_unchecked(in_events) }
     }
 
     pub fn out_events(&mut self) {

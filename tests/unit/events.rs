@@ -194,7 +194,7 @@ mod input_events {
 
     #[test]
     fn input_events() {
-        let input_events = InputEvents::new(&INPUT_EVENTS);
+        let input_events = unsafe { InputEvents::new_unchecked(&INPUT_EVENTS) };
         assert_eq!(input_events.size(), 2);
 
         let header = input_events.get(0);
@@ -209,7 +209,7 @@ mod input_events {
     #[should_panic(expected = "index out of bounds")]
     #[test]
     fn input_events_index_oob() {
-        let input_events = InputEvents::new(&INPUT_EVENTS);
+        let input_events = unsafe { InputEvents::new_unchecked(&INPUT_EVENTS) };
         assert_eq!(input_events.size(), 2);
 
         let _ = input_events.get(2);
