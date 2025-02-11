@@ -221,23 +221,23 @@ impl EventBuilder for MidiBuilder {
     }
 }
 
-pub struct InputEvents(*const clap_input_events);
+pub struct InputEvents<'a>(&'a clap_input_events);
 
-impl InputEvents {
+impl<'a> InputEvents<'a> {
     #[doc(hidden)]
-    pub const unsafe fn new(list: *const clap_input_events) -> Self {
+    pub const fn new(list: &'a clap_input_events) -> Self {
         Self(list)
     }
 
     pub fn size(&self) -> u32 {
-        unsafe { (*self.0).size.unwrap()(self.0) }
+        unsafe { self.0.size.unwrap()(self.0) }
     }
 
     /// # Safety
     ///
     /// The value of `index` must be less than `self.size()`.
     pub unsafe fn get_unchecked(&self, index: u32) -> &Header {
-        let header = unsafe { &*(*self.0).get.unwrap()(self.0, index) };
+        let header = unsafe { &*self.0.get.unwrap()(self.0, index) };
         unsafe { Header::new(header) }
     }
 
@@ -262,7 +262,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             Error::PayloadSize(size) => {
-                write!(f, "wrong payload size for the defined event type: {size}")
+                write!(f, "payload size for the defined event type: {size}")
             }
             Error::OtherType(id) => write!(f, "other type, id: {id}"),
         }
