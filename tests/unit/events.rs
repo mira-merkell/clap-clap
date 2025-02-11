@@ -321,13 +321,20 @@ mod midi2 {
 }
 
 mod input_events {
-    use std::ptr::null_mut;
+    use std::{
+        marker::PhantomPinned,
+        pin::Pin,
+        ptr::{null, null_mut},
+    };
 
     use clap_clap::{
-        events::InputEvents,
+        events::{
+            Event, EventBuilder, InputEvents, Midi, Midi2, Midi2Builder, MidiBuilder, ParamValue,
+            ParamValueBuilder,
+        },
         ffi::{
-            CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, CLAP_EVENT_PARAM_VALUE, clap_event_header,
-            clap_event_midi, clap_event_param_value, clap_input_events,
+            CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, CLAP_EVENT_MIDI2, CLAP_EVENT_PARAM_VALUE,
+            clap_event_header, clap_event_midi, clap_event_param_value, clap_input_events,
         },
     };
 
@@ -404,5 +411,159 @@ mod input_events {
         assert_eq!(input_events.size(), 2);
 
         let _ = input_events.get(2);
+    }
+
+    struct TestBed<'a> {
+        events: Vec<Box<dyn Event + 'a>>,
+        clap_input_events: clap_input_events,
+        // clap_input_events list will be passed the pointer to events,
+        // which makes is a self-referential struct.  We need to make sure the
+        // TestBed is not moved.
+        _marker: PhantomPinned,
+    }
+
+    impl<'a> TestBed<'a> {
+        fn new() -> Pin<Box<Self>> {
+            extern "C-unwind" fn size(list: *const clap_input_events) -> u32 {
+                let events: &Vec<Box<dyn Event>> = unsafe { &*((*list).ctx as *const _) };
+                events.len() as u32
+            }
+
+            extern "C-unwind" fn get(
+                list: *const clap_input_events,
+                index: u32,
+            ) -> *const clap_event_header {
+                let events: &Vec<Box<dyn Event>> = unsafe { &*((*list).ctx as *const _) };
+                let index = index as usize;
+                if index < events.len() {
+                    events[index].header().as_clap_event_header()
+                } else {
+                    null()
+                }
+            }
+            let mut bed = Box::new(Self {
+                events: Vec::new(),
+                clap_input_events: clap_input_events {
+                    ctx: null_mut(),
+                    size: Some(size),
+                    get: Some(get),
+                },
+                _marker: PhantomPinned,
+            });
+            bed.clap_input_events.ctx = &raw const bed.events as *mut _;
+            Box::into_pin(bed)
+        }
+
+        fn push_event<E: Event + 'a>(self: Pin<&mut Self>, event: E) {
+            unsafe { Pin::get_unchecked_mut(self) }
+                .events
+                .push(Box::new(event))
+        }
+
+        fn input_events(&'a self) -> InputEvents<'a> {
+            unsafe { InputEvents::new_unchecked(&self.clap_input_events) }
+        }
+
+        fn retrieve_events(&self, input_events: InputEvents<'a>) {
+            for (i, known) in self.events.iter().enumerate() {
+                let ev = input_events.get(i as u32);
+                let type_id = ev.r#type() as u32;
+
+                if type_id == CLAP_EVENT_MIDI {
+                    assert_eq!(known.header().midi().unwrap(), ev.midi().unwrap());
+                }
+                if type_id == CLAP_EVENT_MIDI2 {
+                    assert_eq!(known.header().midi2().unwrap(), ev.midi2().unwrap());
+                }
+                if type_id == CLAP_EVENT_PARAM_VALUE {
+                    assert_eq!(
+                        known.header().param_value().unwrap(),
+                        ev.param_value().unwrap()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn testbed_self_test_01() {
+        let midi = Midi::build().port_index(1);
+
+        let mut bed = TestBed::new();
+        bed.as_mut().push_event(midi.event());
+        let input_events = bed.input_events();
+
+        assert_eq!(input_events.size(), 1);
+    }
+
+    #[test]
+    fn testbed_self_test_02() {
+        let midi = Midi::build().port_index(1);
+        let midi2 = Midi2::build().port_index(3);
+        let mut bed = TestBed::new();
+
+        bed.as_mut().push_event(midi.event());
+        bed.as_mut().push_event(midi2.event());
+        let input_events = bed.input_events();
+        assert_eq!(input_events.size(), 2);
+
+        let ev = input_events.get(0);
+        let retrieved = ev.midi().unwrap();
+        assert_eq!(retrieved.port_index(), 1);
+
+        let ev = input_events.get(1);
+        let retrieved = ev.midi2().unwrap();
+        assert_eq!(retrieved.port_index(), 3);
+    }
+
+    #[derive(Debug, Copy, Clone, PartialEq)]
+    enum KnownEvent {
+        Midi(MidiBuilder),
+        Midi2(Midi2Builder),
+        ParamValue(ParamValueBuilder),
+    }
+
+    fn check_input_events(events: &[KnownEvent]) {
+        let mut bed = TestBed::new();
+        for known in events {
+            match known {
+                KnownEvent::Midi(ev) => bed.as_mut().push_event(ev.event()),
+                KnownEvent::Midi2(ev) => bed.as_mut().push_event(ev.event()),
+                KnownEvent::ParamValue(ev) => bed.as_mut().push_event(ev.event()),
+            }
+        }
+
+        let input_events = bed.input_events();
+        bed.retrieve_events(input_events);
+    }
+
+    #[test]
+    fn retrieve_events_01() {
+        let events = [KnownEvent::Midi(Midi::build().port_index(1))];
+        check_input_events(&events);
+    }
+
+    #[test]
+    fn retrieve_events_02() {
+        let events = [
+            KnownEvent::Midi(Midi::build().port_index(1)),
+            KnownEvent::Midi2(Midi2::build().port_index(2)),
+            KnownEvent::ParamValue(ParamValue::build().value(12.34)),
+        ];
+        check_input_events(&events);
+    }
+
+    #[test]
+    fn retrieve_events_03() {
+        let events = [
+            KnownEvent::Midi(Midi::build().port_index(1)),
+            KnownEvent::Midi2(Midi2::build().port_index(2)),
+            KnownEvent::ParamValue(ParamValue::build().value(12.34)),
+        ];
+        let events: Vec<_> = (0..1000)
+            .map(|i| events[(7 * i + 13) % events.len()])
+            .collect();
+
+        check_input_events(&events);
     }
 }

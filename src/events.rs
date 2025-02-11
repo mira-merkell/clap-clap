@@ -18,8 +18,10 @@ use crate::{
 macro_rules! impl_event_cast_methods {
     ($name:tt, $name_unchk:tt, $type:ty, $cast_type:ty, $clap_id:ident $(,)?) => {
         /// # Safety
-        ///
-        #[doc = concat!("The caller must ensure that this `Header` has correct size and type to contain the header and the payload of event of the returned type: `", stringify!($name), "`.")]
+        #[doc = concat!("The caller must ensure that this `Header` has correct \
+            size and type to contain the header and the payload of event of the \
+            returned type: `", stringify!($name), "`.")
+                ]
         pub const unsafe fn $name_unchk(&self) -> $type {
             unsafe { <$type>::new_unchecked(self) }
         }
