@@ -17,6 +17,9 @@ pub struct Host {
     clap_host: *const clap_host,
 }
 
+unsafe impl Send for Host {}
+unsafe impl Sync for Host {}
+
 impl Host {
     /// # Safety
     ///
