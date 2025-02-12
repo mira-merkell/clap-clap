@@ -21,8 +21,8 @@ at [docs.rs](https://docs.rs/clap-clap/latest/clap_clap/).
 
 You can find the source code of a simple plugin template [here].
 
-To compile the sources, install Rust `1.85.0` or later (for the 2024
-edition, available on *nightly* and *beta* channels) and clone the repository:
+To compile the sources, install Rust `1.85.0` or later (for the Rust 2024
+edition) and clone the repository:
 
 ```bash
 git clone https://github.com/mira-merkell/clap-clap
