@@ -110,7 +110,7 @@ mod param_value {
         let header = unsafe { Header::new(&event.header) };
         assert_eq!(
             Err(events::Error::OtherType(CLAP_EVENT_NOTE_CHOKE as u16)),
-            header.midi()
+            header.param_value()
         )
     }
 
@@ -165,6 +165,123 @@ mod param_value {
 
         assert_eq!(event1.value(), 123.456);
         assert_eq!(event2.value(), 123.456);
+
+        assert_eq!(event1.port_index(), 1);
+        assert_eq!(event2.port_index(), 3);
+    }
+}
+
+mod param_mod {
+    use std::ptr::null_mut;
+
+    use clap_clap::{
+        events,
+        events::{EventBuilder, Header, ParamMod},
+        ffi::{
+            CLAP_EVENT_NOTE_CHOKE, CLAP_EVENT_PARAM_MOD, clap_event_header, clap_event_param_mod,
+        },
+    };
+
+    #[test]
+    fn try_01() {
+        let event = clap_event_param_mod {
+            header: clap_event_header {
+                size: 33,
+                time: 0,
+                space_id: 0,
+                r#type: CLAP_EVENT_PARAM_MOD as u16,
+                flags: 0,
+            },
+            param_id: 0,
+            cookie: null_mut(),
+            note_id: 0,
+            port_index: 0,
+            channel: 0,
+            key: 0,
+            amount: 0.0,
+        };
+
+        let header = unsafe { Header::new(&event.header) };
+        assert_eq!(Err(events::Error::PayloadSize(33)), header.param_mod())
+    }
+
+    #[test]
+    fn try_02() {
+        let event = clap_event_param_mod {
+            header: clap_event_header {
+                size: size_of::<clap_event_param_mod>() as u32,
+                time: 0,
+                space_id: 0,
+                r#type: CLAP_EVENT_NOTE_CHOKE as u16,
+                flags: 0,
+            },
+            param_id: 0,
+            cookie: null_mut(),
+            note_id: 0,
+            port_index: 0,
+            channel: 0,
+            key: 0,
+            amount: 0.0,
+        };
+
+        let header = unsafe { Header::new(&event.header) };
+        assert_eq!(
+            Err(events::Error::OtherType(CLAP_EVENT_NOTE_CHOKE as u16)),
+            header.param_mod()
+        )
+    }
+
+    #[test]
+    fn try_03() {
+        let event = clap_event_param_mod {
+            header: clap_event_header {
+                size: size_of::<clap_event_param_mod>() as u32,
+                time: 0,
+                space_id: 0,
+                r#type: CLAP_EVENT_PARAM_MOD as u16,
+                flags: 0,
+            },
+            param_id: 0,
+            cookie: null_mut(),
+            note_id: 0,
+            port_index: 87,
+            channel: 1,
+            key: 0,
+            amount: 123.456,
+        };
+
+        let header = unsafe { Header::new(&event.header) };
+        let _ = header.midi().unwrap_err();
+        let event = header.param_mod().unwrap();
+        assert_eq!(event.port_index(), 87);
+        assert_eq!(event.amount(), 123.456);
+    }
+
+    #[test]
+    fn build() {
+        let value1 = ParamMod::build().port_index(1).amount(123.456);
+        let value2 = value1.port_index(3);
+
+        let event1 = value1.event();
+        let event2 = value2.event();
+
+        assert_eq!(event1.amount(), 123.456);
+        assert_eq!(event2.amount(), 123.456);
+
+        assert_eq!(event1.port_index(), 1);
+        assert_eq!(event2.port_index(), 3);
+    }
+
+    #[test]
+    fn update() {
+        let value1 = ParamMod::build().port_index(1).amount(123.456);
+        let event1 = value1.event();
+
+        let value2 = ParamMod::update(&event1).port_index(3);
+        let event2 = value2.event();
+
+        assert_eq!(event1.amount(), 123.456);
+        assert_eq!(event2.amount(), 123.456);
 
         assert_eq!(event1.port_index(), 1);
         assert_eq!(event2.port_index(), 3);
@@ -238,7 +355,7 @@ mod transport {
         let header = unsafe { Header::new(&event.header) };
         assert_eq!(
             Err(events::Error::OtherType(CLAP_EVENT_NOTE_CHOKE as u16)),
-            header.midi()
+            header.transport()
         )
     }
 

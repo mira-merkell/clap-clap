@@ -8,9 +8,10 @@ use std::{
 
 use crate::{
     ffi::{
-        CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, CLAP_EVENT_MIDI2, CLAP_EVENT_PARAM_VALUE,
-        CLAP_EVENT_TRANSPORT, clap_event_header, clap_event_midi, clap_event_midi2,
-        clap_event_param_value, clap_event_transport, clap_input_events,
+        CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, CLAP_EVENT_MIDI2, CLAP_EVENT_PARAM_MOD,
+        CLAP_EVENT_PARAM_VALUE, CLAP_EVENT_TRANSPORT, clap_event_header, clap_event_midi,
+        clap_event_midi2, clap_event_param_mod, clap_event_param_value, clap_event_transport,
+        clap_input_events,
     },
     fixedpoint::{BeatTime, SecTime},
     id::ClapId,
@@ -22,7 +23,7 @@ macro_rules! impl_event_cast_methods {
         #[doc = concat!("The caller must ensure that this `Header` has correct \
             size and type to contain the header and the payload of event of the \
             returned type: `", stringify!($name), "`.")
-                                                                        ]
+                                                                                        ]
         pub const unsafe fn $name_unchk(&self) -> $type {
             unsafe { <$type>::new_unchecked(self) }
         }
@@ -109,6 +110,14 @@ impl Header {
         ParamValue,
         clap_event_param_value,
         CLAP_EVENT_PARAM_VALUE
+    );
+
+    impl_event_cast_methods!(
+        param_mod,
+        param_mod_unchecked,
+        ParamMod,
+        clap_event_param_mod,
+        CLAP_EVENT_PARAM_MOD
     );
 
     impl_event_cast_methods!(
@@ -302,6 +311,106 @@ impl Default for ParamValueBuilder {
 }
 
 impl_event_builder!(ParamValueBuilder, ParamValue<'a>, param_value_unchecked);
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct ParamMod<'a> {
+    header: &'a Header,
+}
+
+impl<'a> ParamMod<'a> {
+    /// # Safety
+    ///
+    /// The `header` must be a header of type: `clap_event_param_mod`.
+    pub const unsafe fn new_unchecked(header: &'a Header) -> Self {
+        Self { header }
+    }
+
+    const fn as_clap_event_param_mod(&self) -> &clap_event_param_mod {
+        // SAFETY: By construction, this cast is safe.
+        unsafe { self.header.cast_unchecked() }
+    }
+
+    impl_event_const_getter!(channel, as_clap_event_param_mod, i16);
+    impl_event_const_getter!(cookie, as_clap_event_param_mod, *mut c_void);
+    impl_event_const_getter!(key, as_clap_event_param_mod, i16);
+    impl_event_const_getter!(note_id, as_clap_event_param_mod, i32);
+
+    pub fn param_id(&self) -> ClapId {
+        self.as_clap_event_param_mod()
+            .param_id
+            .try_into()
+            .unwrap_or(ClapId::invalid_id())
+    }
+
+    impl_event_const_getter!(port_index, as_clap_event_param_mod, i16);
+    impl_event_const_getter!(amount, as_clap_event_param_mod, f64);
+
+    pub const fn build() -> ParamModBuilder {
+        ParamModBuilder::new()
+    }
+
+    pub fn update(&self) -> ParamModBuilder {
+        ParamModBuilder::with_param_mod(self)
+    }
+}
+
+impl Event for ParamMod<'_> {
+    fn header(&self) -> &Header {
+        self.header
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct ParamModBuilder(clap_event_param_mod);
+
+impl ParamModBuilder {
+    pub const fn new() -> Self {
+        Self(clap_event_param_mod {
+            header: clap_event_header {
+                size: size_of::<clap_event_param_mod>() as u32,
+                time: 0,
+                space_id: CLAP_CORE_EVENT_SPACE_ID,
+                r#type: CLAP_EVENT_PARAM_MOD as u16,
+                flags: 0,
+            },
+            param_id: 0,
+            cookie: null_mut(),
+            note_id: 0,
+            port_index: 0,
+            channel: 0,
+            key: 0,
+            amount: 0.0,
+        })
+    }
+
+    pub fn with_param_mod(param_mod: &ParamMod<'_>) -> Self {
+        // SAFETY: ParamValue constructor guarantees that this cast is safe, and we can
+        // copy the object of type: `clap_event_param_mod`.
+        Self(*unsafe { param_mod.header().cast_unchecked() })
+    }
+
+    impl_event_builder_setter!(port_index, i16);
+    impl_event_builder_setter!(channel, i16);
+    impl_event_builder_setter!(cookie, *mut c_void);
+    impl_event_builder_setter!(key, i16);
+    impl_event_builder_setter!(note_id, i32);
+
+    pub fn param_id(self, value: ClapId) -> Self {
+        let mut builder = self;
+        builder.0.param_id = value.into();
+        builder
+    }
+
+    impl_event_builder_setter!(amount, f64);
+}
+
+impl Default for ParamModBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl_event_builder!(ParamModBuilder, ParamMod<'a>, param_mod_unchecked);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Transport<'a> {
