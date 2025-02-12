@@ -35,7 +35,7 @@
 #[macro_export]
 macro_rules! entry {
     ($($plug:ty),*) => {
-        mod _clap_entry {
+        pub mod _clap_entry {
             use $crate::ffi::{
                 CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION,
                 clap_plugin, clap_plugin_descriptor, clap_plugin_entry,
