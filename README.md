@@ -13,7 +13,7 @@ You can find the documentation at [docs.rs][documentation].
 ## Goals
 
 * Provide a dynamical runtime environment to access [CLAP API] from safe Rust.
-* Follow CLAP terminology and the framework of CLAP extension modules.
+* Follow closely the CLAP module structure and terminology.
 * Build a plugin testbed and a debugging platform.
 
 [CLAP API]: https://github.com/free-audio/clap/tree/main/include/clap
@@ -85,7 +85,7 @@ as a `*.clap` file.
 
 [`Plugin`]: https://docs.rs/clap-clap/latest/clap_clap/plugin/trait.Plugin.html
 
-## Authors
+## Credits and License
 
 Copyright (c) 2025 ⧉⧉⧉
 
