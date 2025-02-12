@@ -62,14 +62,8 @@ impl Process {
     ///
     /// If None, then this is a free running host and no transport events will
     /// be provided.
-    pub const fn transport(&self) -> Option<Transport> {
-        let transport = self.as_clap_process().transport;
-        if !transport.is_null() {
-            // SAFETY: We just checked if the pointer is non-null.
-            Some(Transport(unsafe { *transport }))
-        } else {
-            None
-        }
+    pub const fn transport(&self) -> Option<Transport<'_>> {
+        todo!()
     }
 
     pub const fn audio_inputs_count(&self) -> u32 {

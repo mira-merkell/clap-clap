@@ -308,7 +308,8 @@ fn process_new() {
     assert_eq!(process.frames_count(), test_process.frames_count);
 
     let transport = process.transport().unwrap();
-    assert_eq!(transport, test_process.transport.into());
+    assert_eq!(transport.tempo(), test_process.transport.tempo);
+    assert_eq!(transport.bar_number(), test_process.transport.bar_number);
 
     assert_eq!(
         process.audio_inputs_count(),

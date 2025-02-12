@@ -250,9 +250,9 @@ pub struct clap_event_midi2 {
 #[derive(Debug, Copy, Clone)]
 pub struct clap_input_events {
     pub ctx: *mut c_void,
-    pub size: Option<unsafe extern "C" fn(list: *const clap_input_events) -> u32>,
+    pub size: Option<unsafe extern "C-unwind" fn(list: *const clap_input_events) -> u32>,
     pub get: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             list: *const clap_input_events,
             index: u32,
         ) -> *const clap_event_header,

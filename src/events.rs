@@ -1,459 +1,682 @@
 //! Events and event lists.
 
-use core::fmt::{Display, Formatter};
-use std::ffi::c_uint;
+use std::{
+    ffi::c_void,
+    fmt::{Display, Formatter},
+    ptr::{null_mut, slice_from_raw_parts},
+};
 
 use crate::{
     ffi::{
-        self, CLAP_EVENT_DONT_RECORD, CLAP_EVENT_IS_LIVE, CLAP_TRANSPORT_HAS_BEATS_TIMELINE,
-        CLAP_TRANSPORT_HAS_SECONDS_TIMELINE, CLAP_TRANSPORT_HAS_TEMPO,
-        CLAP_TRANSPORT_HAS_TIME_SIGNATURE, CLAP_TRANSPORT_IS_LOOP_ACTIVE,
-        CLAP_TRANSPORT_IS_PLAYING, CLAP_TRANSPORT_IS_RECORDING, CLAP_TRANSPORT_IS_WITHIN_PRE_ROLL,
-        clap_event_header, clap_event_midi, clap_event_midi_sysex, clap_event_midi2,
-        clap_event_note, clap_event_note_expression, clap_event_param_gesture,
-        clap_event_param_mod, clap_event_param_value, clap_event_transport, clap_input_events,
-        clap_output_events,
+        CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, CLAP_EVENT_MIDI2, CLAP_EVENT_PARAM_VALUE,
+        CLAP_EVENT_TRANSPORT, clap_event_header, clap_event_midi, clap_event_midi2,
+        clap_event_param_value, clap_event_transport, clap_input_events,
     },
     fixedpoint::{BeatTime, SecTime},
     id::ClapId,
 };
 
-macro_rules! impl_flags_set_clear {
-    ($Typ:ty, $flag_repr:ty) => {
-        impl $Typ {
-            pub const fn is_set(&self, flags: $flag_repr) -> bool {
-                *self as $flag_repr & flags != 0
-            }
+macro_rules! impl_event_cast_methods {
+    ($name:tt, $name_unchk:tt, $type:ty, $cast_type:ty, $clap_id:ident $(,)?) => {
+        /// # Safety
+        #[doc = concat!("The caller must ensure that this `Header` has correct \
+            size and type to contain the header and the payload of event of the \
+            returned type: `", stringify!($name), "`.")
+                                                                                ]
+        pub const unsafe fn $name_unchk(&self) -> $type {
+            unsafe { <$type>::new_unchecked(self) }
+        }
 
-            pub const fn set(&self, flags: $flag_repr) -> $flag_repr {
-                *self as $flag_repr | flags
+        pub const fn $name(&self) -> Result<$type, Error> {
+            if self.r#type() != $clap_id as u16 {
+                return Err(Error::OtherType(self.r#type()));
             }
-
-            pub const fn clear(&self, flags: $flag_repr) -> $flag_repr {
-                !(*self as $flag_repr) & flags
+            if self.size() != size_of::<$cast_type>() as u32 {
+                return Err(Error::PayloadSize(self.size()));
             }
+            // SAFETY: We just checked if `self` is a event of type to be cast to.
+            Ok(unsafe { <$type>::new_unchecked(self) })
         }
     };
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-#[repr(u32)]
-pub enum EventFlags {
-    IsLive = CLAP_EVENT_IS_LIVE,
-    DontRecord = CLAP_EVENT_DONT_RECORD,
-}
+#[derive(Debug, PartialEq)]
+pub struct Header([u8]);
 
-impl_flags_set_clear!(EventFlags, u32);
-
-/// CLAP event.
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Event {
-    NoteOn(Note),
-    NoteOff(Note),
-    NoteChoke(Note),
-    NoteEnd(Note),
-    NoteExpression(NoteExpression),
-    ParamValue(ParamValue),
-    ParamMod(ParamMod),
-    ParamGestureBegin(ParamGesture),
-    ParamGestureEnd(ParamGesture),
-    Transport(Transport),
-    Midi(Midi),
-    Midi2(Midi2),
-    MidiSysex(MidiSysex),
-}
-
-impl Event {
+impl Header {
     /// # Safety
     ///
-    /// The pointer `header` must point to a full CLAP event of some type, i.e.
-    /// it must be followed be the event 'body', so that the cast is safe.
-    /// In particular, header must be non-null.
-    #[doc(hidden)]
-    pub const unsafe fn cast_and_copy_clap_event(
-        header: *const clap_event_header,
-    ) -> Result<Self, Error> {
-        let ev_type = unsafe { *header }.r#type;
-
-        macro_rules! cast_header_copy {
-            ($kind:ident, $event:tt) => {
-                Ok(Self::$kind($event(unsafe { *header.cast() })))
-            };
-        }
-
-        match ev_type as c_uint {
-            ffi::CLAP_EVENT_NOTE_ON => cast_header_copy!(NoteOn, Note),
-            ffi::CLAP_EVENT_NOTE_OFF => cast_header_copy!(NoteOff, Note),
-            ffi::CLAP_EVENT_NOTE_CHOKE => cast_header_copy!(NoteChoke, Note),
-            ffi::CLAP_EVENT_NOTE_END => cast_header_copy!(NoteEnd, Note),
-
-            ffi::CLAP_EVENT_NOTE_EXPRESSION => {
-                Ok(Event::NoteExpression(
-                    // SAFETY: the header is valid, and we just checked if the event type is
-                    // correct.
-                    match unsafe { NoteExpression::cast_and_copy_clap_event(header) } {
-                        // We don't call `unwrap()` here because the function is `const`.
-                        Ok(note_expr) => note_expr,
-                        Err(e) => {
-                            return Err(e);
-                        }
-                    },
-                ))
-            }
-
-            ffi::CLAP_EVENT_PARAM_VALUE => cast_header_copy!(ParamValue, ParamValue),
-            ffi::CLAP_EVENT_PARAM_MOD => cast_header_copy!(ParamMod, ParamMod),
-            ffi::CLAP_EVENT_PARAM_GESTURE_BEGIN => {
-                cast_header_copy!(ParamGestureBegin, ParamGesture)
-            }
-            ffi::CLAP_EVENT_PARAM_GESTURE_END => {
-                cast_header_copy!(ParamGestureEnd, ParamGesture)
-            }
-            ffi::CLAP_EVENT_TRANSPORT => cast_header_copy!(Transport, Transport),
-            ffi::CLAP_EVENT_MIDI => cast_header_copy!(Midi, Midi),
-            ffi::CLAP_EVENT_MIDI2 => cast_header_copy!(Midi2, Midi2),
-            ffi::CLAP_EVENT_MIDI_SYSEX => cast_header_copy!(MidiSysex, MidiSysex),
-            _ => Err(Error::UnknownEvent(ev_type)),
-        }
+    /// The reference must point to a valid header of a CLAP event. i.e.
+    ///
+    /// 1. The header's field: `size` must indicate the correct size of the
+    ///    event.
+    /// 2. The header's field: `type` must indicate the correct type of the
+    ///    event.
+    /// 3. The entire memory block of size `header.size`, starting from the
+    ///    address of `header` must hold a properly initialized and aligned
+    ///    object whose type is inferred from `header.type`.
+    ///
+    /// This is to make possible to cast `&raw const *header` pointer to
+    /// a pointer to the concrete event type.
+    pub const unsafe fn new(header: &clap_event_header) -> &Self {
+        let len = header.size as usize;
+        let data = &raw const *header as *const _;
+        unsafe { &*(slice_from_raw_parts::<u8>(data, len) as *const _) }
     }
 
-    const fn clap_event_header(&self) -> &clap_event_header {
-        match self {
-            Event::NoteOn(ev) => &ev.0.header,
-            Event::NoteOff(ev) => &ev.0.header,
-            Event::NoteChoke(ev) => &ev.0.header,
-            Event::NoteEnd(ev) => &ev.0.header,
-            Event::NoteExpression(ev) => ev.clap_event_header(),
-            Event::ParamValue(ev) => &ev.0.header,
-            Event::ParamMod(ev) => &ev.0.header,
-            Event::ParamGestureBegin(ev) => &ev.0.header,
-            Event::ParamGestureEnd(ev) => &ev.0.header,
-            Event::Transport(ev) => &ev.0.header,
-            Event::Midi(ev) => &ev.0.header,
-            Event::Midi2(ev) => &ev.0.header,
-            Event::MidiSysex(ev) => &ev.0.header,
-        }
-    }
-}
-
-macro_rules! impl_event_get_attr {
-    ($Typ:ty, $($attr:tt:$attr_typ:ty),*) => {
-        impl $Typ {
-            $(
-                pub const fn $attr(&self) -> $attr_typ {
-                    self.0.$attr
-                }
-
-            )*
-
-            pub const fn time(&self) -> u32 {
-                self.0.header.time
-            }
-
-            pub const fn space_id(&self) -> u16 {
-                self.0.header.space_id
-            }
-
-            pub const fn flags(&self) -> u32 {
-                self.0.header.flags
-            }
-        }
-    };
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Note(clap_event_note);
-
-impl_event_get_attr!(Note,
-    note_id:i32, port_index:i16, channel:i16, key:i16, velocity:f64
-);
-
-impl From<clap_event_note> for Note {
-    fn from(value: clap_event_note) -> Self {
-        Self(value)
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum NoteExpression {
-    Volume(Expression),
-    Pan(Expression),
-    Tuning(Expression),
-    Vibrato(Expression),
-    Expression(Expression),
-    Brightness(Expression),
-    Pressure(Expression),
-}
-
-impl NoteExpression {
     /// # Safety
     ///
-    /// 1. The pointer `header` must point to a full CLAP event of some type,
-    ///    i.e. it must be followed be the event 'body', so that the cast is
-    ///    safe. In particular, header must be non-null.
-    /// 2. The event type must be CLAP_EVENT_NOTE_EXPRESSION.
-    const unsafe fn cast_and_copy_clap_event(
-        header: *const clap_event_header,
-    ) -> Result<Self, Error> {
-        let ev = unsafe { *header.cast::<clap_event_note_expression>() };
-        match ev.expression_id {
-            ffi::CLAP_NOTE_EXPRESSION_VOLUME => Ok(Self::Volume(Expression(ev))),
-            ffi::CLAP_NOTE_EXPRESSION_PAN => Ok(Self::Pan(Expression(ev))),
-            ffi::CLAP_NOTE_EXPRESSION_TUNING => Ok(Self::Tuning(Expression(ev))),
-            ffi::CLAP_NOTE_EXPRESSION_VIBRATO => Ok(Self::Vibrato(Expression(ev))),
-            ffi::CLAP_NOTE_EXPRESSION_EXPRESSION => Ok(Self::Expression(Expression(ev))),
-            ffi::CLAP_NOTE_EXPRESSION_BRIGHTNESS => Ok(Self::Brightness(Expression(ev))),
-            ffi::CLAP_NOTE_EXPRESSION_PRESSURE => Ok(Self::Pressure(Expression(ev))),
-            _ => Err(Error::UnknownExpression(ev.expression_id)),
-        }
+    /// The caller must ensure that the cast to a reference of type `T` is safe,
+    /// i.e. that the header and the payload hold together a properly
+    /// initialized and aligned object of type `T`.
+    const unsafe fn cast_unchecked<T>(&self) -> &T {
+        unsafe { &*self.0.as_ptr().cast() }
     }
 
-    const fn expression(&self) -> &Expression {
-        match self {
-            NoteExpression::Volume(e) => e,
-            NoteExpression::Pan(e) => e,
-            NoteExpression::Tuning(e) => e,
-            NoteExpression::Vibrato(e) => e,
-            NoteExpression::Expression(e) => e,
-            NoteExpression::Brightness(e) => e,
-            NoteExpression::Pressure(e) => e,
-        }
+    pub const fn as_clap_event_header(&self) -> &clap_event_header {
+        // SAFETY: By construction, a cast to `clap_event_header` from with `self` was
+        // created is safe.
+        unsafe { self.cast_unchecked() }
     }
 
-    const fn clap_event_header(&self) -> &clap_event_header {
-        &self.expression().0.header
+    const fn to_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub const fn flags(&self) -> u32 {
+        self.as_clap_event_header().flags
+    }
+
+    pub const fn size(&self) -> u32 {
+        self.0.len() as u32
+    }
+
+    pub const fn space_id(&self) -> u16 {
+        self.as_clap_event_header().space_id
+    }
+
+    pub const fn time(&self) -> u32 {
+        self.as_clap_event_header().time
+    }
+
+    pub const fn r#type(&self) -> u16 {
+        self.as_clap_event_header().r#type
+    }
+
+    impl_event_cast_methods!(
+        param_value,
+        param_value_unchecked,
+        ParamValue,
+        clap_event_param_value,
+        CLAP_EVENT_PARAM_VALUE
+    );
+
+    impl_event_cast_methods!(
+        transport,
+        transport_unchecked,
+        Transport,
+        clap_event_transport,
+        CLAP_EVENT_TRANSPORT
+    );
+
+    impl_event_cast_methods!(midi, midi_unchecked, Midi, clap_event_midi, CLAP_EVENT_MIDI);
+
+    impl_event_cast_methods!(
+        midi2,
+        midi2_unchecked,
+        Midi2,
+        clap_event_midi2,
+        CLAP_EVENT_MIDI2
+    );
+}
+
+pub trait Event {
+    fn header(&self) -> &Header;
+
+    fn to_bytes(&self) -> &[u8] {
+        self.header().to_bytes()
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Expression(clap_event_note_expression);
+pub trait EventBuilder {
+    type Event<'a>: Event
+    where
+        Self: 'a;
 
-impl_event_get_attr!(Expression,
-    note_id:i32, port_index:i16, channel:i16, key:i16, value:f64
-);
+    fn time(self, value: u32) -> Self;
+    fn space_id(self, value: u16) -> Self;
+    fn flags(self, value: u32) -> Self;
 
-impl From<clap_event_note_expression> for Expression {
-    fn from(value: clap_event_note_expression) -> Self {
-        Self(value)
-    }
+    fn event(&self) -> Self::Event<'_>;
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct ParamValue(clap_event_param_value);
-
-impl_event_get_attr!(ParamValue,
-    note_id:i32, port_index:i16, channel:i16, key:i16, value:f64
-);
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct ParamMod(clap_event_param_mod);
-
-impl_event_get_attr!(ParamMod,
-    note_id:i32, port_index:i16, channel:i16, key:i16, amount:f64
-);
-
-impl ParamMod {
-    pub fn param_id(&self) -> ClapId {
-        self.0.param_id.try_into().unwrap_or(ClapId::invalid_id())
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct ParamGesture(clap_event_param_gesture);
-
-impl_event_get_attr!(ParamGesture,);
-
-impl ParamGesture {
-    pub fn param_id(&self) -> ClapId {
-        self.0.param_id.try_into().unwrap_or(ClapId::invalid_id())
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-#[repr(u32)]
-pub enum TransportFlags {
-    HasTempo = CLAP_TRANSPORT_HAS_TEMPO,
-    HasBeatsTimeline = CLAP_TRANSPORT_HAS_BEATS_TIMELINE,
-    HasSecondsTimeline = CLAP_TRANSPORT_HAS_SECONDS_TIMELINE,
-    HasTimeSignature = CLAP_TRANSPORT_HAS_TIME_SIGNATURE,
-    IsPlaying = CLAP_TRANSPORT_IS_PLAYING,
-    IsRecording = CLAP_TRANSPORT_IS_RECORDING,
-    IsLoopActive = CLAP_TRANSPORT_IS_LOOP_ACTIVE,
-    IsWithinPreRoll = CLAP_TRANSPORT_IS_WITHIN_PRE_ROLL,
-}
-
-impl_flags_set_clear!(TransportFlags, u32);
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Transport(pub(crate) clap_event_transport);
-
-impl_event_get_attr!(Transport,
-    tempo:f64, tempo_inc:f64,
-    bar_number:i32,
-    tsig_num:u16, tsig_denom:u16
-);
-
-macro_rules! impl_transport_get_attr {
-    ($Typ:ty, $($attr:tt:$attr_typ:ty),*) => {
-        impl $Typ {
-            $(
-                pub const fn $attr(&self) -> $attr_typ {
-                    <$attr_typ>::new(self.0.$attr)
-                }
-            )*
+macro_rules! impl_event_const_getter {
+    ($name:tt, $cast_method:ident, $type:ty $(,)?) => {
+        pub const fn $name(&self) -> $type {
+            self.$cast_method().$name
         }
     };
 }
 
-impl_transport_get_attr!(Transport,
-    song_pos_beats:BeatTime, song_pos_seconds:SecTime,
-    loop_start_beats:BeatTime, loop_end_beats:BeatTime,
-    loop_start_seconds:SecTime, loop_end_seconds:SecTime,
-    bar_start:BeatTime
-);
+macro_rules! impl_event_builder_setter {
+    ($name:tt, $type:ty $(,)*) => {
+        pub const fn $name(self, value: $type) -> Self {
+            let mut build = self;
+            build.0.$name = value;
+            build
+        }
+    };
+}
 
-impl From<clap_event_transport> for Transport {
-    fn from(value: clap_event_transport) -> Self {
-        Self(value)
+macro_rules! impl_event_builder {
+    ($type:ty, $event_type:ty, $cast_method:ident $(,)?) => {
+        impl EventBuilder for $type {
+            type Event<'a>
+                = $event_type
+            where
+                Self: 'a;
+
+            fn time(self, value: u32) -> Self {
+                let mut build = self;
+                build.0.header.time = value;
+                build
+            }
+
+            fn space_id(self, value: u16) -> Self {
+                let mut build = self;
+                build.0.header.space_id = value;
+                build
+            }
+
+            fn flags(self, value: u32) -> Self {
+                let mut build = self;
+                build.0.header.flags = value;
+                build
+            }
+
+            fn event(&self) -> Self::Event<'_> {
+                // SAFETY: By construction, `self.header` is a valid header of the event type.
+                let header = unsafe { Header::new(&self.0.header) };
+                unsafe { header.$cast_method() }
+            }
+        }
+    };
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct ParamValue<'a> {
+    header: &'a Header,
+}
+
+impl<'a> ParamValue<'a> {
+    /// # Safety
+    ///
+    /// The `header` must be a header of type: `clap_event_param_value`.
+    pub const unsafe fn new_unchecked(header: &'a Header) -> Self {
+        Self { header }
+    }
+
+    const fn as_clap_event_param_value(&self) -> &clap_event_param_value {
+        // SAFETY: By construction, this cast is safe.
+        unsafe { self.header.cast_unchecked() }
+    }
+
+    impl_event_const_getter!(channel, as_clap_event_param_value, i16);
+    impl_event_const_getter!(cookie, as_clap_event_param_value, *mut c_void);
+    impl_event_const_getter!(key, as_clap_event_param_value, i16);
+    impl_event_const_getter!(note_id, as_clap_event_param_value, i32);
+
+    pub fn param_id(&self) -> ClapId {
+        self.as_clap_event_param_value()
+            .param_id
+            .try_into()
+            .unwrap_or(ClapId::invalid_id())
+    }
+
+    impl_event_const_getter!(port_index, as_clap_event_param_value, i16);
+    impl_event_const_getter!(value, as_clap_event_param_value, f64);
+
+    pub const fn build() -> ParamValueBuilder {
+        ParamValueBuilder::new()
+    }
+
+    pub fn update(&self) -> ParamValueBuilder {
+        ParamValueBuilder::with_param_value(self)
+    }
+}
+
+impl Event for ParamValue<'_> {
+    fn header(&self) -> &Header {
+        self.header
     }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Midi(clap_event_midi);
+pub struct ParamValueBuilder(clap_event_param_value);
 
-impl_event_get_attr!(Midi, port_index:u16);
+impl ParamValueBuilder {
+    pub const fn new() -> Self {
+        Self(clap_event_param_value {
+            header: clap_event_header {
+                size: size_of::<clap_event_param_value>() as u32,
+                time: 0,
+                space_id: CLAP_CORE_EVENT_SPACE_ID,
+                r#type: CLAP_EVENT_PARAM_VALUE as u16,
+                flags: 0,
+            },
+            param_id: 0,
+            cookie: null_mut(),
+            note_id: 0,
+            port_index: 0,
+            channel: 0,
+            key: 0,
+            value: 0.0,
+        })
+    }
 
-impl Midi {
-    pub const fn data(&self) -> &[u8; 3] {
-        &self.0.data
+    pub fn with_param_value(param_value: &ParamValue<'_>) -> Self {
+        // SAFETY: ParamValue constructor guarantees that this cast is safe, and we can
+        // copy the object of type: `clap_event_param_value`.
+        Self(*unsafe { param_value.header().cast_unchecked() })
+    }
+
+    impl_event_builder_setter!(port_index, i16);
+    impl_event_builder_setter!(channel, i16);
+    impl_event_builder_setter!(cookie, *mut c_void);
+    impl_event_builder_setter!(key, i16);
+    impl_event_builder_setter!(note_id, i32);
+
+    pub fn param_id(self, value: ClapId) -> Self {
+        let mut builder = self;
+        builder.0.param_id = value.into();
+        builder
+    }
+
+    impl_event_builder_setter!(value, f64);
+}
+
+impl Default for ParamValueBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
+impl_event_builder!(ParamValueBuilder, ParamValue<'a>, param_value_unchecked);
+
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Midi2(clap_event_midi2);
+pub struct Transport<'a> {
+    header: &'a Header,
+}
 
-impl_event_get_attr!(Midi2, port_index:u16);
+macro_rules! impl_transport_time_getter {
+    ($name:tt, $type:tt $(,)?) => {
+        pub const fn $name(&self) -> $type {
+            $type(self.as_clap_event_transport().$name)
+        }
+    };
+}
 
-impl Midi2 {
+impl<'a> Transport<'a> {
+    /// # Safety
+    ///
+    /// The `header` must be a header of type: `clap_event_transport`.
+    pub const unsafe fn new_unchecked(header: &'a Header) -> Self {
+        Self { header }
+    }
+
+    const fn as_clap_event_transport(&self) -> &clap_event_transport {
+        // SAFETY: By construction, this cast is safe.
+        unsafe { self.header.cast_unchecked() }
+    }
+
+    impl_transport_time_getter!(song_pos_seconds, SecTime);
+    impl_transport_time_getter!(song_pos_beats, BeatTime);
+    impl_transport_time_getter!(loop_start_beats, BeatTime);
+    impl_transport_time_getter!(loop_end_beats, BeatTime);
+    impl_transport_time_getter!(loop_start_seconds, SecTime);
+    impl_transport_time_getter!(loop_end_seconds, SecTime);
+    impl_transport_time_getter!(bar_start, BeatTime);
+
+    impl_event_const_getter!(flags, as_clap_event_transport, u32);
+    impl_event_const_getter!(tempo, as_clap_event_transport, f64);
+    impl_event_const_getter!(tempo_inc, as_clap_event_transport, f64);
+    impl_event_const_getter!(bar_number, as_clap_event_transport, i32);
+    impl_event_const_getter!(tsig_num, as_clap_event_transport, u16);
+    impl_event_const_getter!(tsig_denom, as_clap_event_transport, u16);
+
+    pub const fn build() -> TransportBuilder {
+        TransportBuilder::new()
+    }
+
+    pub fn update(&self) -> TransportBuilder {
+        TransportBuilder::with_transport(self)
+    }
+}
+
+impl Event for Transport<'_> {
+    fn header(&self) -> &Header {
+        self.header
+    }
+}
+
+macro_rules! impl_transport_time_setter {
+    ($name:tt, $type:tt $(,)?) => {
+        pub const fn $name(self, value: $type) -> Self {
+            let mut build = self;
+            build.0.$name = value.0;
+            build
+        }
+    };
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct TransportBuilder(clap_event_transport);
+
+impl TransportBuilder {
+    pub const fn new() -> Self {
+        Self(clap_event_transport {
+            header: clap_event_header {
+                size: size_of::<clap_event_transport>() as u32,
+                time: 0,
+                space_id: CLAP_CORE_EVENT_SPACE_ID,
+                r#type: CLAP_EVENT_TRANSPORT as u16,
+                flags: 0,
+            },
+            flags: 0,
+            song_pos_beats: 0,
+            song_pos_seconds: 0,
+            tempo: 0.0,
+            tempo_inc: 0.0,
+            loop_start_beats: 0,
+            loop_end_beats: 0,
+            loop_start_seconds: 0,
+            loop_end_seconds: 0,
+            bar_start: 0,
+            bar_number: 0,
+            tsig_num: 0,
+            tsig_denom: 0,
+        })
+    }
+
+    pub fn with_transport(param_value: &Transport<'_>) -> Self {
+        // SAFETY: Transport constructor guarantees that this cast is safe, and we can
+        // copy the object of type: `clap_event_transport`.
+        Self(*unsafe { param_value.header().cast_unchecked() })
+    }
+
+    impl_transport_time_setter!(song_pos_seconds, SecTime);
+    impl_transport_time_setter!(song_pos_beats, BeatTime);
+    impl_transport_time_setter!(loop_start_beats, BeatTime);
+    impl_transport_time_setter!(loop_end_beats, BeatTime);
+    impl_transport_time_setter!(loop_start_seconds, SecTime);
+    impl_transport_time_setter!(loop_end_seconds, SecTime);
+    impl_transport_time_setter!(bar_start, BeatTime);
+
+    impl_event_builder_setter!(flags, u32);
+    impl_event_builder_setter!(tempo, f64);
+    impl_event_builder_setter!(tempo_inc, f64);
+    impl_event_builder_setter!(bar_number, i32);
+    impl_event_builder_setter!(tsig_num, u16);
+    impl_event_builder_setter!(tsig_denom, u16);
+}
+
+impl Default for TransportBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl_event_builder!(TransportBuilder, Transport<'a>, transport_unchecked);
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Midi2<'a> {
+    header: &'a Header,
+}
+
+impl<'a> Midi2<'a> {
+    /// # Safety
+    ///
+    /// The `header` must be a header of type: `clap_event_midi2`.
+    pub const unsafe fn new_unchecked(header: &'a Header) -> Self {
+        Self { header }
+    }
+
+    const fn as_clap_event_midi2(&self) -> &clap_event_midi2 {
+        // SAFETY: By construction, this cast is safe.
+        unsafe { self.header.cast_unchecked() }
+    }
+
+    impl_event_const_getter!(port_index, as_clap_event_midi2, u16);
+
     pub const fn data(&self) -> &[u32; 4] {
-        &self.0.data
+        &self.as_clap_event_midi2().data
+    }
+
+    /// # Example
+    ///
+    /// ```rust
+    /// # use clap_clap::events::{Event, EventBuilder,Midi2};
+    /// let midi = Midi2::build().port_index(1).time(3);
+    /// let event = midi.event();
+    ///
+    /// assert_eq!(event.port_index(), 1);
+    /// assert_eq!(event.header().time(), 3);
+    /// ```
+    pub const fn build() -> Midi2Builder {
+        Midi2Builder::new()
+    }
+
+    /// # Example
+    ///
+    /// ```rust
+    /// # use clap_clap::events::{Event, EventBuilder,Midi2};
+    /// let midi = Midi2::build().port_index(1).data([1, 2, 3, 4]);
+    /// let event = midi.event();
+    ///
+    /// let other_midi = event.update().data([4, 5, 6, 7]);
+    /// let other_event = other_midi.event();
+    ///
+    /// assert_eq!(event.port_index(), 1);
+    /// assert_eq!(event.data(), &[1, 2, 3, 4]);
+    ///
+    /// assert_eq!(other_event.port_index(), 1);
+    /// assert_eq!(other_event.data(), &[4, 5, 6, 7]);
+    /// ```
+    pub fn update(&self) -> Midi2Builder {
+        Midi2Builder::with_midi2(self)
+    }
+}
+
+impl Event for Midi2<'_> {
+    fn header(&self) -> &Header {
+        self.header
     }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct MidiSysex(clap_event_midi_sysex);
+pub struct Midi2Builder(clap_event_midi2);
 
-#[derive(Debug)]
-pub struct InputEvents(*const clap_input_events);
+impl Midi2Builder {
+    pub const fn new() -> Self {
+        Self(clap_event_midi2 {
+            header: clap_event_header {
+                size: size_of::<clap_event_midi2>() as u32,
+                time: 0,
+                space_id: CLAP_CORE_EVENT_SPACE_ID,
+                r#type: CLAP_EVENT_MIDI2 as u16,
+                flags: 0,
+            },
+            port_index: 0,
+            data: [0; 4],
+        })
+    }
 
-impl InputEvents {
-    /// # Safety:
+    pub fn with_midi2(midi: &Midi2<'_>) -> Self {
+        // SAFETY: Midi constructor guarantees that this cast is safe, and we can copy
+        // the object of type: `clap_event_midi2`.
+        Self(*unsafe { midi.header().cast_unchecked() })
+    }
+
+    impl_event_builder_setter!(port_index, u16);
+    impl_event_builder_setter!(data, [u32; 4]);
+}
+
+impl Default for Midi2Builder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl_event_builder!(Midi2Builder, Midi2<'a>, midi2_unchecked);
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Midi<'a> {
+    header: &'a Header,
+}
+
+impl<'a> Midi<'a> {
+    /// # Safety
     ///
-    /// 1. `clap_input_events` must be non-null
-    /// 2. `clap_input_events.size` must be non-null
-    /// 3. `clap_input_events.get` must be non-null
-    pub(crate) const unsafe fn new(clap_input_events: *const clap_input_events) -> Self {
-        Self(clap_input_events)
+    /// The `header` must be a header of type: `clap_event_midi`.
+    pub const unsafe fn new_unchecked(header: &'a Header) -> Self {
+        Self { header }
+    }
+
+    const fn as_clap_event_midi(&self) -> &clap_event_midi {
+        // SAFETY: By construction, this cast is safe.
+        unsafe { self.header.cast_unchecked() }
+    }
+
+    impl_event_const_getter!(port_index, as_clap_event_midi, u16);
+
+    pub const fn data(&self) -> &[u8; 3] {
+        &self.as_clap_event_midi().data
+    }
+
+    /// # Example
+    ///
+    /// ```rust
+    /// # use clap_clap::events::{Event, EventBuilder,Midi};
+    /// let midi = Midi::build().port_index(1).time(3);
+    /// let event = midi.event();
+    ///
+    /// assert_eq!(event.port_index(), 1);
+    /// assert_eq!(event.header().time(), 3);
+    /// ```
+    pub const fn build() -> MidiBuilder {
+        MidiBuilder::new()
+    }
+
+    /// # Example
+    ///
+    /// ```rust
+    /// # use clap_clap::events::{Event, EventBuilder,Midi};
+    /// let midi = Midi::build().port_index(1).data([1, 2, 3]);
+    /// let event = midi.event();
+    ///
+    /// let other_midi = event.update().data([4, 5, 6]);
+    /// let other_event = other_midi.event();
+    ///
+    /// assert_eq!(event.port_index(), 1);
+    /// assert_eq!(event.data(), &[1, 2, 3]);
+    ///
+    /// assert_eq!(other_event.port_index(), 1);
+    /// assert_eq!(other_event.data(), &[4, 5, 6]);
+    /// ```
+    pub fn update(&self) -> MidiBuilder {
+        MidiBuilder::with_midi(self)
+    }
+}
+
+impl Event for Midi<'_> {
+    fn header(&self) -> &Header {
+        self.header
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct MidiBuilder(clap_event_midi);
+
+impl MidiBuilder {
+    pub const fn new() -> Self {
+        Self(clap_event_midi {
+            header: clap_event_header {
+                size: size_of::<clap_event_midi>() as u32,
+                time: 0,
+                space_id: CLAP_CORE_EVENT_SPACE_ID,
+                r#type: CLAP_EVENT_MIDI as u16,
+                flags: 0,
+            },
+            port_index: 0,
+            data: [0; 3],
+        })
+    }
+
+    pub fn with_midi(midi: &Midi<'_>) -> Self {
+        // SAFETY: Midi constructor guarantees that this cast is safe, and we can copy
+        // the object of type: `clap_event_midi`.
+        Self(*unsafe { midi.header().cast_unchecked() })
+    }
+
+    impl_event_builder_setter!(port_index, u16);
+    impl_event_builder_setter!(data, [u8; 3]);
+}
+
+impl Default for MidiBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl_event_builder!(MidiBuilder, Midi<'a>, midi_unchecked);
+
+pub struct InputEvents<'a>(&'a clap_input_events);
+
+impl<'a> InputEvents<'a> {
+    /// # Safety
+    ///
+    /// The pointers: `list.size` and `list.get` must be Some.
+    #[doc(hidden)]
+    pub const unsafe fn new_unchecked(list: &'a clap_input_events) -> Self {
+        Self(list)
     }
 
     pub fn size(&self) -> u32 {
-        // SAFETY: By construction, the call is safe.
-        unsafe { (*self.0).size.unwrap()(self.0) }
+        // SAFETY: By construction, the pointer `self.size` is Some.
+        unsafe { self.0.size.unwrap()(self.0) }
     }
 
     /// # Safety
     ///
     /// The value of `index` must be less than `self.size()`.
-    pub unsafe fn get_unchecked(&self, index: u32) -> Result<Event, Error> {
-        // SAFETY: By construction, and by the fact that `index < self.size()`,
-        // the call to `get()` is safe.
-        let header = unsafe { (*self.0).get.unwrap()(self.0, index) };
-        if header.is_null() {
-            return Err(Error::Null);
-        }
-        // SAFETY: the header ev is followed by the 'body' of the event, because
-        // the header points to a genuine event obtained from the host.
-        unsafe { Event::cast_and_copy_clap_event(header) }
+    pub unsafe fn get_unchecked(&self, index: u32) -> &Header {
+        // SAFETY: By construction, the pointer `self.get` is Some.
+        let header = unsafe { &*self.0.get.unwrap()(self.0, index) };
+        unsafe { Header::new(header) }
     }
 
     /// # Panic
     ///
-    /// This function will panic if `index >= self.size()`.
-    pub fn get(&self, index: u32) -> Result<Event, Error> {
-        (index < self.size())
-            .then_some(unsafe { self.get_unchecked(index) })
-            .expect("index out of bound")
-    }
-}
-
-pub struct OutputEvents {
-    clap_output_events: *const clap_output_events,
-    last_time: u32,
-}
-
-impl OutputEvents {
-    /// # Safety:
-    ///
-    /// 1. `clap_output_events` must be non-null
-    /// 2. `clap_output_events.try_push` must be non-null
-    pub(crate) const unsafe fn new(clap_output_events: *const clap_output_events) -> Self {
-        Self {
-            clap_output_events,
-            last_time: 0,
-        }
-    }
-
-    /// # Safety
-    ///
-    /// Events must be pushed into the list in the sample order.
-    pub unsafe fn try_push_unchecked(&mut self, event: Event) -> Result<(), Error> {
-        let header = event.clap_event_header();
-        // SAFETY: By construction, `try_push()` is non-null.
-        unsafe { (*self.clap_output_events).try_push.unwrap()(self.clap_output_events, header) }
-            .then_some(())
-            .ok_or(Error::TryPush(event))
-    }
-
-    pub fn try_push(&mut self, event: Event) -> Result<(), Error> {
-        let header = event.clap_event_header();
-        let time = header.time;
-        if self.last_time <= time {
-            let res = unsafe { self.try_push_unchecked(event) };
-            self.last_time = time;
-            res
-        } else {
-            Err(Error::OutOfOrder(event))
-        }
+    /// Panic if `index` greater or equal than `self.size()`.
+    pub fn get(&self, index: u32) -> &Header {
+        assert!(index < self.size(), "index out of bounds");
+        unsafe { self.get_unchecked(index) }
     }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Error {
-    Null,
-    UnknownEvent(u16),
-    UnknownExpression(i32),
-    OutOfOrder(Event),
-    TryPush(Event),
+    OtherType(u16),
+    PayloadSize(u32),
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
-            Error::Null => {
-                write!(f, "null pointer")
+            Error::PayloadSize(size) => {
+                write!(f, "payload size for the defined event type: {size}")
             }
-            Error::UnknownEvent(id) => {
-                write!(f, "unknown event type: {id}")
-            }
-            Error::UnknownExpression(id) => {
-                write!(f, "unknown note expression: {id}")
-            }
-            Error::OutOfOrder(ev) => {
-                write!(f, "events must be inserted in the sample order: {ev:?}")
-            }
-            Error::TryPush(ev) => {
-                write!(f, "event could not be pushed to the queue: {ev:?}")
-            }
+            Error::OtherType(id) => write!(f, "other type, id: {id}"),
         }
     }
 }
