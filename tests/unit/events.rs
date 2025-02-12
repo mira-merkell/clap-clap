@@ -142,17 +142,170 @@ mod param_value {
 
     #[test]
     fn build() {
-        let param_value1 = ParamValue::build().port_index(1).value(123.456);
-        let param_value2 = param_value1.port_index(3);
+        let value1 = ParamValue::build().port_index(1).value(123.456);
+        let value2 = value1.port_index(3);
 
-        let event1 = param_value1.event();
-        let event2 = param_value2.event();
+        let event1 = value1.event();
+        let event2 = value2.event();
 
         assert_eq!(event1.value(), 123.456);
         assert_eq!(event2.value(), 123.456);
 
         assert_eq!(event1.port_index(), 1);
         assert_eq!(event2.port_index(), 3);
+    }
+
+    #[test]
+    fn update() {
+        let value1 = ParamValue::build().port_index(1).value(123.456);
+        let event1 = value1.event();
+
+        let value2 = ParamValue::update(&event1).port_index(3);
+        let event2 = value2.event();
+
+        assert_eq!(event1.value(), 123.456);
+        assert_eq!(event2.value(), 123.456);
+
+        assert_eq!(event1.port_index(), 1);
+        assert_eq!(event2.port_index(), 3);
+    }
+}
+
+mod transport {
+    use clap_clap::{
+        events,
+        events::{EventBuilder, Header, Transport},
+        ffi::{
+            CLAP_EVENT_NOTE_CHOKE, CLAP_EVENT_TRANSPORT, clap_event_header, clap_event_transport,
+        },
+        fixedpoint::{BeatTime, SecTime},
+    };
+
+    #[test]
+    fn try_01() {
+        let event = clap_event_transport {
+            header: clap_event_header {
+                size: 33,
+                time: 0,
+                space_id: 0,
+                r#type: CLAP_EVENT_TRANSPORT as u16,
+                flags: 0,
+            },
+            flags: 0,
+            song_pos_beats: 0,
+            song_pos_seconds: 0,
+            tempo: 0.0,
+            tempo_inc: 0.0,
+            loop_start_beats: 0,
+            loop_end_beats: 0,
+            loop_start_seconds: 0,
+            loop_end_seconds: 0,
+            bar_start: 0,
+            bar_number: 0,
+            tsig_num: 0,
+            tsig_denom: 0,
+        };
+
+        let header = unsafe { Header::new(&event.header) };
+        assert_eq!(Err(events::Error::PayloadSize(33)), header.transport())
+    }
+
+    #[test]
+    fn try_02() {
+        let event = clap_event_transport {
+            header: clap_event_header {
+                size: size_of::<clap_event_transport>() as u32,
+                time: 0,
+                space_id: 0,
+                r#type: CLAP_EVENT_NOTE_CHOKE as u16,
+                flags: 0,
+            },
+            flags: 0,
+            song_pos_beats: 0,
+            song_pos_seconds: 0,
+            tempo: 0.0,
+            tempo_inc: 0.0,
+            loop_start_beats: 0,
+            loop_end_beats: 0,
+            loop_start_seconds: 0,
+            loop_end_seconds: 0,
+            bar_start: 0,
+            bar_number: 0,
+            tsig_num: 0,
+            tsig_denom: 0,
+        };
+
+        let header = unsafe { Header::new(&event.header) };
+        assert_eq!(
+            Err(events::Error::OtherType(CLAP_EVENT_NOTE_CHOKE as u16)),
+            header.midi()
+        )
+    }
+
+    #[test]
+    fn try_03() {
+        let event = clap_event_transport {
+            header: clap_event_header {
+                size: size_of::<clap_event_transport>() as u32,
+                time: 0,
+                space_id: 0,
+                r#type: CLAP_EVENT_TRANSPORT as u16,
+                flags: 0,
+            },
+            flags: 0,
+            song_pos_beats: 0,
+            song_pos_seconds: 0,
+            tempo: 0.0,
+            tempo_inc: 0.0,
+            loop_start_beats: 0,
+            loop_end_beats: 110011,
+            loop_start_seconds: 0,
+            loop_end_seconds: 0,
+            bar_start: 0,
+            bar_number: 12345,
+            tsig_num: 0,
+            tsig_denom: 0,
+        };
+
+        let header = unsafe { Header::new(&event.header) };
+        let _ = header.param_value().unwrap_err();
+        let event = header.transport().unwrap();
+        assert_eq!(event.loop_end_beats(), BeatTime(110011));
+        assert_eq!(event.bar_number(), 12345);
+    }
+
+    #[test]
+    fn build() {
+        let value1 = Transport::build()
+            .tempo(1.11)
+            .song_pos_seconds(SecTime::from(12.34));
+        let value2 = value1.tempo(3.3);
+
+        let event1 = value1.event();
+        let event2 = value2.event();
+
+        assert_eq!(event1.song_pos_seconds(), SecTime::from(12.34));
+        assert_eq!(event2.song_pos_seconds(), SecTime::from(12.34));
+
+        assert_eq!(event1.tempo(), 1.11);
+        assert_eq!(event2.tempo(), 3.3);
+    }
+
+    #[test]
+    fn update() {
+        let value1 = Transport::build()
+            .tempo(1.11)
+            .song_pos_seconds(SecTime::from(12.34));
+        let event1 = value1.event();
+
+        let value2 = Transport::update(&event1).tempo(3.3);
+        let event2 = value2.event();
+
+        assert_eq!(event1.song_pos_seconds(), SecTime::from(12.34));
+        assert_eq!(event2.song_pos_seconds(), SecTime::from(12.34));
+
+        assert_eq!(event1.tempo(), 1.11);
+        assert_eq!(event2.tempo(), 3.3);
     }
 }
 
@@ -236,6 +389,21 @@ mod midi {
         assert_eq!(event1.port_index(), 1);
         assert_eq!(event2.port_index(), 3);
     }
+
+    #[test]
+    fn update() {
+        let midi1 = Midi::build().port_index(1).data([5, 6, 7]);
+        let event1 = midi1.event();
+
+        let midi2 = Midi::update(&event1).port_index(3);
+        let event2 = midi2.event();
+
+        assert_eq!(event1.data(), &[5, 6, 7]);
+        assert_eq!(event2.data(), &[5, 6, 7]);
+
+        assert_eq!(event1.port_index(), 1);
+        assert_eq!(event2.port_index(), 3);
+    }
 }
 
 mod midi2 {
@@ -310,6 +478,21 @@ mod midi2 {
         let midi2 = midi1.port_index(3);
 
         let event1 = midi1.event();
+        let event2 = midi2.event();
+
+        assert_eq!(event1.data(), &[5, 6, 7, 8]);
+        assert_eq!(event2.data(), &[5, 6, 7, 8]);
+
+        assert_eq!(event1.port_index(), 1);
+        assert_eq!(event2.port_index(), 3);
+    }
+
+    #[test]
+    fn update() {
+        let midi1 = Midi2::build().port_index(1).data([5, 6, 7, 8]);
+        let event1 = midi1.event();
+
+        let midi2 = Midi2::update(&event1).port_index(3);
         let event2 = midi2.event();
 
         assert_eq!(event1.data(), &[5, 6, 7, 8]);

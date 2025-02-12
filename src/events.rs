@@ -9,9 +9,10 @@ use std::{
 use crate::{
     ffi::{
         CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, CLAP_EVENT_MIDI2, CLAP_EVENT_PARAM_VALUE,
-        clap_event_header, clap_event_midi, clap_event_midi2, clap_event_param_value,
-        clap_input_events,
+        CLAP_EVENT_TRANSPORT, clap_event_header, clap_event_midi, clap_event_midi2,
+        clap_event_param_value, clap_event_transport, clap_input_events,
     },
+    fixedpoint::{BeatTime, SecTime},
     id::ClapId,
 };
 
@@ -21,7 +22,7 @@ macro_rules! impl_event_cast_methods {
         #[doc = concat!("The caller must ensure that this `Header` has correct \
             size and type to contain the header and the payload of event of the \
             returned type: `", stringify!($name), "`.")
-                ]
+                                                                        ]
         pub const unsafe fn $name_unchk(&self) -> $type {
             unsafe { <$type>::new_unchecked(self) }
         }
@@ -109,7 +110,17 @@ impl Header {
         clap_event_param_value,
         CLAP_EVENT_PARAM_VALUE
     );
+
+    impl_event_cast_methods!(
+        transport,
+        transport_unchecked,
+        Transport,
+        clap_event_transport,
+        CLAP_EVENT_TRANSPORT
+    );
+
     impl_event_cast_methods!(midi, midi_unchecked, Midi, clap_event_midi, CLAP_EVENT_MIDI);
+
     impl_event_cast_methods!(
         midi2,
         midi2_unchecked,
@@ -291,6 +302,131 @@ impl Default for ParamValueBuilder {
 }
 
 impl_event_builder!(ParamValueBuilder, ParamValue<'a>, param_value_unchecked);
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Transport<'a> {
+    header: &'a Header,
+}
+
+macro_rules! impl_transport_time_getter {
+    ($name:tt, $type:tt $(,)?) => {
+        pub const fn $name(&self) -> $type {
+            $type(self.as_clap_event_transport().$name)
+        }
+    };
+}
+
+impl<'a> Transport<'a> {
+    /// # Safety
+    ///
+    /// The `header` must be a header of type: `clap_event_transport`.
+    pub const unsafe fn new_unchecked(header: &'a Header) -> Self {
+        Self { header }
+    }
+
+    const fn as_clap_event_transport(&self) -> &clap_event_transport {
+        // SAFETY: By construction, this cast is safe.
+        unsafe { self.header.cast_unchecked() }
+    }
+
+    impl_transport_time_getter!(song_pos_seconds, SecTime);
+    impl_transport_time_getter!(song_pos_beats, BeatTime);
+    impl_transport_time_getter!(loop_start_beats, BeatTime);
+    impl_transport_time_getter!(loop_end_beats, BeatTime);
+    impl_transport_time_getter!(loop_start_seconds, SecTime);
+    impl_transport_time_getter!(loop_end_seconds, SecTime);
+    impl_transport_time_getter!(bar_start, BeatTime);
+
+    impl_event_const_getter!(flags, as_clap_event_transport, u32);
+    impl_event_const_getter!(tempo, as_clap_event_transport, f64);
+    impl_event_const_getter!(tempo_inc, as_clap_event_transport, f64);
+    impl_event_const_getter!(bar_number, as_clap_event_transport, i32);
+    impl_event_const_getter!(tsig_num, as_clap_event_transport, u16);
+    impl_event_const_getter!(tsig_denom, as_clap_event_transport, u16);
+
+    pub const fn build() -> TransportBuilder {
+        TransportBuilder::new()
+    }
+
+    pub fn update(&self) -> TransportBuilder {
+        TransportBuilder::with_transport(self)
+    }
+}
+
+impl Event for Transport<'_> {
+    fn header(&self) -> &Header {
+        self.header
+    }
+}
+
+macro_rules! impl_transport_time_setter {
+    ($name:tt, $type:tt $(,)?) => {
+        pub const fn $name(self, value: $type) -> Self {
+            let mut build = self;
+            build.0.$name = value.0;
+            build
+        }
+    };
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct TransportBuilder(clap_event_transport);
+
+impl TransportBuilder {
+    pub const fn new() -> Self {
+        Self(clap_event_transport {
+            header: clap_event_header {
+                size: size_of::<clap_event_transport>() as u32,
+                time: 0,
+                space_id: CLAP_CORE_EVENT_SPACE_ID,
+                r#type: CLAP_EVENT_TRANSPORT as u16,
+                flags: 0,
+            },
+            flags: 0,
+            song_pos_beats: 0,
+            song_pos_seconds: 0,
+            tempo: 0.0,
+            tempo_inc: 0.0,
+            loop_start_beats: 0,
+            loop_end_beats: 0,
+            loop_start_seconds: 0,
+            loop_end_seconds: 0,
+            bar_start: 0,
+            bar_number: 0,
+            tsig_num: 0,
+            tsig_denom: 0,
+        })
+    }
+
+    pub fn with_transport(param_value: &Transport<'_>) -> Self {
+        // SAFETY: Transport constructor guarantees that this cast is safe, and we can
+        // copy the object of type: `clap_event_transport`.
+        Self(*unsafe { param_value.header().cast_unchecked() })
+    }
+
+    impl_transport_time_setter!(song_pos_seconds, SecTime);
+    impl_transport_time_setter!(song_pos_beats, BeatTime);
+    impl_transport_time_setter!(loop_start_beats, BeatTime);
+    impl_transport_time_setter!(loop_end_beats, BeatTime);
+    impl_transport_time_setter!(loop_start_seconds, SecTime);
+    impl_transport_time_setter!(loop_end_seconds, SecTime);
+    impl_transport_time_setter!(bar_start, BeatTime);
+
+    impl_event_builder_setter!(flags, u32);
+    impl_event_builder_setter!(tempo, f64);
+    impl_event_builder_setter!(tempo_inc, f64);
+    impl_event_builder_setter!(bar_number, i32);
+    impl_event_builder_setter!(tsig_num, u16);
+    impl_event_builder_setter!(tsig_denom, u16);
+}
+
+impl Default for TransportBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl_event_builder!(TransportBuilder, Transport<'a>, transport_unchecked);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Midi2<'a> {
