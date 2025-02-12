@@ -14,9 +14,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        profile: [ dev, release ]
-        os: [ ubuntu-20.04, ubuntu-24.04, windows-2022, macos-14 ]
+        profile:
+          - dev
+          - release
+        os:
+          - ubuntu-22.04
+          - ubuntu-24.04
+          - windows-2022
+          - macos-13
+          - macos-14
         toolchain:
+          - stable
           - beta
           - nightly
     steps:
@@ -28,10 +36,10 @@ jobs:
           rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
       - name: Build
         run: |
-          cargo build --verbose --workspace --profile ${{ matrix.profile }}
+          cargo build --verbose --profile ${{ matrix.profile }}
       - name: Build examples
         run: |
           cargo build --examples --profile ${{ matrix.profile }}
       - name: Test
         run: |
-          cargo test --verbose --workspace --profile ${{ matrix.profile }}
+          cargo test --verbose --profile ${{ matrix.profile }}
