@@ -11,7 +11,7 @@ use crate::{
         CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, CLAP_EVENT_MIDI2, CLAP_EVENT_PARAM_MOD,
         CLAP_EVENT_PARAM_VALUE, CLAP_EVENT_TRANSPORT, clap_event_header, clap_event_midi,
         clap_event_midi2, clap_event_param_mod, clap_event_param_value, clap_event_transport,
-        clap_input_events,
+        clap_input_events, clap_output_events,
     },
     fixedpoint::{BeatTime, SecTime},
     id::ClapId,
@@ -23,7 +23,7 @@ macro_rules! impl_event_cast_methods {
         #[doc = concat!("The caller must ensure that this `Header` has correct \
             size and type to contain the header and the payload of event of the \
             returned type: `", stringify!($name), "`.")
-                                                                                        ]
+                                                                                                ]
         pub const unsafe fn $name_unchk(&self) -> $type {
             unsafe { <$type>::new_unchecked(self) }
         }
@@ -773,10 +773,54 @@ impl<'a> InputEvents<'a> {
     }
 }
 
+pub struct OutputEvents<'a> {
+    list: &'a clap_output_events,
+    last_time: u32,
+}
+
+impl<'a> OutputEvents<'a> {
+    /// # Safety
+    ///
+    /// The pointer: `list.try_push` must be Some.
+    #[doc(hidden)]
+    pub const unsafe fn new_unchecked(list: &'a clap_output_events) -> Self {
+        Self { list, last_time: 0 }
+    }
+
+    /// # Safety
+    ///
+    /// Events must be pushed in sample time order, i.e. `event.header().time()`
+    /// must not be smaller than the time of the previous event successfully
+    /// pushed.
+    pub unsafe fn try_push_unchecked(&mut self, event: impl Event) -> Result<(), Error> {
+        let time = event.header().time();
+
+        if unsafe { self.list.try_push.unwrap()(self.list, event.header().as_clap_event_header()) }
+        {
+            self.last_time = time;
+            Ok(())
+        } else {
+            Err(Error::TryPush)
+        }
+    }
+
+    pub fn try_push(&mut self, event: impl Event) -> Result<(), Error> {
+        if event.header().time() >= self.last_time {
+            unsafe { self.try_push_unchecked(event) }
+        } else {
+            Err(Error::OutOfOrder {
+                last_time: self.last_time,
+            })
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Error {
     OtherType(u16),
     PayloadSize(u32),
+    TryPush,
+    OutOfOrder { last_time: u32 },
 }
 
 impl Display for Error {
@@ -786,6 +830,12 @@ impl Display for Error {
                 write!(f, "payload size for the defined event type: {size}")
             }
             Error::OtherType(id) => write!(f, "other type, id: {id}"),
+
+            Error::TryPush => write!(f, "pushing event failed"),
+
+            Error::OutOfOrder { last_time } => {
+                write!(f, "event out of order, last event's time: {last_time}")
+            }
         }
     }
 }
