@@ -629,8 +629,8 @@ mod input_events {
 
     use clap_clap::{
         events::{
-            Event, EventBuilder, InputEvents, Midi, Midi2, Midi2Builder, MidiBuilder, ParamValue,
-            ParamValueBuilder,
+            Event, EventBuilder, InputEvents, Midi, Midi2, Midi2Builder, MidiBuilder, ParamMod,
+            ParamModBuilder, ParamValue, ParamValueBuilder,
         },
         ffi::{
             CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, CLAP_EVENT_MIDI2, CLAP_EVENT_PARAM_VALUE,
@@ -820,6 +820,7 @@ mod input_events {
     enum KnownEvent {
         Midi(MidiBuilder),
         Midi2(Midi2Builder),
+        ParamMod(ParamModBuilder),
         ParamValue(ParamValueBuilder),
     }
 
@@ -829,6 +830,7 @@ mod input_events {
             match known {
                 KnownEvent::Midi(ev) => bed.as_mut().push_event(ev.event()),
                 KnownEvent::Midi2(ev) => bed.as_mut().push_event(ev.event()),
+                KnownEvent::ParamMod(ev) => bed.as_mut().push_event(ev.event()),
                 KnownEvent::ParamValue(ev) => bed.as_mut().push_event(ev.event()),
             }
         }
@@ -848,6 +850,7 @@ mod input_events {
         let events = [
             KnownEvent::Midi(Midi::build().port_index(1)),
             KnownEvent::Midi2(Midi2::build().port_index(2)),
+            KnownEvent::ParamMod(ParamMod::build().amount(12.345)),
             KnownEvent::ParamValue(ParamValue::build().value(12.34)),
         ];
         check_input_events(&events);
@@ -858,6 +861,7 @@ mod input_events {
         let events = [
             KnownEvent::Midi(Midi::build().port_index(1)),
             KnownEvent::Midi2(Midi2::build().port_index(2)),
+            KnownEvent::ParamMod(ParamMod::build().amount(12.345)),
             KnownEvent::ParamValue(ParamValue::build().value(12.34)),
         ];
         let events: Vec<_> = (0..1000)
