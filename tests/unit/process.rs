@@ -1,5 +1,4 @@
 use std::{
-    ops::Deref,
     pin::Pin,
     ptr::{NonNull, null},
 };
@@ -355,8 +354,7 @@ fn transport_null() {
 
     clap_process.transport = null();
 
-    let mut process =
-        unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
+    let process = unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
     assert!(process.transport().is_none());
 }
 
