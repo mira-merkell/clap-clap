@@ -67,9 +67,10 @@ pub const CLAP_PLUGIN_FEATURE_AMBISONIC: &CStr = c"ambisonic";
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_entry {
     pub clap_version: clap_version,
-    pub init: Option<unsafe extern "C" fn(plugin_path: *const c_char) -> bool>,
-    pub deinit: Option<unsafe extern "C" fn()>,
-    pub get_factory: Option<unsafe extern "C" fn(factory_id: *const c_char) -> *const c_void>,
+    pub init: Option<unsafe extern "C-unwind" fn(plugin_path: *const c_char) -> bool>,
+    pub deinit: Option<unsafe extern "C-unwind" fn()>,
+    pub get_factory:
+        Option<unsafe extern "C-unwind" fn(factory_id: *const c_char) -> *const c_void>,
 }
 
 #[repr(C)]
@@ -82,11 +83,14 @@ pub struct clap_host {
     pub url: *const c_char,
     pub version: *const c_char,
     pub get_extension: Option<
-        unsafe extern "C" fn(host: *const clap_host, extension_id: *const c_char) -> *const c_void,
+        unsafe extern "C-unwind" fn(
+            host: *const clap_host,
+            extension_id: *const c_char,
+        ) -> *const c_void,
     >,
-    pub request_restart: Option<unsafe extern "C" fn(host: *const clap_host)>,
-    pub request_process: Option<unsafe extern "C" fn(host: *const clap_host)>,
-    pub request_callback: Option<unsafe extern "C" fn(host: *const clap_host)>,
+    pub request_restart: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
+    pub request_process: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
+    pub request_callback: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
 }
 
 #[doc = " We use fixed point representation of beat time and seconds time\n Usage:\n   double x = ...; // in beats\n   clap_beattime y = round(CLAP_BEATTIME_FACTOR * x);"]
@@ -250,9 +254,9 @@ pub struct clap_event_midi2 {
 #[derive(Debug, Copy, Clone)]
 pub struct clap_input_events {
     pub ctx: *mut c_void,
-    pub size: Option<unsafe extern "C" fn(list: *const clap_input_events) -> u32>,
+    pub size: Option<unsafe extern "C-unwind" fn(list: *const clap_input_events) -> u32>,
     pub get: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             list: *const clap_input_events,
             index: u32,
         ) -> *const clap_event_header,
@@ -264,7 +268,7 @@ pub struct clap_input_events {
 pub struct clap_output_events {
     pub ctx: *mut c_void,
     pub try_push: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             list: *const clap_output_events,
             event: *const clap_event_header,
         ) -> bool,
@@ -322,30 +326,30 @@ pub struct clap_plugin_descriptor {
 pub struct clap_plugin {
     pub desc: *const clap_plugin_descriptor,
     pub plugin_data: *mut c_void,
-    pub init: Option<unsafe extern "C" fn(plugin: *const clap_plugin) -> bool>,
-    pub destroy: Option<unsafe extern "C" fn(plugin: *const clap_plugin)>,
+    pub init: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> bool>,
+    pub destroy: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin)>,
     pub activate: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             sample_rate: f64,
             min_frames_count: u32,
             max_frames_count: u32,
         ) -> bool,
     >,
-    pub deactivate: Option<unsafe extern "C" fn(plugin: *const clap_plugin)>,
-    pub start_processing: Option<unsafe extern "C" fn(plugin: *const clap_plugin) -> bool>,
-    pub stop_processing: Option<unsafe extern "C" fn(plugin: *const clap_plugin)>,
-    pub reset: Option<unsafe extern "C" fn(plugin: *const clap_plugin)>,
+    pub deactivate: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin)>,
+    pub start_processing: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> bool>,
+    pub stop_processing: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin)>,
+    pub reset: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin)>,
     pub process: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             process: *const clap_process,
         ) -> clap_process_status,
     >,
     pub get_extension: Option<
-        unsafe extern "C" fn(plugin: *const clap_plugin, id: *const c_char) -> *const c_void,
+        unsafe extern "C-unwind" fn(plugin: *const clap_plugin, id: *const c_char) -> *const c_void,
     >,
-    pub on_main_thread: Option<unsafe extern "C" fn(plugin: *const clap_plugin)>,
+    pub on_main_thread: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin)>,
 }
 
 pub const CLAP_PLUGIN_FACTORY_ID: &CStr = c"clap.plugin-factory";
@@ -353,15 +357,16 @@ pub const CLAP_PLUGIN_FACTORY_ID: &CStr = c"clap.plugin-factory";
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_factory {
-    pub get_plugin_count: Option<unsafe extern "C" fn(factory: *const clap_plugin_factory) -> u32>,
+    pub get_plugin_count:
+        Option<unsafe extern "C-unwind" fn(factory: *const clap_plugin_factory) -> u32>,
     pub get_plugin_descriptor: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             factory: *const clap_plugin_factory,
             index: u32,
         ) -> *const clap_plugin_descriptor,
     >,
     pub create_plugin: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             factory: *const clap_plugin_factory,
             host: *const clap_host,
             plugin_id: *const c_char,
@@ -397,61 +402,64 @@ pub type clap_preset_discovery_flags = c_uint;
 pub struct clap_preset_discovery_metadata_receiver {
     pub receiver_data: *mut c_void,
     pub on_error: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             receiver: *const clap_preset_discovery_metadata_receiver,
             os_error: i32,
             error_message: *const c_char,
         ),
     >,
     pub begin_preset: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             receiver: *const clap_preset_discovery_metadata_receiver,
             name: *const c_char,
             load_key: *const c_char,
         ) -> bool,
     >,
     pub add_plugin_id: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             receiver: *const clap_preset_discovery_metadata_receiver,
             plugin_id: *const clap_universal_plugin_id,
         ),
     >,
     pub set_soundpack_id: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             receiver: *const clap_preset_discovery_metadata_receiver,
             soundpack_id: *const c_char,
         ),
     >,
     pub set_flags: Option<
-        unsafe extern "C" fn(receiver: *const clap_preset_discovery_metadata_receiver, flags: u32),
+        unsafe extern "C-unwind" fn(
+            receiver: *const clap_preset_discovery_metadata_receiver,
+            flags: u32,
+        ),
     >,
     pub add_creator: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             receiver: *const clap_preset_discovery_metadata_receiver,
             creator: *const c_char,
         ),
     >,
     pub set_description: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             receiver: *const clap_preset_discovery_metadata_receiver,
             description: *const c_char,
         ),
     >,
     pub set_timestamps: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             receiver: *const clap_preset_discovery_metadata_receiver,
             creation_time: clap_timestamp,
             modification_time: clap_timestamp,
         ),
     >,
     pub add_feature: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             receiver: *const clap_preset_discovery_metadata_receiver,
             feature: *const c_char,
         ),
     >,
     pub add_extra_info: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             receiver: *const clap_preset_discovery_metadata_receiver,
             key: *const c_char,
             value: *const c_char,
@@ -503,10 +511,13 @@ pub struct clap_preset_discovery_provider_descriptor {
 pub struct clap_preset_discovery_provider {
     pub desc: *const clap_preset_discovery_provider_descriptor,
     pub provider_data: *mut c_void,
-    pub init: Option<unsafe extern "C" fn(provider: *const clap_preset_discovery_provider) -> bool>,
-    pub destroy: Option<unsafe extern "C" fn(provider: *const clap_preset_discovery_provider)>,
+    pub init: Option<
+        unsafe extern "C-unwind" fn(provider: *const clap_preset_discovery_provider) -> bool,
+    >,
+    pub destroy:
+        Option<unsafe extern "C-unwind" fn(provider: *const clap_preset_discovery_provider)>,
     pub get_metadata: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             provider: *const clap_preset_discovery_provider,
             location_kind: u32,
             location: *const c_char,
@@ -514,7 +525,7 @@ pub struct clap_preset_discovery_provider {
         ) -> bool,
     >,
     pub get_extension: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             provider: *const clap_preset_discovery_provider,
             extension_id: *const c_char,
         ) -> *const c_void,
@@ -531,25 +542,25 @@ pub struct clap_preset_discovery_indexer {
     pub version: *const c_char,
     pub indexer_data: *mut c_void,
     pub declare_filetype: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             indexer: *const clap_preset_discovery_indexer,
             filetype: *const clap_preset_discovery_filetype,
         ) -> bool,
     >,
     pub declare_location: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             indexer: *const clap_preset_discovery_indexer,
             location: *const clap_preset_discovery_location,
         ) -> bool,
     >,
     pub declare_soundpack: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             indexer: *const clap_preset_discovery_indexer,
             soundpack: *const clap_preset_discovery_soundpack,
         ) -> bool,
     >,
     pub get_extension: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             indexer: *const clap_preset_discovery_indexer,
             extension_id: *const c_char,
         ) -> *const c_void,
@@ -559,15 +570,16 @@ pub struct clap_preset_discovery_indexer {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_preset_discovery_factory {
-    pub count: Option<unsafe extern "C" fn(factory: *const clap_preset_discovery_factory) -> u32>,
+    pub count:
+        Option<unsafe extern "C-unwind" fn(factory: *const clap_preset_discovery_factory) -> u32>,
     pub get_descriptor: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             factory: *const clap_preset_discovery_factory,
             index: u32,
         ) -> *const clap_preset_discovery_provider_descriptor,
     >,
     pub create: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             factory: *const clap_preset_discovery_factory,
             indexer: *const clap_preset_discovery_indexer,
             provider_id: *const c_char,
@@ -601,13 +613,13 @@ pub struct clap_ambisonic_config {
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_ambisonic {
     pub is_config_supported: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             config: *const clap_ambisonic_config,
         ) -> bool,
     >,
     pub get_config: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             is_input: bool,
             port_index: u32,
@@ -619,7 +631,7 @@ pub struct clap_plugin_ambisonic {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_ambisonic {
-    pub changed: Option<unsafe extern "C" fn(host: *const clap_host)>,
+    pub changed: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
 }
 
 #[doc = " @page Audio Ports Activation\n\n This extension provides a way for the host to activate and de-activate audio ports.\n Deactivating a port provides the following benefits:\n - the plugin knows ahead of time that a given input is not present and can choose\n   an optimized computation path,\n - the plugin knows that an output is not consumed by the host, and doesn't need to\n   compute it.\n\n Audio ports can only be activated or deactivated when the plugin is deactivated, unless\n can_activate_while_processing() returns true.\n\n Audio buffers must still be provided if the audio port is deactivated.\n In such case, they shall be filled with 0 (or whatever is the neutral value in your context)\n and the constant_mask shall be set.\n\n Audio ports are initially in the active state after creating the plugin instance.\n Audio ports state are not saved in the plugin state, so the host must restore the\n audio ports state after creating the plugin instance.\n\n Audio ports state is invalidated by clap_plugin_audio_ports_config.select() and\n clap_host_audio_ports.rescan(CLAP_AUDIO_PORTS_RESCAN_LIST)."]
@@ -630,9 +642,9 @@ pub const CLAP_EXT_AUDIO_PORTS_ACTIVATION_COMPAT: &CStr = c"clap.audio-ports-act
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_audio_ports_activation {
     pub can_activate_while_processing:
-        Option<unsafe extern "C" fn(plugin: *const clap_plugin) -> bool>,
+        Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> bool>,
     pub set_active: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             is_input: bool,
             port_index: u32,
@@ -668,9 +680,10 @@ pub struct clap_audio_port_info {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_audio_ports {
-    pub count: Option<unsafe extern "C" fn(plugin: *const clap_plugin, is_input: bool) -> u32>,
+    pub count:
+        Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin, is_input: bool) -> u32>,
     pub get: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             index: u32,
             is_input: bool,
@@ -690,8 +703,8 @@ pub const CLAP_AUDIO_PORTS_RESCAN_LIST: c_uint = 32;
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_audio_ports {
     pub is_rescan_flag_supported:
-        Option<unsafe extern "C" fn(host: *const clap_host, flag: u32) -> bool>,
-    pub rescan: Option<unsafe extern "C" fn(host: *const clap_host, flags: u32)>,
+        Option<unsafe extern "C-unwind" fn(host: *const clap_host, flag: u32) -> bool>,
+    pub rescan: Option<unsafe extern "C-unwind" fn(host: *const clap_host, flags: u32)>,
 }
 
 #[doc = " @page Audio Ports Config\n\n This extension let the plugin provide port configurations presets.\n For example mono, stereo, surround, ambisonic, ...\n\n After the plugin initialization, the host may scan the list of configurations and eventually\n select one that fits the plugin context. The host can only select a configuration if the plugin\n is deactivated.\n\n A configuration is a very simple description of the audio ports:\n - it describes the main input and output ports\n - it has a name that can be displayed to the user\n\n The idea behind the configurations, is to let the user choose one via a menu.\n\n Plugins with very complex configuration possibilities should let the user configure the ports\n from the plugin GUI, and call @ref clap_host_audio_ports.rescan(CLAP_AUDIO_PORTS_RESCAN_ALL).\n\n To inquire the exact bus layout, the plugin implements the clap_plugin_audio_ports_config_info_t\n extension where all busses can be retrieved in the same way as in the audio-port extension."]
@@ -717,24 +730,24 @@ pub struct clap_audio_ports_config {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_audio_ports_config {
-    pub count: Option<unsafe extern "C" fn(plugin: *const clap_plugin) -> u32>,
+    pub count: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> u32>,
     pub get: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             index: u32,
             config: *mut clap_audio_ports_config,
         ) -> bool,
     >,
     pub select:
-        Option<unsafe extern "C" fn(plugin: *const clap_plugin, config_id: clap_id) -> bool>,
+        Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin, config_id: clap_id) -> bool>,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_audio_ports_config_info {
-    pub current_config: Option<unsafe extern "C" fn(plugin: *const clap_plugin) -> clap_id>,
+    pub current_config: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> clap_id>,
     pub get: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             config_id: clap_id,
             port_index: u32,
@@ -747,7 +760,7 @@ pub struct clap_plugin_audio_ports_config_info {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_audio_ports_config {
-    pub rescan: Option<unsafe extern "C" fn(host: *const clap_host)>,
+    pub rescan: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
 }
 
 pub const CLAP_EXT_CONFIGURABLE_AUDIO_PORTS: &CStr = c"clap.configurable-audio-ports/1";
@@ -767,14 +780,14 @@ pub struct clap_audio_port_configuration_request {
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_configurable_audio_ports {
     pub can_apply_configuration: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             requests: *const clap_audio_port_configuration_request,
             request_count: u32,
         ) -> bool,
     >,
     pub apply_configuration: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             requests: *const clap_audio_port_configuration_request,
             request_count: u32,
@@ -838,14 +851,14 @@ pub struct clap_context_menu_submenu {
 pub struct clap_context_menu_builder {
     pub ctx: *mut c_void,
     pub add_item: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             builder: *const clap_context_menu_builder,
             item_kind: clap_context_menu_item_kind,
             item_data: *const c_void,
         ) -> bool,
     >,
     pub supports: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             builder: *const clap_context_menu_builder,
             item_kind: clap_context_menu_item_kind,
         ) -> bool,
@@ -855,14 +868,14 @@ pub struct clap_context_menu_builder {
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_context_menu {
     pub populate: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             target: *const clap_context_menu_target,
             builder: *const clap_context_menu_builder,
         ) -> bool,
     >,
     pub perform: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             target: *const clap_context_menu_target,
             action_id: clap_id,
@@ -874,22 +887,22 @@ pub struct clap_plugin_context_menu {
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_context_menu {
     pub populate: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             host: *const clap_host,
             target: *const clap_context_menu_target,
             builder: *const clap_context_menu_builder,
         ) -> bool,
     >,
     pub perform: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             host: *const clap_host,
             target: *const clap_context_menu_target,
             action_id: clap_id,
         ) -> bool,
     >,
-    pub can_popup: Option<unsafe extern "C" fn(host: *const clap_host) -> bool>,
+    pub can_popup: Option<unsafe extern "C-unwind" fn(host: *const clap_host) -> bool>,
     pub popup: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             host: *const clap_host,
             target: *const clap_context_menu_target,
             screen_index: i32,
@@ -905,7 +918,7 @@ pub const CLAP_EXT_EVENT_REGISTRY: &CStr = c"clap.event-registry";
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_event_registry {
     pub query: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             host: *const clap_host,
             space_name: *const c_char,
             space_id: *mut u16,
@@ -954,61 +967,75 @@ pub struct clap_gui_resize_hints {
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_gui {
     pub is_api_supported: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             api: *const c_char,
             is_floating: bool,
         ) -> bool,
     >,
     pub get_preferred_api: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             api: *mut *const c_char,
             is_floating: *mut bool,
         ) -> bool,
     >,
     pub create: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             api: *const c_char,
             is_floating: bool,
         ) -> bool,
     >,
-    pub destroy: Option<unsafe extern "C" fn(plugin: *const clap_plugin)>,
-    pub set_scale: Option<unsafe extern "C" fn(plugin: *const clap_plugin, scale: f64) -> bool>,
+    pub destroy: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin)>,
+    pub set_scale:
+        Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin, scale: f64) -> bool>,
     pub get_size: Option<
-        unsafe extern "C" fn(plugin: *const clap_plugin, width: *mut u32, height: *mut u32) -> bool,
+        unsafe extern "C-unwind" fn(
+            plugin: *const clap_plugin,
+            width: *mut u32,
+            height: *mut u32,
+        ) -> bool,
     >,
-    pub can_resize: Option<unsafe extern "C" fn(plugin: *const clap_plugin) -> bool>,
+    pub can_resize: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> bool>,
     pub get_resize_hints: Option<
-        unsafe extern "C" fn(plugin: *const clap_plugin, hints: *mut clap_gui_resize_hints) -> bool,
+        unsafe extern "C-unwind" fn(
+            plugin: *const clap_plugin,
+            hints: *mut clap_gui_resize_hints,
+        ) -> bool,
     >,
     pub adjust_size: Option<
-        unsafe extern "C" fn(plugin: *const clap_plugin, width: *mut u32, height: *mut u32) -> bool,
+        unsafe extern "C-unwind" fn(
+            plugin: *const clap_plugin,
+            width: *mut u32,
+            height: *mut u32,
+        ) -> bool,
     >,
-    pub set_size:
-        Option<unsafe extern "C" fn(plugin: *const clap_plugin, width: u32, height: u32) -> bool>,
+    pub set_size: Option<
+        unsafe extern "C-unwind" fn(plugin: *const clap_plugin, width: u32, height: u32) -> bool,
+    >,
     pub set_parent: Option<
-        unsafe extern "C" fn(plugin: *const clap_plugin, window: *const clap_window) -> bool,
+        unsafe extern "C-unwind" fn(plugin: *const clap_plugin, window: *const clap_window) -> bool,
     >,
     pub set_transient: Option<
-        unsafe extern "C" fn(plugin: *const clap_plugin, window: *const clap_window) -> bool,
+        unsafe extern "C-unwind" fn(plugin: *const clap_plugin, window: *const clap_window) -> bool,
     >,
     pub suggest_title:
-        Option<unsafe extern "C" fn(plugin: *const clap_plugin, title: *const c_char)>,
-    pub show: Option<unsafe extern "C" fn(plugin: *const clap_plugin) -> bool>,
-    pub hide: Option<unsafe extern "C" fn(plugin: *const clap_plugin) -> bool>,
+        Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin, title: *const c_char)>,
+    pub show: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> bool>,
+    pub hide: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> bool>,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_gui {
-    pub resize_hints_changed: Option<unsafe extern "C" fn(host: *const clap_host)>,
-    pub request_resize:
-        Option<unsafe extern "C" fn(host: *const clap_host, width: u32, height: u32) -> bool>,
-    pub request_show: Option<unsafe extern "C" fn(host: *const clap_host) -> bool>,
-    pub request_hide: Option<unsafe extern "C" fn(host: *const clap_host) -> bool>,
-    pub closed: Option<unsafe extern "C" fn(host: *const clap_host, was_destroyed: bool)>,
+    pub resize_hints_changed: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
+    pub request_resize: Option<
+        unsafe extern "C-unwind" fn(host: *const clap_host, width: u32, height: u32) -> bool,
+    >,
+    pub request_show: Option<unsafe extern "C-unwind" fn(host: *const clap_host) -> bool>,
+    pub request_hide: Option<unsafe extern "C-unwind" fn(host: *const clap_host) -> bool>,
+    pub closed: Option<unsafe extern "C-unwind" fn(host: *const clap_host, was_destroyed: bool)>,
 }
 
 pub const CLAP_EXT_LATENCY: &CStr = c"clap.latency";
@@ -1016,13 +1043,13 @@ pub const CLAP_EXT_LATENCY: &CStr = c"clap.latency";
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_latency {
-    pub get: Option<unsafe extern "C" fn(plugin: *const clap_plugin) -> u32>,
+    pub get: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> u32>,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_latency {
-    pub changed: Option<unsafe extern "C" fn(host: *const clap_host)>,
+    pub changed: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
 }
 
 pub const CLAP_EXT_LOG: &CStr = c"clap.log";
@@ -1039,7 +1066,7 @@ pub type clap_log_severity = i32;
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_log {
     pub log: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             host: *const clap_host,
             severity: clap_log_severity,
             msg: *const c_char,
@@ -1060,9 +1087,9 @@ pub struct clap_note_name {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_note_name {
-    pub count: Option<unsafe extern "C" fn(plugin: *const clap_plugin) -> u32>,
+    pub count: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> u32>,
     pub get: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             index: u32,
             note_name: *mut clap_note_name,
@@ -1073,7 +1100,7 @@ pub struct clap_plugin_note_name {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_note_name {
-    pub changed: Option<unsafe extern "C" fn(host: *const clap_host)>,
+    pub changed: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
 }
 
 #[doc = " @page Note Ports\n\n This extension provides a way for the plugin to describe its current note ports.\n If the plugin does not implement this extension, it won't have note input or output.\n The plugin is only allowed to change its note ports configuration while it is deactivated."]
@@ -1097,9 +1124,10 @@ pub struct clap_note_port_info {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_note_ports {
-    pub count: Option<unsafe extern "C" fn(plugin: *const clap_plugin, is_input: bool) -> u32>,
+    pub count:
+        Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin, is_input: bool) -> u32>,
     pub get: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             index: u32,
             is_input: bool,
@@ -1114,8 +1142,8 @@ pub const CLAP_NOTE_PORTS_RESCAN_NAMES: c_uint = 2;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_note_ports {
-    pub supported_dialects: Option<unsafe extern "C" fn(host: *const clap_host) -> u32>,
-    pub rescan: Option<unsafe extern "C" fn(host: *const clap_host, flags: u32)>,
+    pub supported_dialects: Option<unsafe extern "C-unwind" fn(host: *const clap_host) -> u32>,
+    pub rescan: Option<unsafe extern "C-unwind" fn(host: *const clap_host, flags: u32)>,
 }
 
 #[doc = " @page Parameters\n @brief parameters management\n\n Main idea:\n\n The host sees the plugin as an atomic entity; and acts as a controller on top of its parameters.\n The plugin is responsible for keeping its audio processor and its GUI in sync.\n\n The host can at any time read parameters' value on the [main-thread] using\n @ref clap_plugin_params.get_value().\n\n There are two options to communicate parameter value changes, and they are not concurrent.\n - send automation points during clap_plugin.process()\n - send automation points during clap_plugin_params.flush(), for parameter changes\n   without processing audio\n\n When the plugin changes a parameter value, it must inform the host.\n It will send @ref CLAP_EVENT_PARAM_VALUE event during process() or flush().\n If the user is adjusting the value, don't forget to mark the beginning and end\n of the gesture by sending CLAP_EVENT_PARAM_GESTURE_BEGIN and CLAP_EVENT_PARAM_GESTURE_END\n events.\n\n @note MIDI CCs are tricky because you may not know when the parameter adjustment ends.\n Also if the host records incoming MIDI CC and parameter change automation at the same time,\n there will be a conflict at playback: MIDI CC vs Automation.\n The parameter automation will always target the same parameter because the param_id is stable.\n The MIDI CC may have a different mapping in the future and may result in a different playback.\n\n When a MIDI CC changes a parameter's value, set the flag CLAP_EVENT_DONT_RECORD in\n clap_event_param.header.flags. That way the host may record the MIDI CC automation, but not the\n parameter change and there won't be conflict at playback.\n\n Scenarios:\n\n I. Loading a preset\n - load the preset in a temporary state\n - call @ref clap_host_params.rescan() if anything changed\n - call @ref clap_host_latency.changed() if latency changed\n - invalidate any other info that may be cached by the host\n - if the plugin is activated and the preset will introduce breaking changes\n   (latency, audio ports, new parameters, ...) be sure to wait for the host\n   to deactivate the plugin to apply those changes.\n   If there are no breaking changes, the plugin can apply them them right away.\n   The plugin is responsible for updating both its audio processor and its gui.\n\n II. Turning a knob on the DAW interface\n - the host will send an automation event to the plugin via a process() or flush()\n\n III. Turning a knob on the Plugin interface\n - the plugin is responsible for sending the parameter value to its audio processor\n - call clap_host_params->request_flush() or clap_host->request_process().\n - when the host calls either clap_plugin->process() or clap_plugin_params->flush(),\n   send an automation event and don't forget to wrap the parameter change(s)\n   with CLAP_EVENT_PARAM_GESTURE_BEGIN and CLAP_EVENT_PARAM_GESTURE_END to define the\n   beginning and end of the gesture.\n\n IV. Turning a knob via automation\n - host sends an automation point during clap_plugin->process() or clap_plugin_params->flush().\n - the plugin is responsible for updating its GUI\n\n V. Turning a knob via plugin's internal MIDI mapping\n - the plugin sends a CLAP_EVENT_PARAM_VALUE output event, set should_record to false\n - the plugin is responsible for updating its GUI\n\n VI. Adding or removing parameters\n - if the plugin is activated call clap_host->restart()\n - once the plugin isn't active:\n   - apply the new state\n   - if a parameter is gone or is created with an id that may have been used before,\n     call clap_host_params.clear(host, param_id, CLAP_PARAM_CLEAR_ALL)\n   - call clap_host_params->rescan(CLAP_PARAM_RESCAN_ALL)\n\n CLAP allows the plugin to change the parameter range, yet the plugin developer\n should be aware that doing so isn't without risk, especially if you made the\n promise to never change the sound. If you want to be 100% certain that the\n sound will not change with all host, then simply never change the range.\n\n There are two approaches to automations, either you automate the plain value,\n or you automate the knob position. The first option will be robust to a range\n increase, while the second won't be.\n\n If the host goes with the second approach (automating the knob position), it means\n that the plugin is hosted in a relaxed environment regarding sound changes (they are\n accepted, and not a concern as long as they are reasonable). Though, stepped parameters\n should be stored as plain value in the document.\n\n If the host goes with the first approach, there will still be situation where the\n sound may inevitably change. For example, if the plugin increase the range, there\n is an automation playing at the max value and on top of that an LFO is applied.\n See the following curve:\n                                   .\n                                  . .\n          .....                  .   .\n before: .     .     and after: .     .\n\n Persisting parameter values:\n\n Plugins are responsible for persisting their parameter's values between\n sessions by implementing the state extension. Otherwise parameter value will\n not be recalled when reloading a project. Hosts should _not_ try to save and\n restore parameter values for plugins that don't implement the state\n extension.\n\n Advice for the host:\n\n - store plain values in the document (automation)\n - store modulation amount in plain value delta, not in percentage\n - when you apply a CC mapping, remember the min/max plain values so you can adjust\n - do not implement a parameter saving fall back for plugins that don't\n   implement the state extension\n\n Advice for the plugin:\n\n - think carefully about your parameter range when designing your DSP\n - avoid shrinking parameter ranges, they are very likely to change the sound\n - consider changing the parameter range as a tradeoff: what you improve vs what you break\n - make sure to implement saving and loading the parameter values using the\n   state extension\n - if you plan to use adapters for other plugin formats, then you need to pay extra\n   attention to the adapter requirements"]
@@ -1156,23 +1184,23 @@ pub struct clap_param_info {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_params {
-    pub count: Option<unsafe extern "C" fn(plugin: *const clap_plugin) -> u32>,
+    pub count: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> u32>,
     pub get_info: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             param_index: u32,
             param_info: *mut clap_param_info,
         ) -> bool,
     >,
     pub get_value: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             param_id: clap_id,
             out_value: *mut f64,
         ) -> bool,
     >,
     pub value_to_text: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             param_id: clap_id,
             value: f64,
@@ -1181,7 +1209,7 @@ pub struct clap_plugin_params {
         ) -> bool,
     >,
     pub text_to_value: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             param_id: clap_id,
             param_value_text: *const c_char,
@@ -1189,7 +1217,7 @@ pub struct clap_plugin_params {
         ) -> bool,
     >,
     pub flush: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             in_: *const clap_input_events,
             out: *const clap_output_events,
@@ -1212,15 +1240,15 @@ pub type clap_param_clear_flags = u32;
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_params {
     pub rescan:
-        Option<unsafe extern "C" fn(host: *const clap_host, flags: clap_param_rescan_flags)>,
+        Option<unsafe extern "C-unwind" fn(host: *const clap_host, flags: clap_param_rescan_flags)>,
     pub clear: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             host: *const clap_host,
             param_id: clap_id,
             flags: clap_param_clear_flags,
         ),
     >,
-    pub request_flush: Option<unsafe extern "C" fn(host: *const clap_host)>,
+    pub request_flush: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
 }
 
 #[repr(C)]
@@ -1252,7 +1280,7 @@ pub const CLAP_PARAM_INDICATION_AUTOMATION_OVERRIDING: c_uint = 4;
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_param_indication {
     pub set_mapping: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             param_id: clap_id,
             has_mapping: bool,
@@ -1262,7 +1290,7 @@ pub struct clap_plugin_param_indication {
         ),
     >,
     pub set_automation: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             param_id: clap_id,
             automation_state: u32,
@@ -1282,7 +1310,11 @@ pub type clap_posix_fd_flags = u32;
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_posix_fd_support {
     pub on_fd: Option<
-        unsafe extern "C" fn(plugin: *const clap_plugin, fd: c_int, flags: clap_posix_fd_flags),
+        unsafe extern "C-unwind" fn(
+            plugin: *const clap_plugin,
+            fd: c_int,
+            flags: clap_posix_fd_flags,
+        ),
     >,
 }
 
@@ -1290,12 +1322,21 @@ pub struct clap_plugin_posix_fd_support {
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_posix_fd_support {
     pub register_fd: Option<
-        unsafe extern "C" fn(host: *const clap_host, fd: c_int, flags: clap_posix_fd_flags) -> bool,
+        unsafe extern "C-unwind" fn(
+            host: *const clap_host,
+            fd: c_int,
+            flags: clap_posix_fd_flags,
+        ) -> bool,
     >,
     pub modify_fd: Option<
-        unsafe extern "C" fn(host: *const clap_host, fd: c_int, flags: clap_posix_fd_flags) -> bool,
+        unsafe extern "C-unwind" fn(
+            host: *const clap_host,
+            fd: c_int,
+            flags: clap_posix_fd_flags,
+        ) -> bool,
     >,
-    pub unregister_fd: Option<unsafe extern "C" fn(host: *const clap_host, fd: c_int) -> bool>,
+    pub unregister_fd:
+        Option<unsafe extern "C-unwind" fn(host: *const clap_host, fd: c_int) -> bool>,
 }
 
 pub const CLAP_EXT_PRESET_LOAD: &CStr = c"clap.preset-load/2";
@@ -1305,7 +1346,7 @@ pub const CLAP_EXT_PRESET_LOAD_COMPAT: &CStr = c"clap.preset-load.draft/2";
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_preset_load {
     pub from_location: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             location_kind: u32,
             location: *const c_char,
@@ -1318,7 +1359,7 @@ pub struct clap_plugin_preset_load {
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_preset_load {
     pub on_error: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             host: *const clap_host,
             location_kind: u32,
             location: *const c_char,
@@ -1328,7 +1369,7 @@ pub struct clap_host_preset_load {
         ),
     >,
     pub loaded: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             host: *const clap_host,
             location_kind: u32,
             location: *const c_char,
@@ -1355,9 +1396,9 @@ pub struct clap_remote_controls_page {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_remote_controls {
-    pub count: Option<unsafe extern "C" fn(plugin: *const clap_plugin) -> u32>,
+    pub count: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> u32>,
     pub get: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             page_index: u32,
             page: *mut clap_remote_controls_page,
@@ -1368,8 +1409,8 @@ pub struct clap_plugin_remote_controls {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_remote_controls {
-    pub changed: Option<unsafe extern "C" fn(host: *const clap_host)>,
-    pub suggest_page: Option<unsafe extern "C" fn(host: *const clap_host, page_id: clap_id)>,
+    pub changed: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
+    pub suggest_page: Option<unsafe extern "C-unwind" fn(host: *const clap_host, page_id: clap_id)>,
 }
 
 pub const CLAP_EXT_RENDER: &CStr = c"clap.render";
@@ -1381,9 +1422,12 @@ pub type clap_plugin_render_mode = i32;
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_render {
     pub has_hard_realtime_requirement:
-        Option<unsafe extern "C" fn(plugin: *const clap_plugin) -> bool>,
+        Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> bool>,
     pub set: Option<
-        unsafe extern "C" fn(plugin: *const clap_plugin, mode: clap_plugin_render_mode) -> bool,
+        unsafe extern "C-unwind" fn(
+            plugin: *const clap_plugin,
+            mode: clap_plugin_render_mode,
+        ) -> bool,
     >,
 }
 
@@ -1392,7 +1436,11 @@ pub struct clap_plugin_render {
 pub struct clap_istream {
     pub ctx: *mut c_void,
     pub read: Option<
-        unsafe extern "C" fn(stream: *const clap_istream, buffer: *mut c_void, size: u64) -> i64,
+        unsafe extern "C-unwind" fn(
+            stream: *const clap_istream,
+            buffer: *mut c_void,
+            size: u64,
+        ) -> i64,
     >,
 }
 
@@ -1401,7 +1449,11 @@ pub struct clap_istream {
 pub struct clap_ostream {
     pub ctx: *mut c_void,
     pub write: Option<
-        unsafe extern "C" fn(stream: *const clap_ostream, buffer: *const c_void, size: u64) -> i64,
+        unsafe extern "C-unwind" fn(
+            stream: *const clap_ostream,
+            buffer: *const c_void,
+            size: u64,
+        ) -> i64,
     >,
 }
 
@@ -1416,14 +1468,14 @@ pub type clap_plugin_state_context_type = c_uint;
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_state_context {
     pub save: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             stream: *const clap_ostream,
             context_type: u32,
         ) -> bool,
     >,
     pub load: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             stream: *const clap_istream,
             context_type: u32,
@@ -1438,17 +1490,23 @@ pub const CLAP_EXT_STATE: &CStr = c"clap.state";
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_state {
     pub save: Option<
-        unsafe extern "C" fn(plugin: *const clap_plugin, stream: *const clap_ostream) -> bool,
+        unsafe extern "C-unwind" fn(
+            plugin: *const clap_plugin,
+            stream: *const clap_ostream,
+        ) -> bool,
     >,
     pub load: Option<
-        unsafe extern "C" fn(plugin: *const clap_plugin, stream: *const clap_istream) -> bool,
+        unsafe extern "C-unwind" fn(
+            plugin: *const clap_plugin,
+            stream: *const clap_istream,
+        ) -> bool,
     >,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_state {
-    pub mark_dirty: Option<unsafe extern "C" fn(host: *const clap_host)>,
+    pub mark_dirty: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
 }
 
 pub const CLAP_EXT_SURROUND: &CStr = c"clap.surround/4";
@@ -1478,9 +1536,9 @@ pub const CLAP_SURROUND_TBR: c_uint = 17;
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_surround {
     pub is_channel_mask_supported:
-        Option<unsafe extern "C" fn(plugin: *const clap_plugin, channel_mask: u64) -> bool>,
+        Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin, channel_mask: u64) -> bool>,
     pub get_channel_map: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             plugin: *const clap_plugin,
             is_input: bool,
             port_index: u32,
@@ -1493,7 +1551,7 @@ pub struct clap_plugin_surround {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_surround {
-    pub changed: Option<unsafe extern "C" fn(host: *const clap_host)>,
+    pub changed: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
 }
 
 pub const CLAP_EXT_TAIL: &CStr = c"clap.tail";
@@ -1501,13 +1559,13 @@ pub const CLAP_EXT_TAIL: &CStr = c"clap.tail";
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_pluginail {
-    pub get: Option<unsafe extern "C" fn(plugin: *const clap_plugin) -> u32>,
+    pub get: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> u32>,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_hostail {
-    pub changed: Option<unsafe extern "C" fn(host: *const clap_host)>,
+    pub changed: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
 }
 
 pub const CLAP_EXT_THREAD_CHECK: &CStr = c"clap.thread-check";
@@ -1516,8 +1574,8 @@ pub const CLAP_EXT_THREAD_CHECK: &CStr = c"clap.thread-check";
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_hosthread_check {
-    pub is_main_thread: Option<unsafe extern "C" fn(host: *const clap_host) -> bool>,
-    pub is_audio_thread: Option<unsafe extern "C" fn(host: *const clap_host) -> bool>,
+    pub is_main_thread: Option<unsafe extern "C-unwind" fn(host: *const clap_host) -> bool>,
+    pub is_audio_thread: Option<unsafe extern "C-unwind" fn(host: *const clap_host) -> bool>,
 }
 
 #[doc = " @page\n\n This extension lets the plugin use the host's thread pool.\n\n The plugin must provide @ref clap_pluginhread_pool, and the host may provide @ref\n clap_hosthread_pool. If it doesn't, the plugin should process its data by its own means. In\n the worst case, a single threaded for-loop.\n\n Simple example with N voices to process\n\n @code\n void myplug_thread_pool_exec(const clap_plugin *plugin, uint32_t voice_index)\n {\n    compute_voice(plugin, voice_index);\n }\n\n void myplug_process(const clap_plugin *plugin, const clap_process *process)\n {\n    ...\n    bool didComputeVoices = false;\n    if (host_thread_pool && host_thread_pool.exec)\n       didComputeVoices = host_thread_pool.request_exec(host, plugin, N);\n\n    if (!didComputeVoices)\n       for (uint32_t i = 0; i < N; ++i)\n          myplug_thread_pool_exec(plugin, i);\n    ...\n }\n @endcode\n\n Be aware that using a thread pool may break hard real-time rules due to the thread\n synchronization involved.\n\n If the host knows that it is running under hard real-time pressure it may decide to not\n provide this interface."]
@@ -1526,13 +1584,14 @@ pub const CLAP_EXT_THREAD_POOL: &CStr = c"clap.thread-pool";
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_pluginhread_pool {
-    pub exec: Option<unsafe extern "C" fn(plugin: *const clap_plugin, task_index: u32)>,
+    pub exec: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin, task_index: u32)>,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_hosthread_pool {
-    pub request_exec: Option<unsafe extern "C" fn(host: *const clap_host, num_tasks: u32) -> bool>,
+    pub request_exec:
+        Option<unsafe extern "C-unwind" fn(host: *const clap_host, num_tasks: u32) -> bool>,
 }
 
 pub const CLAP_EXT_TIMER_SUPPORT: &CStr = c"clap.timer-support";
@@ -1540,21 +1599,22 @@ pub const CLAP_EXT_TIMER_SUPPORT: &CStr = c"clap.timer-support";
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_pluginimer_support {
-    pub on_timer: Option<unsafe extern "C" fn(plugin: *const clap_plugin, timer_id: clap_id)>,
+    pub on_timer:
+        Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin, timer_id: clap_id)>,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_hostimer_support {
     pub register_timer: Option<
-        unsafe extern "C" fn(
+        unsafe extern "C-unwind" fn(
             host: *const clap_host,
             period_ms: u32,
             timer_id: *mut clap_id,
         ) -> bool,
     >,
     pub unregister_timer:
-        Option<unsafe extern "C" fn(host: *const clap_host, timer_id: clap_id) -> bool>,
+        Option<unsafe extern "C-unwind" fn(host: *const clap_host, timer_id: clap_id) -> bool>,
 }
 
 pub const CLAP_EXT_TRACK_INFO: &CStr = c"clap.track-info/1";
@@ -1580,14 +1640,15 @@ pub struct clap_track_info {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_pluginrack_info {
-    pub changed: Option<unsafe extern "C" fn(plugin: *const clap_plugin)>,
+    pub changed: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin)>,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_hostrack_info {
-    pub get:
-        Option<unsafe extern "C" fn(host: *const clap_host, info: *mut clap_track_info) -> bool>,
+    pub get: Option<
+        unsafe extern "C-unwind" fn(host: *const clap_host, info: *mut clap_track_info) -> bool,
+    >,
 }
 
 pub const CLAP_EXT_VOICE_INFO: &CStr = c"clap.voice-info";
@@ -1606,12 +1667,12 @@ pub struct clap_voice_info {
 #[derive(Debug, Copy, Clone)]
 pub struct clap_plugin_voice_info {
     pub get: Option<
-        unsafe extern "C" fn(plugin: *const clap_plugin, info: *mut clap_voice_info) -> bool,
+        unsafe extern "C-unwind" fn(plugin: *const clap_plugin, info: *mut clap_voice_info) -> bool,
     >,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct clap_host_voice_info {
-    pub changed: Option<unsafe extern "C" fn(host: *const clap_host)>,
+    pub changed: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
 }

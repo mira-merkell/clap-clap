@@ -32,12 +32,12 @@ pub struct TestHost {
 
 impl TestHost {
     fn new(config: TestHostConfig) -> Pin<Box<Self>> {
-        extern "C" fn get_extension(_: *const clap_host, _: *const c_char) -> *const c_void {
+        extern "C-unwind" fn get_extension(_: *const clap_host, _: *const c_char) -> *const c_void {
             null()
         }
-        extern "C" fn request_restart(_: *const clap_host) {}
-        extern "C" fn request_reset(_: *const clap_host) {}
-        extern "C" fn request_callback(_: *const clap_host) {}
+        extern "C-unwind" fn request_restart(_: *const clap_host) {}
+        extern "C-unwind" fn request_reset(_: *const clap_host) {}
+        extern "C-unwind" fn request_callback(_: *const clap_host) {}
 
         let name = CString::new(config.name).unwrap();
         let vendor = CString::new(config.vendor).unwrap();
