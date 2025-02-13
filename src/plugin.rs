@@ -15,7 +15,8 @@ use crate::{
 
 mod desc;
 
-pub(crate) use desc::{PluginDescriptor, build_plugin_descriptor};
+#[doc(hidden)]
+pub use desc::PluginDescriptor;
 
 mod ffi;
 
@@ -89,7 +90,7 @@ impl<P: Plugin> ClapPluginExtensions<P> {
 
 pub(crate) struct Runtime<P: Plugin> {
     pub(crate) audio_thread: Option<P::AudioThread>,
-    pub(crate) descriptor: PluginDescriptor<P>,
+    pub(crate) descriptor: PluginDescriptor,
     pub(crate) host: Arc<Host>,
     pub(crate) plugin: P,
     pub(crate) plugin_extensions: Mutex<ClapPluginExtensions<P>>,
@@ -98,7 +99,7 @@ pub(crate) struct Runtime<P: Plugin> {
 impl<P: Plugin> Runtime<P> {
     pub(crate) fn initialize(host: Arc<Host>) -> Result<Self, Error> {
         Ok(Self {
-            descriptor: build_plugin_descriptor()?,
+            descriptor: PluginDescriptor::new::<P>()?,
             plugin: P::default(),
             audio_thread: None,
             host,
@@ -227,6 +228,12 @@ impl Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+impl From<NulError> for Error {
+    fn from(value: NulError) -> Self {
+        Self::NulError(value)
+    }
+}
 
 impl From<Error> for crate::Error {
     fn from(value: Error) -> Self {

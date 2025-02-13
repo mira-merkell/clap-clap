@@ -232,7 +232,7 @@ extern "C-unwind" fn on_main_thread<P: Plugin>(plugin: *const clap_plugin) {
 
 pub(crate) fn box_clap_plugin<P: Plugin>(data: Runtime<P>) -> Box<clap_plugin> {
     let data = Box::new(data);
-    let desc = &raw const data.descriptor.clap_plugin_descriptor;
+    let desc = &raw const *data.descriptor.clap_plugin_descriptor();
     let data = Box::into_raw(data);
 
     Box::new(clap_plugin {

@@ -23,6 +23,9 @@ use clap_clap::{
 
 use crate::{plugin::dummy_host::DUMMY_HOST, process::TestProcessConfig};
 
+#[cfg(test)]
+mod desc;
+
 #[derive(Default)]
 pub struct TestPlugin {
     id: Option<SystemTime>,
