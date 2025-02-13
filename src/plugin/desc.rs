@@ -73,4 +73,8 @@ impl PluginDescriptor {
     pub fn plugin_id(&self) -> &CStr {
         self.id.as_ref()
     }
+
+    pub fn clap_plugin_descriptor(&self) -> &clap_plugin_descriptor {
+        &self.clap_plugin_descriptor
+    }
 }
