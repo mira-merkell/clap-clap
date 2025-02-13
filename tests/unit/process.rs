@@ -1,7 +1,4 @@
-use std::{
-    pin::Pin,
-    ptr::{NonNull, null},
-};
+use std::ptr::{NonNull, null};
 
 use clap_clap::{
     ffi::{
@@ -43,18 +40,20 @@ struct TestAudioBuffer {
     latency: u32,
     constant_mask: u64,
 
+    // Pointers to data32/64. These pointers point to Vec buffers on the heap.
+    // TestAudioBuffer can be moved without invalidating them.
     raw_data32: Vec<*mut f32>,
     raw_data64: Vec<*mut f64>,
 }
 
 impl TestAudioBuffer {
-    fn new(n: u32, channel_count: u32, latency: u32) -> Pin<Box<Self>> {
+    fn new(n: u32, channel_count: u32, latency: u32) -> Self {
         let mut data32 = vec![TestChannel::new(n); channel_count as usize];
         let mut data64 = vec![TestChannel::new(n); channel_count as usize];
         let raw_data32 = data32.iter_mut().map(|ch| ch.as_mut_ptr()).collect();
         let raw_data64 = data64.iter_mut().map(|ch| ch.as_mut_ptr()).collect();
 
-        Box::pin(Self {
+        Self {
             data32,
             data64,
             channel_count,
@@ -62,10 +61,10 @@ impl TestAudioBuffer {
             constant_mask: 0,
             raw_data32,
             raw_data64,
-        })
+        }
     }
 
-    fn clap_audio_buffer(self: &mut Pin<Box<Self>>) -> clap_audio_buffer {
+    fn clap_audio_buffer(&mut self) -> clap_audio_buffer {
         clap_audio_buffer {
             data32: self.raw_data32.as_mut_ptr(),
             data64: self.raw_data64.as_mut_ptr(),
@@ -81,8 +80,8 @@ pub struct TestProcess {
     steady_time: i64,
     frames_count: u32,
     transport: clap_event_transport,
-    audio_inputs: Vec<Pin<Box<TestAudioBuffer>>>,
-    audio_outputs: Vec<Pin<Box<TestAudioBuffer>>>,
+    audio_inputs: Vec<TestAudioBuffer>,
+    audio_outputs: Vec<TestAudioBuffer>,
     audio_inputs_count: u32,
     audio_outputs_count: u32,
 
@@ -117,7 +116,7 @@ fn build_clap_event_transport() -> clap_event_transport {
 }
 
 impl TestProcess {
-    fn new(config: TestProcessConfig) -> Pin<Box<Self>> {
+    fn new(config: TestProcessConfig) -> Self {
         let mut audio_inputs: Vec<_> = (0..config.audio_inputs_count)
             .map(|_| {
                 TestAudioBuffer::new(config.frames_count, config.channel_count, config.latency)
@@ -138,7 +137,7 @@ impl TestProcess {
             .map(|ao| ao.clap_audio_buffer())
             .collect();
 
-        Box::pin(Self {
+        Self {
             steady_time: config.steady_time,
             frames_count: config.frames_count,
             transport: build_clap_event_transport(),
@@ -148,10 +147,10 @@ impl TestProcess {
             audio_outputs_count: config.audio_outputs_count,
             raw_audio_inputs,
             raw_audio_outputs,
-        })
+        }
     }
 
-    pub fn clap_process(self: &mut Pin<Box<Self>>) -> clap_process {
+    pub fn clap_process(&mut self) -> clap_process {
         clap_process {
             steady_time: self.steady_time,
             frames_count: self.frames_count,
@@ -177,7 +176,7 @@ pub struct TestProcessConfig {
 }
 
 impl TestProcessConfig {
-    pub fn build(self) -> Pin<Box<TestProcess>> {
+    pub fn build(self) -> TestProcess {
         TestProcess::new(self)
     }
 }
@@ -281,6 +280,40 @@ fn self_test_04_64() {
     let sample = unsafe { *in0_ch0.add(0) };
     assert_eq!(sample, 11.13);
 
+    let out2 = unsafe { *clap_process.audio_outputs.add(2) };
+    let out2_ch2 = unsafe { *out2.data64.add(2) };
+    let sample = unsafe { *out2_ch2.add(1) };
+    assert_eq!(sample, 0.777);
+}
+
+#[test]
+fn self_test_valid_after_moved() {
+    let mut process = TestProcessConfig {
+        latency: 0,
+        steady_time: 1,
+        frames_count: 2,
+        channel_count: 3,
+        audio_inputs_count: 4,
+        audio_outputs_count: 5,
+    }
+    .build();
+    process.audio_outputs[2].data64[2].data()[1] = 0.777;
+
+    let clap_process = process.clap_process();
+    let out2 = unsafe { *clap_process.audio_outputs.add(2) };
+    let out2_ch2 = unsafe { *out2.data64.add(2) };
+    let sample = unsafe { *out2_ch2.add(1) };
+    assert_eq!(sample, 0.777);
+
+    let mut boxed = Box::new(process);
+    let clap_process = boxed.clap_process();
+    let out2 = unsafe { *clap_process.audio_outputs.add(2) };
+    let out2_ch2 = unsafe { *out2.data64.add(2) };
+    let sample = unsafe { *out2_ch2.add(1) };
+    assert_eq!(sample, 0.777);
+
+    let mut back_on_stack = *boxed;
+    let clap_process = back_on_stack.clap_process();
     let out2 = unsafe { *clap_process.audio_outputs.add(2) };
     let out2_ch2 = unsafe { *out2.data64.add(2) };
     let sample = unsafe { *out2_ch2.add(1) };
