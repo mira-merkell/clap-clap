@@ -624,7 +624,7 @@ pub mod input_events {
     use std::{
         marker::PhantomPinned,
         pin::Pin,
-        ptr::{null, null_mut},
+        ptr::{NonNull, null, null_mut},
     };
 
     use clap_clap::{
@@ -635,7 +635,9 @@ pub mod input_events {
         ffi::{
             CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, CLAP_EVENT_MIDI2, CLAP_EVENT_PARAM_VALUE,
             clap_event_header, clap_event_midi, clap_event_param_value, clap_input_events,
+            clap_process,
         },
+        prelude::Process,
     };
 
     static EVENT1: clap_event_midi = clap_event_midi {
@@ -874,10 +876,41 @@ pub mod input_events {
 
         check_input_events(&events);
     }
+
+    #[test]
+    fn process_input_events() {
+        let event = Midi2::build().port_index(2);
+        let mut bed = TestBed::new();
+        bed.as_mut().push_event(event.event());
+        let mut clap_process = clap_process {
+            steady_time: 0,
+            frames_count: 0,
+            transport: null(),
+            audio_inputs: null(),
+            audio_outputs: null_mut(),
+            audio_inputs_count: 0,
+            audio_outputs_count: 0,
+            in_events: &raw const bed.clap_input_events,
+            out_events: null(),
+        };
+        let process =
+            unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
+
+        let input_events = process.in_events();
+        assert_eq!(input_events.size(), 1);
+        let retrieved = input_events.get(0);
+
+        let retrieved = retrieved.midi2().unwrap();
+        assert_eq!(retrieved.port_index(), event.event().port_index());
+    }
 }
 
 mod output_events {
-    use std::{pin::Pin, ptr, ptr::null_mut};
+    use std::{
+        pin::Pin,
+        ptr,
+        ptr::{NonNull, null, null_mut},
+    };
 
     use clap_clap::{
         events::{
@@ -887,7 +920,9 @@ mod output_events {
             CLAP_EVENT_MIDI, CLAP_EVENT_MIDI2, CLAP_EVENT_PARAM_MOD, CLAP_EVENT_PARAM_VALUE,
             CLAP_EVENT_TRANSPORT, clap_event_header, clap_event_midi, clap_event_midi2,
             clap_event_param_mod, clap_event_param_value, clap_event_transport, clap_output_events,
+            clap_process,
         },
+        prelude::Process,
     };
 
     use crate::events::input_events::KnownEvent;
@@ -1054,5 +1089,33 @@ mod output_events {
             .map(|i| events[(13 * i + 27) % events.len()])
             .collect();
         check_push_events(&events);
+    }
+
+    #[test]
+    fn process_out_events() {
+        let event = Midi::build().port_index(34);
+        let mut bed = TestBed::new(1);
+        let mut clap_process = clap_process {
+            steady_time: 0,
+            frames_count: 0,
+            transport: null(),
+            audio_inputs: null(),
+            audio_outputs: null_mut(),
+            audio_inputs_count: 0,
+            audio_outputs_count: 0,
+            in_events: null(),
+            out_events: bed.clap_output_events(),
+        };
+        let process =
+            unsafe { Process::new_unchecked(NonNull::new(&raw mut clap_process).unwrap()) };
+
+        let mut output_events = process.out_events();
+        output_events.try_push(event.event()).unwrap();
+
+        let KnownEvent::Midi(retrieved) = bed.get_event(0).unwrap() else {
+            panic!()
+        };
+
+        assert_eq!(retrieved, event);
     }
 }
