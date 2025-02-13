@@ -15,7 +15,7 @@ use crate::{
 
 mod desc;
 
-pub(crate) use desc::PluginDescriptor;
+pub use desc::PluginDescriptor;
 
 mod ffi;
 

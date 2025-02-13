@@ -8,6 +8,7 @@ use crate::{
     plugin::{Error, Plugin},
 };
 
+#[doc(hidden)]
 #[allow(dead_code)]
 pub struct PluginDescriptor {
     clap_plugin_descriptor: clap_plugin_descriptor,
