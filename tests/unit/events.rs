@@ -935,7 +935,7 @@ mod output_events {
 
     impl TestBed {
         fn new(capacity: usize) -> Pin<Box<Self>> {
-            extern "C" fn try_push(
+            extern "C-unwind" fn try_push(
                 list: *const clap_output_events,
                 event: *const clap_event_header,
             ) -> bool {
