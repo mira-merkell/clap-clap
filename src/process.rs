@@ -8,8 +8,7 @@ use std::{
 };
 
 use crate::{
-    events::{Header, Transport},
-    events::{InputEvents, OutputEvents},
+    events::{Header, InputEvents, OutputEvents, Transport},
     ffi::{
         CLAP_PROCESS_CONTINUE, CLAP_PROCESS_CONTINUE_IF_NOT_QUIET, CLAP_PROCESS_SLEEP,
         CLAP_PROCESS_TAIL, clap_audio_buffer, clap_process, clap_process_status,
