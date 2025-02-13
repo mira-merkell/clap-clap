@@ -48,8 +48,18 @@ impl<P: Plugin> FactoryPluginDescriptor<P> {
 
 pub trait FactoryPlugin {
     fn plugin_id(&self) -> &CStr;
-    fn clap_plugin_descriptor(&self) -> *const clap_plugin_descriptor;
-    fn clap_plugin(&self, host: FactoryHost) -> Result<*const clap_plugin, Error>;
+
+    /// # Safety
+    ///
+    /// The caller must assure that the pointer will remain valid for the
+    /// intended use.
+    unsafe fn clap_plugin_descriptor(&self) -> *const clap_plugin_descriptor;
+
+    /// # Safety
+    ///
+    /// The caller must assure that the pointer will remain valid for the
+    /// intended use.
+    unsafe fn clap_plugin(&self, host: FactoryHost) -> Result<*const clap_plugin, Error>;
 }
 
 impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
@@ -61,11 +71,10 @@ impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
         &raw const *self.descriptor.clap_plugin_descriptor()
     }
 
-    fn clap_plugin(&self, host: FactoryHost) -> Result<*const clap_plugin, Error> {
-        // Safety:
-        // The pointer unwrapped from FactoryHost is a valid pointer
-        // to a CLAP host, obtained as the argument passed to plugin
-        // factory's create_plugin().
+    unsafe fn clap_plugin(&self, host: FactoryHost) -> Result<*const clap_plugin, Error> {
+        // SAFETY: The pointer unwrapped from FactoryHost is a valid pointer to a CLAP
+        // host, obtained as the argument passed to plugin factory's
+        // create_plugin().
         let host = unsafe { Host::new(host.into_inner()) };
         Ok(Runtime::<P>::initialize(Arc::new(host))
             .map_err(Error::PluginDescriptor)?
@@ -102,7 +111,7 @@ impl Factory {
         let uindex = usize::try_from(index).map_err(|_| Error::IndexOutOfBounds(index))?;
         (uindex < self.plugins.len())
             // This needs to be lazy to avoid evaluating on invalid index.
-            .then(|| self.plugins[uindex].clap_plugin_descriptor())
+            .then(|| unsafe { self.plugins[uindex].clap_plugin_descriptor() })
             .ok_or(Error::IndexOutOfBounds(index))
     }
 
@@ -111,8 +120,8 @@ impl Factory {
         plugin_id: &CStr,
         host: FactoryHost,
     ) -> Result<*const clap_plugin, Error> {
-        let i = self.id_map.get(plugin_id).ok_or(Error::PluginIdNotFound)?;
-        self.plugins[*i].clap_plugin(host)
+        let i = *self.id_map.get(plugin_id).ok_or(Error::PluginIdNotFound)?;
+        unsafe { self.plugins[i].clap_plugin(host) }
     }
 }
 
