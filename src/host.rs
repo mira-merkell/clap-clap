@@ -1,27 +1,17 @@
 use std::{
-    cell::UnsafeCell,
     ffi::{CStr, c_void},
     fmt::{Display, Formatter},
-    ptr::null,
 };
 
 use crate::{
     ext::host::{log, log::Log},
-    ffi::{CLAP_EXT_LOG, clap_host, clap_host_log, clap_plugin},
+    ffi::{CLAP_EXT_LOG, clap_host, clap_host_log},
     version::ClapVersion,
 };
 
 #[derive(Debug)]
 pub struct Host {
     clap_host: *const clap_host,
-    // This pointer is stored as a backdoor way for the user to implement plugin
-    // functionality that isn't provided by the library.  It can be retrieved
-    // by calling unsafe `Host::_raw_clap_plugin()`.
-    //
-    // We use it for debugging as well: to assure that the pointer to the plugin
-    // provided by the CLAP host, is the same as when the plugin was created by
-    // the plugin factory and thus the clap_plugin struct hasn't moved.
-    clap_plugin: UnsafeCell<*const clap_plugin>,
 }
 
 impl Host {
@@ -38,66 +28,21 @@ impl Host {
     /// validated UTF-8 strings.
     #[doc(hidden)]
     pub const unsafe fn new(clap_host: *const clap_host) -> Self {
-        Self {
-            clap_host,
-            clap_plugin: UnsafeCell::new(null()),
-        }
+        Self { clap_host }
     }
 
-    pub(crate) const fn as_ref(&self) -> &clap_host {
+    pub const fn as_clap_host(&self) -> &clap_host {
         // SAFETY: by construction, we can obtain a shared reference to clap_host for
         // the lifetime of self.
         unsafe { &*self.clap_host }
     }
 
     pub const fn clap_version(&self) -> ClapVersion {
-        self.as_ref().clap_version
+        self.as_clap_host().clap_version
     }
 
     pub const fn get_extension(&self) -> HostExtensions {
         HostExtensions::new(self)
-    }
-
-    /// Get raw pointer to the CLAP host.
-    ///
-    /// This function is here to provide a workaround for users to access CLAP
-    /// host functionality that hasn't been implemented yet in this library.
-    /// Since it would be difficult to define safety requirements for this
-    /// method, it should be considered a last resort, and it's use is
-    /// discouraged.
-    ///
-    /// # Safety
-    ///
-    /// It is unsafe to use this method.
-    #[doc(hidden)]
-    pub const unsafe fn _raw_clap_host(&self) -> *const clap_host {
-        self.clap_host
-    }
-
-    /// # Safety
-    ///
-    /// The caller must assure they're the only ones who can access the host
-    /// structure for the duration of self.
-    pub(crate) const unsafe fn _raw_update_clap_plugin(&self, clap_plugin: *const clap_plugin) {
-        // SAFETY: The safety requirements to access UnsafeCell here are upheld
-        // be the caller.
-        unsafe { *self.clap_plugin.get() = clap_plugin };
-    }
-
-    /// Get raw pointer to the calling CLAP plugin.
-    ///
-    /// This function is here to provide a workaround for users to access CLAP
-    /// plugin functionality that hasn't been implemented yet in this library.
-    /// Since it would be difficult to define safety requirements for this
-    /// method, it should be considered a last resort, and it's use is
-    /// discouraged.
-    ///
-    /// # Safety
-    ///
-    /// It is unsafe to use this method.
-    #[doc(hidden)]
-    pub const unsafe fn _raw_clap_plugin(&self) -> *const clap_plugin {
-        unsafe { *self.clap_plugin.get() }
     }
 }
 
@@ -112,7 +57,7 @@ macro_rules! impl_host_get_str {
                 ///
                 /// This method will panic if the host returns an invalid UTF-8 string.
                 pub fn $description(&self) -> &str {
-                    unsafe { CStr::from_ptr(self.as_ref().$description)
+                    unsafe { CStr::from_ptr(self.as_clap_host().$description)
                                 .to_str()
                                 .expect("host description must be a valid UTF-8 string")
                     }
@@ -129,13 +74,13 @@ macro_rules! impl_host_request {
         impl Host {
             $(
                 pub fn $request_method(&self) {
-                    let clap_host = self.as_ref();
+                    let clap_host = self.as_clap_host();
                     if let Some(callback) = clap_host.$request_method {
                         // SAFETY: The Host constructor checks if callback is
                         // non-null during the initialization. The pointer is a valid function
                         // obtained from the CLAP host. It is guaranteed be the host that the call
                         // is safe.
-                        unsafe { callback(&raw const *self.as_ref()) }
+                        unsafe { callback(&raw const *self.as_clap_host()) }
                     }
                 }
             )*
@@ -156,9 +101,10 @@ impl<'a> HostExtensions<'a> {
 
     fn get_extension_ptr(&self, extension_id: &CStr) -> Option<*const c_void> {
         // HostExtensions::new() guarantees that unwrap won't panic.
-        let callback = self.host.as_ref().get_extension.unwrap();
+        let callback = self.host.as_clap_host().get_extension.unwrap();
         // SAFETY: ClapHost::try_new() guarantees that the call is safe.
-        let ext_ptr = unsafe { callback(&raw const *self.host.as_ref(), extension_id.as_ptr()) };
+        let ext_ptr =
+            unsafe { callback(&raw const *self.host.as_clap_host(), extension_id.as_ptr()) };
         (!ext_ptr.is_null()).then_some(ext_ptr)
     }
 

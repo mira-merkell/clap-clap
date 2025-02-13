@@ -65,11 +65,6 @@ impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
             .map_err(Error::PluginDescriptor)?
             .into_clap_plugin()
             .into_inner();
-        // Update host with the pointer to the freshly created plugin.
-        // SAFETY: The plugin (and the runtime) hasn't been passed to the host yet.
-        // We are still the only ones who can access Host, hence the call is safe.
-        unsafe { host._raw_update_clap_plugin(plugin) };
-
         Ok(plugin)
     }
 }

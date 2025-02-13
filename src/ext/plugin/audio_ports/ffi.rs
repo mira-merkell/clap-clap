@@ -1,7 +1,7 @@
 use crate::{
     ext::plugin::audio_ports::AudioPorts,
     ffi::{clap_audio_port_info, clap_plugin, clap_plugin_audio_ports},
-    plugin::{ClapPlugin, Plugin, plugin_ptr_unmoved},
+    plugin::{ClapPlugin, Plugin},
 };
 
 extern "C-unwind" fn count<A, P>(plugin: *const clap_plugin, is_input: bool) -> u32
@@ -9,7 +9,6 @@ where
     P: Plugin,
     A: AudioPorts<P>,
 {
-    debug_assert!(unsafe { plugin_ptr_unmoved::<P>(plugin) });
     if plugin.is_null() {
         return 0;
     }
@@ -36,7 +35,6 @@ where
     P: Plugin,
     A: AudioPorts<P>,
 {
-    debug_assert!(unsafe { plugin_ptr_unmoved::<P>(plugin) });
     if plugin.is_null() {
         return false;
     }

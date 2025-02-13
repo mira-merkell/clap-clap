@@ -12,27 +12,8 @@ use crate::{
     process::Process,
 };
 
-/// Check if the plugin pointer obtained from CLAP host points to the same
-/// struct that was allocated by the plugin factory and the plugin hasn't been
-/// moved.
-///
-/// # Safety
-///
-/// The pointer plugin must be non-null and pointing to a clap_plugin allocated
-/// by our plugin factory and tied to type P.
-pub(crate) unsafe fn plugin_ptr_unmoved<P: Plugin>(plugin: *const clap_plugin) -> bool {
-    assert!(!plugin.is_null());
-    let runtime: *const Runtime<P> = unsafe { *plugin }.plugin_data as *const _;
-
-    assert!(!runtime.is_null());
-    let clap_plugin = unsafe { (*runtime).host._raw_clap_plugin() };
-
-    clap_plugin == plugin
-}
-
 #[allow(warnings, unused)]
 extern "C-unwind" fn init<P: Plugin>(plugin: *const clap_plugin) -> bool {
-    debug_assert!(unsafe { plugin_ptr_unmoved::<P>(plugin) });
     if plugin.is_null() {
         return false;
     }
@@ -49,7 +30,6 @@ extern "C-unwind" fn init<P: Plugin>(plugin: *const clap_plugin) -> bool {
 }
 
 extern "C-unwind" fn destroy<P: Plugin>(plugin: *const clap_plugin) {
-    debug_assert!(unsafe { plugin_ptr_unmoved::<P>(plugin) });
     if plugin.is_null() {
         return;
     }
@@ -71,7 +51,6 @@ extern "C-unwind" fn activate<P: Plugin>(
     min_frames_count: u32,
     max_frames_count: u32,
 ) -> bool {
-    debug_assert!(unsafe { plugin_ptr_unmoved::<P>(plugin) });
     if plugin.is_null() {
         return false;
     }
@@ -96,7 +75,6 @@ extern "C-unwind" fn activate<P: Plugin>(
 }
 
 extern "C-unwind" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
-    debug_assert!(unsafe { plugin_ptr_unmoved::<P>(plugin) });
     if plugin.is_null() {
         return;
     }
@@ -118,7 +96,6 @@ extern "C-unwind" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
 }
 
 extern "C-unwind" fn start_processing<P: Plugin>(plugin: *const clap_plugin) -> bool {
-    debug_assert!(unsafe { plugin_ptr_unmoved::<P>(plugin) });
     if plugin.is_null() {
         return false;
     }
@@ -137,7 +114,6 @@ extern "C-unwind" fn start_processing<P: Plugin>(plugin: *const clap_plugin) -> 
 }
 
 extern "C-unwind" fn stop_processing<P: Plugin>(plugin: *const clap_plugin) {
-    debug_assert!(unsafe { plugin_ptr_unmoved::<P>(plugin) });
     if plugin.is_null() {
         return;
     }
@@ -156,7 +132,6 @@ extern "C-unwind" fn stop_processing<P: Plugin>(plugin: *const clap_plugin) {
 }
 
 extern "C-unwind" fn reset<P: Plugin>(plugin: *const clap_plugin) {
-    debug_assert!(unsafe { plugin_ptr_unmoved::<P>(plugin) });
     if plugin.is_null() {
         return;
     }
@@ -179,7 +154,6 @@ extern "C-unwind" fn process<P: Plugin>(
     plugin: *const clap_plugin,
     process: *const clap_process,
 ) -> clap_process_status {
-    debug_assert!(unsafe { plugin_ptr_unmoved::<P>(plugin) });
     if plugin.is_null() {
         return CLAP_PROCESS_ERROR;
     }
@@ -213,7 +187,6 @@ extern "C-unwind" fn get_extension<P: Plugin>(
     plugin: *const clap_plugin,
     id: *const c_char,
 ) -> *const c_void {
-    debug_assert!(unsafe { plugin_ptr_unmoved::<P>(plugin) });
     if plugin.is_null() {
         return null();
     }
@@ -242,7 +215,6 @@ extern "C-unwind" fn get_extension<P: Plugin>(
 }
 
 extern "C-unwind" fn on_main_thread<P: Plugin>(plugin: *const clap_plugin) {
-    debug_assert!(unsafe { plugin_ptr_unmoved::<P>(plugin) });
     if plugin.is_null() {
         return;
     }
