@@ -1,4 +1,4 @@
-use std::ffi::CStr;
+use std::{ffi::CStr, pin::Pin};
 
 use clap_clap::{
     Error,
@@ -42,7 +42,7 @@ fn dummy_desc() {
     assert_eq!(unsafe { CStr::from_ptr((*desc).id) }, c"clap.plugin.test");
 }
 
-fn dummy_host<'a>() -> TestHost<'a> {
+fn dummy_host<'a>() -> Pin<Box<TestHost<'a>>> {
     TestHostConfig {
         name: c"",
         vendor: c"",

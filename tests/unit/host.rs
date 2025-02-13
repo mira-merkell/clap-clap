@@ -1,5 +1,7 @@
 use std::{
     ffi::{CStr, c_char, c_void},
+    marker::PhantomPinned,
+    pin::Pin,
     ptr::{null, null_mut},
 };
 
@@ -14,7 +16,7 @@ pub struct TestHostConfig<'a> {
 }
 
 impl<'a> TestHostConfig<'a> {
-    pub fn build(self) -> TestHost<'a> {
+    pub fn build(self) -> Pin<Box<TestHost<'a>>> {
         TestHost::new(self)
     }
 }
@@ -24,18 +26,19 @@ impl<'a> TestHostConfig<'a> {
 pub struct TestHost<'a> {
     clap_host: clap_host,
     config: TestHostConfig<'a>,
+    _marker: PhantomPinned,
 }
 
 impl<'a> TestHost<'a> {
-    fn new(config: TestHostConfig<'a>) -> TestHost<'a> {
+    fn new(config: TestHostConfig<'a>) -> Pin<Box<TestHost<'a>>> {
         extern "C-unwind" fn get_extension(_: *const clap_host, _: *const c_char) -> *const c_void {
             null()
         }
         extern "C-unwind" fn request_restart(_: *const clap_host) {}
-        extern "C-unwind" fn request_reset(_: *const clap_host) {}
+        extern "C-unwind" fn request_process(_: *const clap_host) {}
         extern "C-unwind" fn request_callback(_: *const clap_host) {}
 
-        Self {
+        let mut host = Box::new(Self {
             clap_host: clap_host {
                 clap_version: CLAP_VERSION,
                 host_data: null_mut(),
@@ -47,20 +50,20 @@ impl<'a> TestHost<'a> {
                 version: config.version.as_ptr(),
                 get_extension: Some(get_extension),
                 request_restart: Some(request_restart),
-                request_process: Some(request_reset),
+                request_process: Some(request_process),
                 request_callback: Some(request_callback),
             },
             config,
-        }
+            _marker: PhantomPinned,
+        });
+        host.clap_host.host_data = &raw mut *host as *mut _;
+        Box::into_pin(host)
     }
 
     pub const fn as_clap_host(&self) -> &clap_host {
         &self.clap_host
     }
 }
-
-unsafe impl<'a> Send for TestHost<'a> {}
-unsafe impl<'a> Sync for TestHost<'a> {}
 
 #[test]
 fn host_new() {
