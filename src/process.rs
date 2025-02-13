@@ -8,6 +8,7 @@ use std::{
 };
 
 use crate::{
+    events::{InputEvents, OutputEvents},
     ffi::{
         CLAP_PROCESS_CONTINUE, CLAP_PROCESS_CONTINUE_IF_NOT_QUIET, CLAP_PROCESS_SLEEP,
         CLAP_PROCESS_TAIL, clap_audio_buffer, clap_process, clap_process_status,
@@ -122,12 +123,21 @@ impl Process {
         }
     }
 
-    pub fn in_events(&self) {
-        todo!()
+    pub const fn in_events(&self) -> InputEvents {
+        let in_events = unsafe { &*(*self.0.as_ptr()).in_events };
+        assert!(
+            in_events.size.is_some() && in_events.get.is_some(),
+            "input events list invalid"
+        );
+        // SAFETY: We just checked if the pointers are Some.
+        unsafe { InputEvents::new_unchecked(in_events) }
     }
 
-    pub fn out_events(&mut self) {
-        todo!()
+    pub fn out_events(&self) -> OutputEvents {
+        let out_events = unsafe { &*(*self.0.as_ptr()).out_events };
+        assert!(out_events.try_push.is_some(), "output events list invalid");
+        // SAFETY: We just checked if the pointer is Some.
+        unsafe { OutputEvents::new_unchecked(out_events) }
     }
 }
 
