@@ -4,7 +4,10 @@ use std::{
 };
 
 use clap_clap::{
-    ffi::{clap_audio_buffer, clap_event_transport, clap_process},
+    ffi::{
+        CLAP_EVENT_TRANSPORT, clap_audio_buffer, clap_event_header, clap_event_transport,
+        clap_process,
+    },
     process::Process,
 };
 
@@ -77,7 +80,7 @@ impl TestAudioBuffer {
 pub struct TestProcess {
     steady_time: i64,
     frames_count: u32,
-    transport: *const clap_event_transport, // not implemented
+    transport: clap_event_transport,
     audio_inputs: Vec<Pin<Box<TestAudioBuffer>>>,
     audio_outputs: Vec<Pin<Box<TestAudioBuffer>>>,
     audio_inputs_count: u32,
@@ -85,6 +88,32 @@ pub struct TestProcess {
 
     raw_audio_inputs: Vec<clap_audio_buffer>,
     raw_audio_outputs: Vec<clap_audio_buffer>,
+}
+
+fn build_clap_event_transport() -> clap_event_transport {
+    assert!(size_of::<clap_event_transport>() < u32::MAX as usize);
+    clap_event_transport {
+        header: clap_event_header {
+            size: size_of::<clap_event_transport>() as u32,
+            time: 1,
+            space_id: 0,
+            r#type: CLAP_EVENT_TRANSPORT as u16,
+            flags: 4,
+        },
+        flags: 0,
+        song_pos_beats: 1,
+        song_pos_seconds: 2,
+        tempo: 3.0,
+        tempo_inc: 4.0,
+        loop_start_beats: 5,
+        loop_end_beats: 6,
+        loop_start_seconds: 7,
+        loop_end_seconds: 8,
+        bar_start: 9,
+        bar_number: 10,
+        tsig_num: 11,
+        tsig_denom: 12,
+    }
 }
 
 impl TestProcess {
@@ -112,7 +141,7 @@ impl TestProcess {
         Box::pin(Self {
             steady_time: config.steady_time,
             frames_count: config.frames_count,
-            transport: null(),
+            transport: build_clap_event_transport(),
             audio_inputs,
             audio_outputs,
             audio_inputs_count: config.audio_inputs_count,
@@ -126,7 +155,7 @@ impl TestProcess {
         clap_process {
             steady_time: self.steady_time,
             frames_count: self.frames_count,
-            transport: self.transport,
+            transport: &self.transport,
             audio_inputs: self.raw_audio_inputs.as_ptr(),
             audio_outputs: self.raw_audio_outputs.as_mut_ptr(),
             audio_inputs_count: self.audio_inputs_count,
@@ -169,6 +198,7 @@ fn self_test_01() {
     assert_eq!(process.audio_outputs[0].latency, 0);
     assert_eq!(process.steady_time, 1);
     assert_eq!(process.frames_count, 2);
+    assert_eq!(process.transport, build_clap_event_transport());
     assert_eq!(process.audio_inputs[0].channel_count, 3);
     assert_eq!(process.audio_outputs[0].channel_count, 3);
     assert_eq!(process.audio_inputs_count, 4);
@@ -189,9 +219,14 @@ fn self_test_02() {
     }
     .build();
 
+    let transport = build_clap_event_transport();
     let clap_process = process.clap_process();
     assert_eq!(clap_process.steady_time, 1);
     assert_eq!(clap_process.frames_count, 2);
+
+    assert!(!clap_process.transport.is_null());
+    assert_eq!(unsafe { *clap_process.transport }, transport);
+
     assert_eq!(clap_process.audio_inputs_count, 4);
     assert_eq!(clap_process.audio_outputs_count, 5);
 }
@@ -270,6 +305,11 @@ fn process_new() {
 
     assert_eq!(process.steady_time(), test_process.steady_time);
     assert_eq!(process.frames_count(), test_process.frames_count);
+
+    let transport = process.transport().unwrap();
+    assert_eq!(transport.tempo(), test_process.transport.tempo);
+    assert_eq!(transport.bar_number(), test_process.transport.bar_number);
+
     assert_eq!(
         process.audio_inputs_count(),
         test_process.audio_inputs_count
@@ -296,6 +336,26 @@ fn process_new() {
         process.audio_outputs(0).channel_count(),
         test_process.audio_outputs[0].channel_count
     );
+}
+
+#[test]
+fn transport_null() {
+    let mut test_process = TestProcessConfig {
+        latency: 0,
+        steady_time: 1,
+        frames_count: 2,
+        channel_count: 3,
+        audio_inputs_count: 4,
+        audio_outputs_count: 5,
+    }
+    .build();
+
+    let mut clap_process = test_process.clap_process();
+
+    clap_process.transport = null();
+
+    let process = unsafe { Process::new_unchecked(NonNull::new_unchecked(&raw mut clap_process)) };
+    assert!(process.transport().is_none());
 }
 
 #[test]
