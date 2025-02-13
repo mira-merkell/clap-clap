@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     ffi::{CStr, CString},
     fmt::{Display, Formatter},
+    marker::PhantomData,
     sync::Arc,
 };
 
@@ -10,7 +11,7 @@ use crate::{
     host,
     host::Host,
     plugin,
-    plugin::{Plugin, PluginDescriptor, Runtime, build_plugin_descriptor},
+    plugin::{Plugin, PluginDescriptor, Runtime},
 };
 
 /// This type exists only be visible from within `clap::entry!` macro.
@@ -35,9 +36,10 @@ pub struct FactoryPluginDescriptor<P>(PluginDescriptor<P>);
 
 impl<P: Plugin> FactoryPluginDescriptor<P> {
     pub fn build() -> Result<Self, Error> {
-        build_plugin_descriptor()
-            .map(Self)
-            .map_err(Error::PluginDescriptor)
+        Ok(Self {
+            descriptor: PluginDescriptor::new::<P>().map_err(Error::PluginDescriptor)?,
+            _marker: PhantomData,
+        })
     }
 }
 
