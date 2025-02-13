@@ -8,6 +8,7 @@ use std::{
 };
 
 use crate::{
+    events::{Header, InputEvents, OutputEvents, Transport},
     ffi::{
         CLAP_PROCESS_CONTINUE, CLAP_PROCESS_CONTINUE_IF_NOT_QUIET, CLAP_PROCESS_SLEEP,
         CLAP_PROCESS_TAIL, clap_audio_buffer, clap_process, clap_process_status,
@@ -57,8 +58,23 @@ impl Process {
         FramesMut::new(self)
     }
 
-    pub fn transport(&self) {
-        todo!()
+    /// Transport info at sample 0.
+    ///
+    /// If None, then this is a free running host and no transport events will
+    /// be provided.
+    pub const fn transport(&self) -> Option<Transport<'_>> {
+        if self.as_clap_process().transport.is_null() {
+            return None;
+        }
+        // SAFETY: We just checked if transport is non-null. We know that
+        // clap_event_transfer is constant and valid for the duration of self,
+        // so it's safe to create a shared reference to it for the lifetime of self.
+        let header = unsafe { &(*self.as_clap_process().transport).header };
+        // SAFETY: We just crated a reference to clap_event_header from a valid
+        // clap_event_transport.
+        let header = unsafe { Header::new(header) };
+        // SAFETY: We know that header is a header of a clap_event_transport.
+        Some(unsafe { Transport::new_unchecked(header) })
     }
 
     pub const fn audio_inputs_count(&self) -> u32 {
@@ -122,12 +138,21 @@ impl Process {
         }
     }
 
-    pub fn in_events(&self) {
-        todo!()
+    pub const fn in_events(&self) -> InputEvents {
+        let in_events = unsafe { &*(*self.0.as_ptr()).in_events };
+        assert!(
+            in_events.size.is_some() && in_events.get.is_some(),
+            "input events list invalid"
+        );
+        // SAFETY: We just checked if the pointers are Some.
+        unsafe { InputEvents::new_unchecked(in_events) }
     }
 
-    pub fn out_events(&mut self) {
-        todo!()
+    pub fn out_events(&self) -> OutputEvents {
+        let out_events = unsafe { &*(*self.0.as_ptr()).out_events };
+        assert!(out_events.try_push.is_some(), "output events list invalid");
+        // SAFETY: We just checked if the pointer is Some.
+        unsafe { OutputEvents::new_unchecked(out_events) }
     }
 }
 
