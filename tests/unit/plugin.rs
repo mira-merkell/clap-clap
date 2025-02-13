@@ -21,10 +21,7 @@ use clap_clap::{
     process::{Process, Status, Status::Continue},
 };
 
-use crate::{
-    host::{TestHost, TestHostConfig},
-    process::TestProcessConfig,
-};
+use crate::{plugin::dummy_host::DUMMY_HOST, process::TestProcessConfig};
 
 #[cfg(test)]
 mod desc;
@@ -149,20 +146,39 @@ static FACTORY: LazyLock<Factory> = LazyLock::new(|| {
     )])
 });
 
-static HOST: LazyLock<TestHost> = LazyLock::new(|| {
-    TestHostConfig {
-        name: "test_host",
-        vendor: "mira-merkell",
-        url: "none",
-        version: "0.0.0",
+mod dummy_host {
+    use std::{
+        ffi::{c_char, c_void},
+        ptr::{null, null_mut},
+    };
+
+    use clap_clap::ffi::{CLAP_VERSION, clap_host};
+
+    extern "C-unwind" fn get_extension(_: *const clap_host, _: *const c_char) -> *const c_void {
+        null()
     }
-    .build()
-});
+    extern "C-unwind" fn request_restart(_: *const clap_host) {}
+    extern "C-unwind" fn request_process(_: *const clap_host) {}
+    extern "C-unwind" fn request_callback(_: *const clap_host) {}
+
+    pub const DUMMY_HOST: clap_host = clap_host {
+        clap_version: CLAP_VERSION,
+        host_data: null_mut(),
+        name: c"test_host".as_ptr(),
+        vendor: c"mira-merkell".as_ptr(),
+        url: c"none".as_ptr(),
+        version: c"".as_ptr(),
+        get_extension: Some(get_extension),
+        request_restart: Some(request_restart),
+        request_process: Some(request_process),
+        request_callback: Some(request_callback),
+    };
+}
 
 unsafe fn build_plugin<P: Plugin>() -> ClapPlugin<P> {
     let plugin = FACTORY
         .create_plugin(c"clap.plugin.test", unsafe {
-            FactoryHost::new(HOST.as_clap_host())
+            FactoryHost::new(&DUMMY_HOST)
         })
         .unwrap();
 
