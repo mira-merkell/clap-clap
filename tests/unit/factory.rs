@@ -43,13 +43,7 @@ fn dummy_desc() {
 }
 
 fn dummy_host<'a>() -> Pin<Box<TestHost<'a>>> {
-    TestHostConfig {
-        name: c"",
-        vendor: c"",
-        url: c"",
-        version: c"",
-    }
-    .build()
+    TestHostConfig::default().build()
 }
 
 #[test]

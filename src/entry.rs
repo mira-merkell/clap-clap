@@ -84,7 +84,14 @@ macro_rules! entry {
                 if plugin_id.is_null() || host.is_null() {
                     return std::ptr::null();
                 }
-                // SAFETY: We just checked that host is non-null.
+                {
+                    let host  = unsafe {&*host};
+                    if host.get_extension.is_none() || host.request_restart.is_none() ||
+                            host.request_process.is_none() || host.request_callback.is_none() {
+                        return std::ptr::null();
+                    }
+                }
+                // SAFETY: We just checked that host and its methods are non-null.
                 let host = unsafe { FactoryHost::new(host) };
                 // SAFETY: We checked if plug_id is non-null.
                 // The host guarantees that this is a valid C string now.

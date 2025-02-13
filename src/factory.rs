@@ -21,7 +21,8 @@ pub struct FactoryHost {
 impl FactoryHost {
     /// # Safety
     ///
-    /// host must be non-null.
+    /// The pointer to `clap_host` and all it's methods must be non-null.
+    #[doc(hidden)]
     pub const unsafe fn new(host: *const clap_host) -> Self {
         Self { host }
     }
@@ -57,8 +58,7 @@ impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
     }
 
     fn clap_plugin(&self, host: FactoryHost) -> Result<*const clap_plugin, Error> {
-        // Safety:
-        // The pointer unwrapped from FactoryHost is a valid pointer
+        // SAFETY: The pointer unwrapped from FactoryHost is a valid pointer
         // to a CLAP host, obtained as the argument passed to plugin
         // factory's create_plugin().
         let host = unsafe { Host::new(host.into_inner()) };

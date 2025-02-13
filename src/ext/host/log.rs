@@ -12,6 +12,7 @@ use crate::{
     host::Host,
 };
 
+#[derive(Debug)]
 pub struct Log<'a> {
     host: &'a Host,
     clap_host_log: *const clap_host_log,
