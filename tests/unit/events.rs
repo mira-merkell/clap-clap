@@ -620,7 +620,7 @@ mod midi2 {
     }
 }
 
-mod input_events {
+pub mod input_events {
     use std::{
         marker::PhantomPinned,
         pin::Pin,
@@ -630,7 +630,7 @@ mod input_events {
     use clap_clap::{
         events::{
             Event, EventBuilder, InputEvents, Midi, Midi2, Midi2Builder, MidiBuilder, ParamMod,
-            ParamModBuilder, ParamValue, ParamValueBuilder,
+            ParamModBuilder, ParamValue, ParamValueBuilder, Transport, TransportBuilder,
         },
         ffi::{
             CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, CLAP_EVENT_MIDI2, CLAP_EVENT_PARAM_VALUE,
@@ -817,11 +817,12 @@ mod input_events {
     }
 
     #[derive(Debug, Copy, Clone, PartialEq)]
-    enum KnownEvent {
+    pub enum KnownEvent {
         Midi(MidiBuilder),
         Midi2(Midi2Builder),
         ParamMod(ParamModBuilder),
         ParamValue(ParamValueBuilder),
+        Transport(TransportBuilder),
     }
 
     fn check_input_events(events: &[KnownEvent]) {
@@ -832,6 +833,7 @@ mod input_events {
                 KnownEvent::Midi2(ev) => bed.as_mut().push_event(ev.event()),
                 KnownEvent::ParamMod(ev) => bed.as_mut().push_event(ev.event()),
                 KnownEvent::ParamValue(ev) => bed.as_mut().push_event(ev.event()),
+                KnownEvent::Transport(ev) => bed.as_mut().push_event(ev.event()),
             }
         }
 
@@ -852,6 +854,7 @@ mod input_events {
             KnownEvent::Midi2(Midi2::build().port_index(2)),
             KnownEvent::ParamMod(ParamMod::build().amount(12.345)),
             KnownEvent::ParamValue(ParamValue::build().value(12.34)),
+            KnownEvent::Transport(Transport::build().bar_number(11)),
         ];
         check_input_events(&events);
     }
@@ -863,11 +866,193 @@ mod input_events {
             KnownEvent::Midi2(Midi2::build().port_index(2)),
             KnownEvent::ParamMod(ParamMod::build().amount(12.345)),
             KnownEvent::ParamValue(ParamValue::build().value(12.34)),
+            KnownEvent::Transport(Transport::build().bar_number(11)),
         ];
         let events: Vec<_> = (0..1000)
             .map(|i| events[(7 * i + 13) % events.len()])
             .collect();
 
         check_input_events(&events);
+    }
+}
+
+mod output_events {
+    use std::{pin::Pin, ptr, ptr::null_mut};
+
+    use clap_clap::{
+        events::{
+            EventBuilder, Header, Midi, Midi2, OutputEvents, ParamMod, ParamValue, Transport,
+        },
+        ffi::{
+            CLAP_EVENT_MIDI, CLAP_EVENT_MIDI2, CLAP_EVENT_PARAM_MOD, CLAP_EVENT_PARAM_VALUE,
+            CLAP_EVENT_TRANSPORT, clap_event_header, clap_event_midi, clap_event_midi2,
+            clap_event_param_mod, clap_event_param_value, clap_event_transport, clap_output_events,
+        },
+    };
+
+    use crate::events::input_events::KnownEvent;
+
+    struct TestBed {
+        clap_output_events: clap_output_events,
+        pushed: Vec<Box<[u8]>>,
+        capacity: usize,
+    }
+
+    impl TestBed {
+        fn new(capacity: usize) -> Pin<Box<Self>> {
+            extern "C" fn try_push(
+                list: *const clap_output_events,
+                event: *const clap_event_header,
+            ) -> bool {
+                let test_bed: &mut TestBed = unsafe { &mut *((*list).ctx as *mut _) };
+
+                if test_bed.pushed.len() < test_bed.capacity {
+                    let event = unsafe { &*event };
+                    let header = unsafe { Header::new(event) };
+                    let bytes = header.to_bytes().to_owned().into_boxed_slice();
+
+                    test_bed.pushed.push(bytes);
+                    true
+                } else {
+                    false
+                }
+            }
+
+            let mut test_bed = Box::new(Self {
+                clap_output_events: clap_output_events {
+                    ctx: null_mut(),
+                    try_push: Some(try_push),
+                },
+                pushed: vec![],
+                capacity,
+            });
+
+            test_bed.clap_output_events.ctx = &raw mut *test_bed as *mut _;
+
+            Box::into_pin(test_bed)
+        }
+
+        fn clap_output_events(&mut self) -> &clap_output_events {
+            &self.clap_output_events
+        }
+
+        fn get_event(&self, index: usize) -> Option<KnownEvent> {
+            assert!(index < self.pushed.len());
+
+            let header: clap_event_header =
+                unsafe { ptr::read_unaligned(self.pushed[index].as_ptr() as *const _) };
+            assert_eq!(header.size, self.pushed[index].len() as u32);
+
+            let x = header.r#type as u32;
+
+            if x == CLAP_EVENT_PARAM_VALUE {
+                let event: clap_event_param_value =
+                    unsafe { ptr::read_unaligned(self.pushed[index].as_ptr() as *const _) };
+                return Some(KnownEvent::ParamValue(event.into()));
+            }
+            if x == CLAP_EVENT_PARAM_MOD {
+                let event: clap_event_param_mod =
+                    unsafe { ptr::read_unaligned(self.pushed[index].as_ptr() as *const _) };
+                return Some(KnownEvent::ParamMod(event.into()));
+            }
+            if x == CLAP_EVENT_TRANSPORT {
+                let event: clap_event_transport =
+                    unsafe { ptr::read_unaligned(self.pushed[index].as_ptr() as *const _) };
+                return Some(KnownEvent::Transport(event.into()));
+            }
+            if x == CLAP_EVENT_MIDI {
+                let event: clap_event_midi =
+                    unsafe { ptr::read_unaligned(self.pushed[index].as_ptr() as *const _) };
+                return Some(KnownEvent::Midi(event.into()));
+            }
+            if x == CLAP_EVENT_MIDI2 {
+                let event: clap_event_midi2 =
+                    unsafe { ptr::read_unaligned(self.pushed[index].as_ptr() as *const _) };
+                return Some(KnownEvent::Midi2(event.into()));
+            }
+            None
+        }
+    }
+
+    #[test]
+    fn self_test_01() {
+        let event = Midi::build().port_index(11);
+
+        let mut test_bed = TestBed::new(1);
+        let mut output_events =
+            unsafe { OutputEvents::new_unchecked(test_bed.clap_output_events()) };
+        output_events.try_push(event.event()).unwrap();
+
+        let retrieved = test_bed.get_event(0).unwrap();
+        let KnownEvent::Midi(midi) = retrieved else {
+            panic!()
+        };
+        assert_eq!(midi.event().port_index(), 11);
+    }
+
+    #[should_panic]
+    #[test]
+    fn self_test_02() {
+        let event = Midi::build().port_index(11);
+
+        let mut test_bed = TestBed::new(1);
+        let mut output_events =
+            unsafe { OutputEvents::new_unchecked(test_bed.clap_output_events()) };
+        output_events.try_push(event.event()).unwrap();
+
+        let _ = test_bed.get_event(1).unwrap();
+    }
+
+    fn check_push_events(events: &[KnownEvent]) {
+        let mut bed = TestBed::new(events.len());
+        let mut output_events = unsafe { OutputEvents::new_unchecked(bed.clap_output_events()) };
+
+        for known in events {
+            match known {
+                KnownEvent::Midi(ev) => output_events.try_push(ev.event()).unwrap(),
+                KnownEvent::Midi2(ev) => output_events.try_push(ev.event()).unwrap(),
+                KnownEvent::ParamMod(ev) => output_events.try_push(ev.event()).unwrap(),
+                KnownEvent::ParamValue(ev) => output_events.try_push(ev.event()).unwrap(),
+                KnownEvent::Transport(ev) => output_events.try_push(ev.event()).unwrap(),
+            }
+        }
+
+        let event = Midi::build();
+        let _ = output_events.try_push(event.event()).unwrap_err();
+
+        let retrieved: Vec<KnownEvent> = (0..events.len())
+            .map(|i| bed.get_event(i).unwrap())
+            .collect();
+
+        assert_eq!(events, retrieved);
+    }
+
+    #[test]
+    fn push_events_01() {
+        let events = [
+            KnownEvent::Midi(Midi::build().port_index(1)),
+            KnownEvent::Midi2(Midi2::build().port_index(2)),
+            KnownEvent::ParamMod(ParamMod::build().amount(12.345)),
+            KnownEvent::ParamValue(ParamValue::build().value(12.34)),
+            KnownEvent::Transport(Transport::build().bar_number(11)),
+        ];
+
+        check_push_events(&events);
+    }
+
+    #[test]
+    fn push_events_02() {
+        let events = [
+            KnownEvent::Midi(Midi::build().port_index(1)),
+            KnownEvent::Midi2(Midi2::build().port_index(2)),
+            KnownEvent::ParamMod(ParamMod::build().amount(12.345)),
+            KnownEvent::ParamValue(ParamValue::build().value(12.34)),
+            KnownEvent::Transport(Transport::build().bar_number(11)),
+        ];
+
+        let events: Vec<_> = (0..1000)
+            .map(|i| events[(13 * i + 27) % events.len()])
+            .collect();
+        check_push_events(&events);
     }
 }

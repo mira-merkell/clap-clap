@@ -80,7 +80,8 @@ impl Header {
         unsafe { self.cast_unchecked() }
     }
 
-    const fn to_bytes(&self) -> &[u8] {
+    #[doc(hidden)]
+    pub const fn to_bytes(&self) -> &[u8] {
         &self.0
     }
 
@@ -310,6 +311,12 @@ impl Default for ParamValueBuilder {
     }
 }
 
+impl From<clap_event_param_value> for ParamValueBuilder {
+    fn from(value: clap_event_param_value) -> Self {
+        Self(value)
+    }
+}
+
 impl_event_builder!(ParamValueBuilder, ParamValue<'a>, param_value_unchecked);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -407,6 +414,12 @@ impl ParamModBuilder {
 impl Default for ParamModBuilder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl From<clap_event_param_mod> for ParamModBuilder {
+    fn from(value: clap_event_param_mod) -> Self {
+        Self(value)
     }
 }
 
@@ -535,6 +548,12 @@ impl Default for TransportBuilder {
     }
 }
 
+impl From<clap_event_transport> for TransportBuilder {
+    fn from(value: clap_event_transport) -> Self {
+        Self(value)
+    }
+}
+
 impl_event_builder!(TransportBuilder, Transport<'a>, transport_unchecked);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -636,6 +655,12 @@ impl Default for Midi2Builder {
     }
 }
 
+impl From<clap_event_midi2> for Midi2Builder {
+    fn from(value: clap_event_midi2) -> Self {
+        Self(value)
+    }
+}
+
 impl_event_builder!(Midi2Builder, Midi2<'a>, midi2_unchecked);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -734,6 +759,12 @@ impl MidiBuilder {
 impl Default for MidiBuilder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl From<clap_event_midi> for MidiBuilder {
+    fn from(value: clap_event_midi) -> Self {
+        Self(value)
     }
 }
 
