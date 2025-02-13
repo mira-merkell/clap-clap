@@ -4,7 +4,7 @@ use crate::{
     plugin::{ClapPlugin, Plugin},
 };
 
-extern "C" fn count<A, P>(plugin: *const clap_plugin, is_input: bool) -> u32
+extern "C-unwind" fn count<A, P>(plugin: *const clap_plugin, is_input: bool) -> u32
 where
     P: Plugin,
     A: AudioPorts<P>,
@@ -25,7 +25,7 @@ where
     A::count(plugin, is_input)
 }
 
-extern "C" fn get<A, P>(
+extern "C-unwind" fn get<A, P>(
     plugin: *const clap_plugin,
     index: u32,
     is_input: bool,

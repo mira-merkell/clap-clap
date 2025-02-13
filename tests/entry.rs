@@ -38,12 +38,12 @@ struct DummyHost(clap_host);
 
 impl DummyHost {
     fn new() -> Self {
-        extern "C" fn get_extension(_: *const clap_host, _: *const c_char) -> *const c_void {
+        extern "C-unwind" fn get_extension(_: *const clap_host, _: *const c_char) -> *const c_void {
             null()
         }
-        extern "C" fn request_restart(_: *const clap_host) {}
-        extern "C" fn request_process(_: *const clap_host) {}
-        extern "C" fn request_callback(_: *const clap_host) {}
+        extern "C-unwind" fn request_restart(_: *const clap_host) {}
+        extern "C-unwind" fn request_process(_: *const clap_host) {}
+        extern "C-unwind" fn request_callback(_: *const clap_host) {}
 
         Self(clap_host {
             clap_version: CLAP_VERSION,
