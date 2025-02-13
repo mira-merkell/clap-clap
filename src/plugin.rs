@@ -76,7 +76,7 @@ impl<P: Plugin> AudioThread<P> for () {
 }
 
 pub(crate) struct ClapPluginExtensions<P> {
-    pub(crate) audio_ports: Option<ClapPluginAudioPorts<P>>,
+    audio_ports: Option<ClapPluginAudioPorts<P>>,
 }
 
 impl<P: Plugin> ClapPluginExtensions<P> {
@@ -88,11 +88,11 @@ impl<P: Plugin> ClapPluginExtensions<P> {
 }
 
 pub(crate) struct Runtime<P: Plugin> {
-    pub(crate) audio_thread: Option<P::AudioThread>,
-    pub(crate) descriptor: PluginDescriptor<P>,
-    pub(crate) host: Arc<Host>,
-    pub(crate) plugin: P,
-    pub(crate) plugin_extensions: Mutex<ClapPluginExtensions<P>>,
+    audio_thread: Option<P::AudioThread>,
+    descriptor: PluginDescriptor<P>,
+    host: Arc<Host>,
+    plugin: P,
+    plugin_extensions: Mutex<ClapPluginExtensions<P>>,
 }
 
 impl<P: Plugin> Runtime<P> {
