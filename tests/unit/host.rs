@@ -1,36 +1,33 @@
 use std::{
-    ffi::{CString, c_char, c_void},
+    ffi::{CStr, c_char, c_void},
     ptr::{null, null_mut},
 };
 
 use clap_clap::{ffi::clap_host, host::Host, version::CLAP_VERSION};
 
+#[derive(Debug)]
 pub struct TestHostConfig<'a> {
-    pub name: &'a str,
-    pub vendor: &'a str,
-    pub url: &'a str,
-    pub version: &'a str,
+    pub name: &'a CStr,
+    pub vendor: &'a CStr,
+    pub url: &'a CStr,
+    pub version: &'a CStr,
 }
 
-impl TestHostConfig<'_> {
-    pub fn build(self) -> TestHost {
+impl<'a> TestHostConfig<'a> {
+    pub fn build(self) -> TestHost<'a> {
         TestHost::new(self)
     }
 }
 
 #[derive(Debug)]
 #[allow(unused)]
-pub struct TestHost {
-    name: CString,
-    vendor: CString,
-    url: CString,
-    version: CString,
-
+pub struct TestHost<'a> {
     clap_host: clap_host,
+    config: TestHostConfig<'a>,
 }
 
-impl TestHost {
-    fn new(config: TestHostConfig) -> Self {
+impl<'a> TestHost<'a> {
+    fn new(config: TestHostConfig<'a>) -> TestHost<'a> {
         extern "C-unwind" fn get_extension(_: *const clap_host, _: *const c_char) -> *const c_void {
             null()
         }
@@ -38,30 +35,22 @@ impl TestHost {
         extern "C-unwind" fn request_reset(_: *const clap_host) {}
         extern "C-unwind" fn request_callback(_: *const clap_host) {}
 
-        let name = CString::new(config.name).unwrap();
-        let vendor = CString::new(config.vendor).unwrap();
-        let url = CString::new(config.url).unwrap();
-        let version = CString::new(config.version).unwrap();
-
         Self {
             clap_host: clap_host {
                 clap_version: CLAP_VERSION,
                 host_data: null_mut(),
                 // Points to the string buffer on the heap.
                 // The string can still be moved.
-                name: name.as_ptr(),
-                vendor: vendor.as_ptr(),
-                url: url.as_ptr(),
-                version: version.as_ptr(),
+                name: config.name.as_ptr(),
+                vendor: config.vendor.as_ptr(),
+                url: config.url.as_ptr(),
+                version: config.version.as_ptr(),
                 get_extension: Some(get_extension),
                 request_restart: Some(request_restart),
                 request_process: Some(request_reset),
                 request_callback: Some(request_callback),
             },
-            name,
-            vendor,
-            url,
-            version,
+            config,
         }
     }
 
@@ -70,16 +59,16 @@ impl TestHost {
     }
 }
 
-unsafe impl Send for TestHost {}
-unsafe impl Sync for TestHost {}
+unsafe impl<'a> Send for TestHost<'a> {}
+unsafe impl<'a> Sync for TestHost<'a> {}
 
 #[test]
 fn host_new() {
     let test_host = TestHostConfig {
-        name: "test_host",
-        url: "test_url",
-        vendor: "test_vendor",
-        version: "test_version",
+        name: c"test_host",
+        url: c"test_url",
+        vendor: c"test_vendor",
+        version: c"test_version",
     }
     .build();
 

@@ -42,12 +42,12 @@ fn dummy_desc() {
     assert_eq!(unsafe { CStr::from_ptr((*desc).id) }, c"clap.plugin.test");
 }
 
-fn dummy_host() -> TestHost {
+fn dummy_host<'a>() -> TestHost<'a> {
     TestHostConfig {
-        name: "",
-        vendor: "",
-        url: "",
-        version: "",
+        name: c"",
+        vendor: c"",
+        url: c"",
+        version: c"",
     }
     .build()
 }

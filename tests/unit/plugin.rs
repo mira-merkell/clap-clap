@@ -148,10 +148,10 @@ static FACTORY: LazyLock<Factory> = LazyLock::new(|| {
 
 static HOST: LazyLock<TestHost> = LazyLock::new(|| {
     TestHostConfig {
-        name: "test_host",
-        vendor: "mira-merkell",
-        url: "none",
-        version: "0.0.0",
+        name: c"test_host",
+        vendor: c"mira-merkell",
+        url: c"none",
+        version: c"0.0.0",
     }
     .build()
 });
