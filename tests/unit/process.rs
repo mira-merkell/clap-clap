@@ -79,7 +79,7 @@ impl TestAudioBuffer {
 pub struct TestProcess {
     steady_time: i64,
     frames_count: u32,
-    transport:  clap_event_transport,
+    transport: clap_event_transport,
     audio_inputs: Vec<TestAudioBuffer>,
     audio_outputs: Vec<TestAudioBuffer>,
     audio_inputs_count: u32,
@@ -280,6 +280,40 @@ fn self_test_04_64() {
     let sample = unsafe { *in0_ch0.add(0) };
     assert_eq!(sample, 11.13);
 
+    let out2 = unsafe { *clap_process.audio_outputs.add(2) };
+    let out2_ch2 = unsafe { *out2.data64.add(2) };
+    let sample = unsafe { *out2_ch2.add(1) };
+    assert_eq!(sample, 0.777);
+}
+
+#[test]
+fn self_test_valid_after_moved() {
+    let mut process = TestProcessConfig {
+        latency: 0,
+        steady_time: 1,
+        frames_count: 2,
+        channel_count: 3,
+        audio_inputs_count: 4,
+        audio_outputs_count: 5,
+    }
+    .build();
+    process.audio_outputs[2].data64[2].data()[1] = 0.777;
+
+    let clap_process = process.clap_process();
+    let out2 = unsafe { *clap_process.audio_outputs.add(2) };
+    let out2_ch2 = unsafe { *out2.data64.add(2) };
+    let sample = unsafe { *out2_ch2.add(1) };
+    assert_eq!(sample, 0.777);
+
+    let mut boxed = Box::new(process);
+    let clap_process = boxed.clap_process();
+    let out2 = unsafe { *clap_process.audio_outputs.add(2) };
+    let out2_ch2 = unsafe { *out2.data64.add(2) };
+    let sample = unsafe { *out2_ch2.add(1) };
+    assert_eq!(sample, 0.777);
+
+    let mut back_on_stack = *boxed;
+    let clap_process = back_on_stack.clap_process();
     let out2 = unsafe { *clap_process.audio_outputs.add(2) };
     let out2_ch2 = unsafe { *out2.data64.add(2) };
     let sample = unsafe { *out2_ch2.add(1) };
