@@ -31,7 +31,7 @@ pub mod prelude {
     };
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub enum Error {
     Factory(factory::Error),
     Events(events::Error),
@@ -39,7 +39,7 @@ pub enum Error {
     Id(id::Error),
     Plugin(plugin::Error),
     Process(process::Error),
-    User(i32),
+    User(Box<dyn std::error::Error + Send + 'static>),
 }
 
 impl std::fmt::Display for Error {
@@ -51,8 +51,8 @@ impl std::fmt::Display for Error {
             Events(e) => write!(f, "events error {e}"),
             Host(e) => write!(f, "host error: {e}"),
             Process(e) => write!(f, "process error: {e}"),
-            Id(e) => write!(f, "id: {e}"),
-            User(ec) => write!(f, "user error: {ec}"),
+            Id(e) => write!(f, "id error: {e}"),
+            User(e) => write!(f, "user error: {e}"),
         }
     }
 }
