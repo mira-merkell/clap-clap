@@ -32,7 +32,10 @@ impl FactoryHost {
     }
 }
 /// This type exists only be visible from within `clap::entry!` macro.
-pub struct FactoryPluginDescriptor<P>(PluginDescriptor<P>);
+pub struct FactoryPluginDescriptor<P> {
+    descriptor: PluginDescriptor,
+    _marker: PhantomData<P>,
+}
 
 impl<P: Plugin> FactoryPluginDescriptor<P> {
     pub fn build() -> Result<Self, Error> {
@@ -51,11 +54,11 @@ pub trait FactoryPlugin {
 
 impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
     fn plugin_id(&self) -> &CStr {
-        self.0.plugin_id()
+        self.descriptor.plugin_id()
     }
 
-    fn clap_plugin_descriptor(&self) -> *const clap_plugin_descriptor {
-        &raw const self.0.clap_plugin_descriptor
+    unsafe fn clap_plugin_descriptor(&self) -> *const clap_plugin_descriptor {
+        &raw const *self.descriptor.clap_plugin_descriptor()
     }
 
     fn clap_plugin(&self, host: FactoryHost) -> Result<*const clap_plugin, Error> {

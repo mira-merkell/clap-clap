@@ -89,7 +89,7 @@ impl<P: Plugin> ClapPluginExtensions<P> {
 
 pub(crate) struct Runtime<P: Plugin> {
     pub(crate) audio_thread: Option<P::AudioThread>,
-    pub(crate) descriptor: PluginDescriptor<P>,
+    pub(crate) descriptor: PluginDescriptor,
     pub(crate) host: Arc<Host>,
     pub(crate) plugin: P,
     pub(crate) plugin_extensions: Mutex<ClapPluginExtensions<P>>,

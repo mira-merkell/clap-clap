@@ -9,8 +9,8 @@ use crate::{
 };
 
 #[allow(dead_code)]
-pub(crate) struct PluginDescriptor<P> {
-    pub(crate) clap_plugin_descriptor: clap_plugin_descriptor,
+pub struct PluginDescriptor {
+    clap_plugin_descriptor: clap_plugin_descriptor,
     clap_features: Box<[*const c_char]>,
 
     id: CString,
@@ -22,8 +22,6 @@ pub(crate) struct PluginDescriptor<P> {
     version: CString,
     description: CString,
     features: Box<[CString]>,
-
-    _marker: PhantomData<P>,
 }
 
 impl PluginDescriptor {
