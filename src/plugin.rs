@@ -15,6 +15,7 @@ use crate::{
 
 mod desc;
 
+#[doc(hidden)]
 pub use desc::PluginDescriptor;
 
 mod ffi;
