@@ -41,13 +41,13 @@ macro_rules! entry {
                 clap_plugin, clap_plugin_descriptor, clap_plugin_entry,
                 clap_plugin_factory, clap_host
             };
-            use $crate::factory::{Factory, FactoryHost, FactoryPluginDescriptor};
+            use $crate::factory::{Factory, FactoryHost, FactoryPluginPrototype};
             use $crate::plugin::Plugin;
 
             use super::*; // Access the types supplied as macro arguments.
 
-            fn plugin_prototype<P: Plugin>() -> Box<FactoryPluginDescriptor<P>> {
-                Box::new(FactoryPluginDescriptor::build()
+            fn plugin_prototype<P: Plugin>() -> Box<FactoryPluginPrototype<P>> {
+                Box::new(FactoryPluginPrototype::build()
                             .expect("cannot build factory plugin descriptor"))
             }
 

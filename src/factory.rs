@@ -14,7 +14,6 @@ use crate::{
     plugin::{Plugin, PluginDescriptor, Runtime},
 };
 
-/// This type exists only be visible from within `clap::entry!` macro.
 pub struct FactoryHost {
     host: *const clap_host,
 }
@@ -31,13 +30,13 @@ impl FactoryHost {
         self.host
     }
 }
-/// This type exists only be visible from within `clap::entry!` macro.
-pub struct FactoryPluginDescriptor<P> {
+
+pub struct FactoryPluginPrototype<P> {
     descriptor: PluginDescriptor,
     _marker: PhantomData<P>,
 }
 
-impl<P: Plugin> FactoryPluginDescriptor<P> {
+impl<P: Plugin> FactoryPluginPrototype<P> {
     pub fn build() -> Result<Self, Error> {
         Ok(Self {
             descriptor: PluginDescriptor::new::<P>().map_err(Error::PluginDescriptor)?,
@@ -62,7 +61,7 @@ pub trait FactoryPlugin {
     unsafe fn clap_plugin(&self, host: FactoryHost) -> Result<*const clap_plugin, Error>;
 }
 
-impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
+impl<P: Plugin> FactoryPlugin for FactoryPluginPrototype<P> {
     fn plugin_id(&self) -> &CStr {
         self.descriptor.plugin_id()
     }
@@ -101,18 +100,17 @@ impl Factory {
     }
 
     pub fn plugins_count(&self) -> u32 {
-        self.plugins
-            .len()
-            .try_into()
-            .expect("plugins_count should fit into u32")
+        debug_assert!(u32::try_from(self.plugins.len()).is_ok());
+        self.plugins.len() as u32
     }
 
     pub fn descriptor(&self, index: u32) -> Result<*const clap_plugin_descriptor, Error> {
-        let uindex = usize::try_from(index).map_err(|_| Error::IndexOutOfBounds(index))?;
-        (uindex < self.plugins.len())
+        debug_assert!(usize::try_from(index).is_ok());
+        let index = index as usize;
+        (index < self.plugins.len())
             // This needs to be lazy to avoid evaluating on invalid index.
-            .then(|| unsafe { self.plugins[uindex].clap_plugin_descriptor() })
-            .ok_or(Error::IndexOutOfBounds(index))
+            .then(|| unsafe { self.plugins[index].clap_plugin_descriptor() })
+            .ok_or(Error::IndexOutOfBounds(index as u32))
     }
 
     pub fn create_plugin(

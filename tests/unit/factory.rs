@@ -4,7 +4,7 @@ use clap_clap::{
     Error,
     factory::{
         Error::{IndexOutOfBounds, PluginIdNotFound},
-        Factory, FactoryHost, FactoryPluginDescriptor,
+        Factory, FactoryHost, FactoryPluginPrototype,
     },
     plugin::Plugin,
 };
@@ -26,7 +26,7 @@ pub fn empty() {
 fn dummy(n: usize) -> Factory {
     Factory::new(
         (0..n)
-            .map(|_| Box::new(FactoryPluginDescriptor::<TestPlugin>::build().unwrap()) as _)
+            .map(|_| Box::new(FactoryPluginPrototype::<TestPlugin>::build().unwrap()) as _)
             .collect(),
     )
 }
@@ -85,8 +85,8 @@ impl Plugin for Dummy {
 
 fn two_dummies() -> Factory {
     Factory::new(vec![
-        Box::new(FactoryPluginDescriptor::<TestPlugin>::build().unwrap()),
-        Box::new(FactoryPluginDescriptor::<Dummy>::build().unwrap()),
+        Box::new(FactoryPluginPrototype::<TestPlugin>::build().unwrap()),
+        Box::new(FactoryPluginPrototype::<Dummy>::build().unwrap()),
     ])
 }
 
