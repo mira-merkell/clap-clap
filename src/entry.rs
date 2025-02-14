@@ -7,7 +7,7 @@
 ///
 /// # Example
 ///
-/// ```no_compile,rust
+/// ```no_compile
 /// #[derive(Default)]
 /// struct MyPlugin;
 ///
