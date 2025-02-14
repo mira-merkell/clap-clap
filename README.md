@@ -4,7 +4,7 @@
 
 A [CLAP] plugin runtime. Very much WIP. 🚧
 
-You can find the documentation at [docs.rs][documentation].
+The library documentation is available at [docs.rs][documentation].
 
 [CLAP]: https://cleveraudio.org
 
@@ -20,8 +20,8 @@ You can find the documentation at [docs.rs][documentation].
 
 ## Example (plugin template)
 
-You can find the source code of a simple plugin template in [
-`examples/plugin_template.rs`].
+You can find the source code of a simple plugin template in:
+[`./examples/plugin_template.rs`].
 
 To compile the sources, install Rust `1.85.0` or later (for the Rust 2024
 edition) and clone the repository:
@@ -50,14 +50,14 @@ Copy the file to where your DAW can find it and rename it to:
 
 ## Installation
 
-You can install this library like any other dependency of your crate:
+Simply add this library as a dependency of your crate:
 
 ```bash
 cargo add clap-clap
 ```
 
 A CLAP plugin is a dynamical library with C ABI and a symbol: `clap_entry`
-visible to the host that would load the plugin. To compile your plugin with the
+visible to the host to load the plugin. To compile your plugin with the
 right ABI, specify the crate type in your `Cargo.toml`:
 
 ```toml
@@ -66,10 +66,10 @@ right ABI, specify the crate type in your `Cargo.toml`:
 crate-type = ["cdylib"]
 ```
 
-To export the entry symbols, use [`clap_clap::entry!`] macro. There macro can
-be invoked only once in the entire plugin code, but you can specify multiple
-types as macro arguments. For example, assuming you have types `MyPlug`
-and `MyPlugToo` that implement [`Plugin`], you can export them by:
+To export the entry symbols, use the provided [`clap_clap::entry!`] macro. The
+macro must be invoked exactly once in the entire plugin code, but you can
+specify multiple types as arguments. For example, assuming  `MyPlug` and
+`MyPlugToo` implement the trait [`Plugin`], you can export them with:
 
 ```rust
 // Your crate's lib.rs:
@@ -77,13 +77,29 @@ clap_clap::entry!(MyPlug, MyPlugToo);
 ```
 
 This will also build a plugin factory that a CLAP host can use to crate
-instances
-of your plugins. The bundle will be a one compiled artefact that you can install
-as a `*.clap` file.
+instances of your plugins. The bundle will be a one compiled artefact that you
+can install as a `*.clap` file.
 
 [`clap_clap::entry!`]: https://docs.rs/clap-clap/latest/clap_clap/macro.entry.html
 
 [`Plugin`]: https://docs.rs/clap-clap/latest/clap_clap/plugin/trait.Plugin.html
+
+## Roadmap
+
+* New unstable minor versions, `0.x.0`, will be published once a month
+  throughout 2025.
+* The beta release of the first stable version: `1.0-beta` will be published in
+  Sep 2025.
+* The stable API will be released in Dec 2025.
+
+## Contributing
+
+All contributions are welcome!
+
+Help with writing documentation and examples will be much needed in the summer.
+Alternatively, if you could set aside a few hours in late 2025 to help with
+testing sample plugins before the stable release, that would be greatly
+appreciated. 🎈
 
 ## Credits and License
 
