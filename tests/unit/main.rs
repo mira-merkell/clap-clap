@@ -6,3 +6,5 @@ mod plugin_features;
 mod process;
 mod string_sizes;
 mod version;
+
+mod shims;
