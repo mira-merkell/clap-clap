@@ -1,10 +1,10 @@
 use std::{
-    ffi::{CStr, CString, c_char},
+    ffi::{c_char, CStr, CString},
     ptr::null,
 };
 
 use crate::{
-    ffi::{CLAP_VERSION, clap_plugin_descriptor},
+    ffi::{clap_plugin_descriptor, CLAP_VERSION},
     plugin::{Error, Plugin},
 };
 
@@ -35,10 +35,7 @@ impl PluginDescriptor {
         let version = CString::new(P::VERSION)?;
         let description = CString::new(P::DESCRIPTION)?;
 
-        let features: Box<[CString]> = P::FEATURES
-            .split_whitespace()
-            .map(CString::new)
-            .collect::<Result<_, _>>()?;
+        let features: Box<[CString]> = P::features().map(CString::new).collect::<Result<_, _>>()?;
         let mut clap_features: Vec<*const c_char> =
             features.iter().map(|s| s.as_c_str().as_ptr()).collect();
         clap_features.push(null());
