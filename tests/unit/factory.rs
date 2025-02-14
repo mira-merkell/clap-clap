@@ -42,14 +42,8 @@ fn dummy_desc() {
     assert_eq!(unsafe { CStr::from_ptr((*desc).id) }, c"clap.plugin.test");
 }
 
-fn dummy_host() -> Pin<Box<TestHost>> {
-    TestHostConfig {
-        name: "",
-        vendor: "",
-        url: "",
-        version: "",
-    }
-    .build()
+fn dummy_host<'a>() -> Pin<Box<TestHost<'a>>> {
+    TestHostConfig::default().build()
 }
 
 #[test]
