@@ -5,10 +5,10 @@
 //!
 //! Non-standard features should be formatted as follows: "$namespace:$feature"
 //!
-//! See also: [`Plugin::FEATURES`] how to define plugin features as an
-//! associated constant string on the plugin trait.
+//! See also: [`Plugin::features`] how to define plugin features as an arbitrary
+//! list of keywords.
 //!
-//! [`Plugin::FEATURES`]: crate::plugin::Plugin::FEATURES
+//! [`Plugin::features`]: crate::plugin::Plugin::features
 
 pub const CLAP_PLUGIN_FEATURE_INSTRUMENT: &str = "instrument";
 pub const CLAP_PLUGIN_FEATURE_AUDIO_EFFECT: &str = "audio-effect";
