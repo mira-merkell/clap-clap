@@ -81,21 +81,26 @@ macro_rules! entry {
                 host: *const clap_host,
                 plugin_id: *const std::ffi::c_char,
             ) -> *const clap_plugin {
-                if plugin_id.is_null() || host.is_null() {
+                if plugin_id.is_null() {
                     return std::ptr::null();
                 }
-                {
-                    let host  = unsafe {&*host};
-                    if host.get_extension.is_none() || host.request_restart.is_none() ||
-                            host.request_process.is_none() || host.request_callback.is_none() {
-                        return std::ptr::null();
-                    }
-                }
-                // SAFETY: We just checked that host and its methods are non-null.
-                let host = unsafe { FactoryHost::new(host) };
                 // SAFETY: We checked if plug_id is non-null.
                 // The host guarantees that this is a valid C string now.
                 let plugin_id = unsafe { std::ffi::CStr::from_ptr(plugin_id) };
+
+                if host.is_null() {
+                    return std::ptr::null();
+                }
+                let host  = unsafe {&*host};
+                if host.get_extension.is_none()
+                    || host.request_restart.is_none()
+                    || host.request_process.is_none()
+                    || host.request_callback.is_none() {
+                    return std::ptr::null();
+                }
+                // SAFETY: We just checked that host and its methods are non-null.
+                let host = unsafe { FactoryHost::new_unchecked(host) };
+
                 FACTORY
                     .create_plugin(plugin_id, host)
                     .unwrap_or(std::ptr::null_mut())

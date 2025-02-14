@@ -53,7 +53,7 @@ fn dummy_create() {
 
     let plugin = factory
         .create_plugin(c"clap.plugin.test", unsafe {
-            FactoryHost::new(test_host.as_clap_host())
+            FactoryHost::new_unchecked(test_host.as_clap_host())
         })
         .unwrap();
 
@@ -120,7 +120,7 @@ fn two_dummies_create0() {
 
     let plugin = factory
         .create_plugin(c"dummy", unsafe {
-            FactoryHost::new(test_host.as_clap_host())
+            FactoryHost::new_unchecked(test_host.as_clap_host())
         })
         .unwrap();
 
@@ -137,7 +137,7 @@ fn two_dummies_create1() {
 
     let plugin = factory
         .create_plugin(c"dummy", unsafe {
-            FactoryHost::new(test_host.as_clap_host())
+            FactoryHost::new_unchecked(test_host.as_clap_host())
         })
         .unwrap();
 
@@ -154,7 +154,7 @@ fn two_dummies_create_badid() {
 
     let err = factory
         .create_plugin(c"noname", unsafe {
-            FactoryHost::new(test_host.as_clap_host())
+            FactoryHost::new_unchecked(test_host.as_clap_host())
         })
         .unwrap_err();
 

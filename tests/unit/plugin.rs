@@ -178,7 +178,7 @@ mod dummy_host {
 unsafe fn build_plugin<P: Plugin>() -> ClapPlugin<P> {
     let plugin = FACTORY
         .create_plugin(c"clap.plugin.test", unsafe {
-            FactoryHost::new(&DUMMY_HOST)
+            FactoryHost::new_unchecked(&DUMMY_HOST)
         })
         .unwrap();
 
