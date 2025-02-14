@@ -56,7 +56,10 @@ impl Plugin for TestPlugin {
     const SUPPORT_URL: &'static str = "support none";
     const VERSION: &'static str = "0.0.099";
     const DESCRIPTION: &'static str = "test plugin";
-    const FEATURES: &'static str = "test audio Allpass other features too: ⧉⧉⧉";
+
+    fn features() -> impl Iterator<Item = &'static str> {
+        "test audio Allpass other features too: ⧉⧉⧉".split_whitespace()
+    }
 
     fn init(&mut self, host: Arc<Host>) -> Result<(), Error> {
         self.id = Some(SystemTime::now());
@@ -264,7 +267,7 @@ fn plugin_descriptor_features() {
         feat = unsafe { feat.add(1) };
     }
 
-    let plugin_features: Vec<_> = TestPlugin::FEATURES.split_whitespace().collect();
+    let plugin_features: Vec<_> = TestPlugin::features().collect();
 
     assert_eq!(features, plugin_features);
 }

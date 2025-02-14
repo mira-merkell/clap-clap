@@ -134,9 +134,7 @@ pub fn build_plugin_descriptor<P: Plugin>() -> Result<PluginDescriptor<P>, Error
         .version(P::VERSION)?
         .description(P::DESCRIPTION)?;
 
-    P::FEATURES
-        .split_whitespace()
-        .try_for_each(|feat| builder.add_feature(feat).map(|_| ()))?;
+    P::features().try_for_each(|feat| builder.add_feature(feat).map(|_| ()))?;
 
     builder.build()
 }
