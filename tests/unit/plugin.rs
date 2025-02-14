@@ -27,6 +27,9 @@ use crate::{
     process::TestProcessConfig,
 };
 
+#[cfg(test)]
+mod desc;
+
 #[derive(Default)]
 pub struct TestPlugin {
     id: Option<SystemTime>,
