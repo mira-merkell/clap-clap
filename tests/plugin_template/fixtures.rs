@@ -4,6 +4,7 @@ use std::{
     ops::Deref,
     pin::Pin,
     ptr::{null, null_mut},
+    sync::Mutex,
 };
 
 use clap_clap::ffi::{
@@ -32,7 +33,7 @@ pub struct TestHostConfig<'a> {
     pub url: &'a CStr,
     pub version: &'a CStr,
 
-    pub ext_log_messages: Option<&'a mut Vec<(clap_log_severity, CString)>>,
+    pub impl_ext_log: bool,
 }
 
 impl<'a> TestHostConfig<'a> {
@@ -44,11 +45,12 @@ impl<'a> TestHostConfig<'a> {
 #[derive(Debug)]
 #[allow(unused)]
 pub struct TestHost<'a> {
-    config: TestHostConfig<'a>,
-
     clap_host: clap_host,
-    clap_host_log: clap_host_log,
 
+    clap_host_log: clap_host_log,
+    pub ext_log_messages: Mutex<Vec<(clap_log_severity, CString)>>,
+
+    config: TestHostConfig<'a>,
     _marker: PhantomPinned,
 }
 
@@ -62,7 +64,7 @@ impl<'a> TestHost<'a> {
             let test_host: &TestHost = unsafe { &*(*host).host_data.cast() };
             let extension_id = unsafe { CStr::from_ptr(extension_id) };
 
-            if extension_id == CLAP_EXT_LOG && test_host.config.ext_log_messages.is_some() {
+            if extension_id == CLAP_EXT_LOG && test_host.config.impl_ext_log {
                 return &raw const test_host.clap_host_log as *const _;
             }
 
@@ -81,10 +83,10 @@ impl<'a> TestHost<'a> {
             let test_host: &mut TestHost = unsafe { &mut *(*host).host_data.cast() };
 
             assert!(!msg.is_null());
-            if let Some(buf) = &mut test_host.config.ext_log_messages {
-                let msg = unsafe { CStr::from_ptr(msg) }.to_owned();
-                buf.push((severity, msg))
-            }
+            let msg = unsafe { CStr::from_ptr(msg) }.to_owned();
+
+            let mut buf = test_host.ext_log_messages.lock().unwrap();
+            buf.push((severity, msg))
         }
 
         let mut host = Box::new(Self {
@@ -103,6 +105,7 @@ impl<'a> TestHost<'a> {
                 request_callback: Some(request_callback),
             },
             clap_host_log: clap_host_log { log: Some(log_log) },
+            ext_log_messages: Mutex::new(Vec::new()),
             config,
             _marker: PhantomPinned,
         });
