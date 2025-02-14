@@ -93,10 +93,28 @@ impl From<Severity> for clap_log_severity {
     }
 }
 
+impl TryFrom<clap_log_severity> for Severity {
+    type Error = crate::ext::host::log::Error;
+
+    fn try_from(value: clap_log_severity) -> Result<Self, Error> {
+        match value {
+            CLAP_LOG_DEBUG => Ok(Severity::Debug),
+            CLAP_LOG_INFO => Ok(Severity::Info),
+            CLAP_LOG_WARNING => Ok(Severity::Warning),
+            CLAP_LOG_ERROR => Ok(Severity::Error),
+            CLAP_LOG_FATAL => Ok(Severity::Fatal),
+            CLAP_LOG_HOST_MISBEHAVING => Ok(Severity::ClapHostMisbehaving),
+            CLAP_LOG_PLUGIN_MISBEHAVING => Ok(Severity::ClapPluginMisbehaving),
+            _ => Err(Error::Severity(value)),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     Callback,
     NulError(NulError),
+    Severity(i32),
 }
 
 impl Display for Error {
@@ -104,6 +122,7 @@ impl Display for Error {
         match self {
             Error::Callback => write!(f, "callback not found"),
             Error::NulError(e) => write!(f, "error converting to C string: {e}"),
+            Error::Severity(v) => write!(f, "unknown severity level: {v}"),
         }
     }
 }
