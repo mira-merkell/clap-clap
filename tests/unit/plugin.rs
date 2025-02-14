@@ -14,7 +14,7 @@ use clap_clap::{
         Extensions,
         audio_ports::{AudioPortInfo, AudioPorts},
     },
-    factory::{Factory, FactoryHost, FactoryPluginDescriptor},
+    factory::{Factory, FactoryHost, FactoryPluginPrototype},
     ffi::{CLAP_EXT_AUDIO_PORTS, clap_plugin_audio_ports},
     host::Host,
     plugin::{AudioThread, ClapPlugin, Plugin},
@@ -145,7 +145,7 @@ impl AudioThread<TestPlugin> for TestAudioThread {
 
 static FACTORY: LazyLock<Factory> = LazyLock::new(|| {
     Factory::new(vec![Box::new(
-        FactoryPluginDescriptor::<TestPlugin>::build().unwrap(),
+        FactoryPluginPrototype::<TestPlugin>::build().unwrap(),
     )])
 });
 
@@ -181,7 +181,7 @@ mod dummy_host {
 unsafe fn build_plugin<P: Plugin>() -> ClapPlugin<P> {
     let plugin = FACTORY
         .create_plugin(c"clap.plugin.test", unsafe {
-            FactoryHost::new(&DUMMY_HOST)
+            FactoryHost::new_unchecked(&DUMMY_HOST)
         })
         .unwrap();
 

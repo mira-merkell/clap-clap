@@ -8,37 +8,36 @@ use std::{
 
 use crate::{
     ffi::{clap_host, clap_plugin, clap_plugin_descriptor},
-    host,
     host::Host,
     plugin,
     plugin::{Plugin, PluginDescriptor, Runtime},
 };
 
-/// This type exists only be visible from within `clap::entry!` macro.
-pub struct FactoryHost {
-    host: *const clap_host,
-}
+pub struct FactoryHost(*const clap_host);
 
 impl FactoryHost {
     /// # Safety
     ///
     /// The pointer to `clap_host` and all it's methods must be non-null.
-    #[doc(hidden)]
-    pub const unsafe fn new(host: *const clap_host) -> Self {
-        Self { host }
-    }
-
-    pub(crate) const fn into_inner(self) -> *const clap_host {
-        self.host
+    /// It must point to a valid CLAP host that a plugin can be
+    /// initialized with.
+    pub const unsafe fn new_unchecked(host: *const clap_host) -> Self {
+        debug_assert!(!host.is_null());
+        Self(host)
     }
 }
-/// This type exists only be visible from within `clap::entry!` macro.
-pub struct FactoryPluginDescriptor<P> {
+
+// SAFETY: !Send for raw pointers is not for safety, just as a lint.
+unsafe impl Send for FactoryHost {}
+// SAFETY: !Sync for raw pointers is not for safety, just as a lint.
+unsafe impl Sync for FactoryHost {}
+
+pub struct FactoryPluginPrototype<P> {
     descriptor: PluginDescriptor,
     _marker: PhantomData<P>,
 }
 
-impl<P: Plugin> FactoryPluginDescriptor<P> {
+impl<P: Plugin> FactoryPluginPrototype<P> {
     pub fn build() -> Result<Self, Error> {
         Ok(Self {
             descriptor: PluginDescriptor::new::<P>().map_err(Error::PluginDescriptor)?,
@@ -63,7 +62,7 @@ pub trait FactoryPlugin {
     unsafe fn clap_plugin(&self, host: FactoryHost) -> Result<*const clap_plugin, Error>;
 }
 
-impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
+impl<P: Plugin> FactoryPlugin for FactoryPluginPrototype<P> {
     fn plugin_id(&self) -> &CStr {
         self.descriptor.plugin_id()
     }
@@ -76,7 +75,7 @@ impl<P: Plugin> FactoryPlugin for FactoryPluginDescriptor<P> {
         // SAFETY: The pointer unwrapped from FactoryHost is a valid pointer
         // to a CLAP host, obtained as the argument passed to plugin
         // factory's create_plugin().
-        let host = unsafe { Host::new(host.into_inner()) };
+        let host = unsafe { Host::new(host.0) };
         Ok(Runtime::<P>::initialize(Arc::new(host))
             .map_err(Error::PluginDescriptor)?
             .into_clap_plugin()
@@ -102,18 +101,17 @@ impl Factory {
     }
 
     pub fn plugins_count(&self) -> u32 {
-        self.plugins
-            .len()
-            .try_into()
-            .expect("plugins_count should fit into u32")
+        debug_assert!(u32::try_from(self.plugins.len()).is_ok());
+        self.plugins.len() as u32
     }
 
     pub fn descriptor(&self, index: u32) -> Result<*const clap_plugin_descriptor, Error> {
-        let uindex = usize::try_from(index).map_err(|_| Error::IndexOutOfBounds(index))?;
-        (uindex < self.plugins.len())
+        debug_assert!(usize::try_from(index).is_ok());
+        let index = index as usize;
+        (index < self.plugins.len())
             // This needs to be lazy to avoid evaluating on invalid index.
-            .then(|| unsafe { self.plugins[uindex].clap_plugin_descriptor() })
-            .ok_or(Error::IndexOutOfBounds(index))
+            .then(|| unsafe { self.plugins[index].clap_plugin_descriptor() })
+            .ok_or(Error::IndexOutOfBounds(index as u32))
     }
 
     pub fn create_plugin(
@@ -126,14 +124,15 @@ impl Factory {
     }
 }
 
+// SAFETY: !Send for raw pointers is not for safety, just as a lint.
 unsafe impl Send for Factory {}
+// SAFETY: !Sync for raw pointers is not for safety, just as a lint.
 unsafe impl Sync for Factory {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     PluginIdNotFound,
     PluginDescriptor(plugin::Error),
-    CreateHost(host::Error),
     IndexOutOfBounds(u32),
 }
 
@@ -142,7 +141,6 @@ impl Display for Error {
         match self {
             Error::PluginIdNotFound => write!(f, "factory plugin id not found"),
             Error::PluginDescriptor(e) => write!(f, "plugin descriptor: {e}"),
-            Error::CreateHost(_) => write!(f, "create host handle"),
             Error::IndexOutOfBounds(n) => write!(f, "index out ouf bounds: {n}"),
         }
     }
