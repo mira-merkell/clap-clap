@@ -21,7 +21,7 @@ The library documentation is available at [docs.rs][documentation].
 ## Example (plugin template)
 
 You can find the source code of a simple plugin template in:
-[`./examples/plugin_template.rs`].
+[`examples/plugin_template.rs`].
 
 To compile the sources, install Rust `1.85.0` or later (for the Rust 2024
 edition) and clone the repository:
@@ -97,9 +97,8 @@ can install as a `*.clap` file.
 All contributions are welcome!
 
 Help with writing documentation and examples will be much needed in the summer.
-Alternatively, if you could set aside a few hours in late 2025 to help with
-testing sample plugins before the stable release, that would be greatly
-appreciated. 🎈
+Alternatively, we would greatly appreciate, if you could set aside a few hours
+in late 2025 to help with testing sample plugins before the stable release. 🎈
 
 ## Credits and License
 
