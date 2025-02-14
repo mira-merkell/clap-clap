@@ -12,16 +12,14 @@ use crate::{
     host::Host,
 };
 
+#[derive(Debug)]
 pub struct Log<'a> {
     host: &'a Host,
-    clap_host_log: *const clap_host_log,
+    clap_host_log: &'a clap_host_log,
 }
 
 impl<'a> Log<'a> {
-    /// # Safety
-    ///
-    /// The pointer to clap_host_log must be non-null
-    pub(crate) const unsafe fn new(host: &'a Host, clap_host_log: *const clap_host_log) -> Self {
+    pub const fn new(host: &'a Host, clap_host_log: &'a clap_host_log) -> Self {
         Self {
             host,
             clap_host_log,
@@ -30,14 +28,14 @@ impl<'a> Log<'a> {
 
     pub fn log(&self, severity: Severity, msg: &str) -> Result<(), Error> {
         let msg = CString::new(msg)?;
-        let callback = unsafe { *self.clap_host_log }.log.ok_or(Error::Callback)?;
+        let callback = self.clap_host_log.log.ok_or(Error::Callback)?;
 
         // SAFETY: We just checked if callback is non-null.  The callback is
         // thread-safe, and we own the reference to msg until the callback
         // returns. So the call is safe.
         unsafe {
             callback(
-                &raw const *self.host.as_ref(),
+                &raw const *self.host.clap_host(),
                 severity.into(),
                 msg.as_ptr(),
             )
@@ -93,10 +91,28 @@ impl From<Severity> for clap_log_severity {
     }
 }
 
+impl TryFrom<clap_log_severity> for Severity {
+    type Error = crate::ext::host::log::Error;
+
+    fn try_from(value: clap_log_severity) -> Result<Self, Error> {
+        match value {
+            CLAP_LOG_DEBUG => Ok(Severity::Debug),
+            CLAP_LOG_INFO => Ok(Severity::Info),
+            CLAP_LOG_WARNING => Ok(Severity::Warning),
+            CLAP_LOG_ERROR => Ok(Severity::Error),
+            CLAP_LOG_FATAL => Ok(Severity::Fatal),
+            CLAP_LOG_HOST_MISBEHAVING => Ok(Severity::ClapHostMisbehaving),
+            CLAP_LOG_PLUGIN_MISBEHAVING => Ok(Severity::ClapPluginMisbehaving),
+            _ => Err(Error::Severity(value)),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     Callback,
     NulError(NulError),
+    Severity(i32),
 }
 
 impl Display for Error {
@@ -104,6 +120,7 @@ impl Display for Error {
         match self {
             Error::Callback => write!(f, "callback not found"),
             Error::NulError(e) => write!(f, "error converting to C string: {e}"),
+            Error::Severity(v) => write!(f, "unknown severity level: {v}"),
         }
     }
 }

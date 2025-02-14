@@ -1,4 +1,4 @@
-use std::{pin::Pin, ptr::NonNull};
+use std::ptr::NonNull;
 
 use clap_clap::process::Process;
 
@@ -6,7 +6,7 @@ use crate::process::TestProcess;
 #[allow(unused)]
 use crate::process::TestProcessConfig;
 
-fn frames_input_data32(mut test_process: Pin<Box<TestProcess>>) {
+fn frames_input_data32(mut test_process: TestProcess) {
     let num_in = test_process.audio_inputs_count;
     let num_ch = test_process.audio_inputs[0].channel_count;
 
@@ -109,7 +109,7 @@ case_frames_input_data32!(frames_input_data32_04, 2, 2);
 case_frames_input_data32!(frames_input_data32_05, 3, 1);
 case_frames_input_data32!(frames_input_data32_06, 1, 3);
 
-fn frames_output_data32(mut test_process: Pin<Box<TestProcess>>) {
+fn frames_output_data32(mut test_process: TestProcess) {
     let num_out = test_process.audio_outputs_count;
     let num_ch = test_process.audio_outputs[0].channel_count;
 

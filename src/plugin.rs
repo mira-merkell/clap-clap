@@ -1,6 +1,7 @@
 use std::{
     ffi::NulError,
     fmt::Display,
+    iter::empty,
     marker::PhantomData,
     sync::{Arc, Mutex},
 };
@@ -15,7 +16,8 @@ use crate::{
 
 mod desc;
 
-pub(crate) use desc::{PluginDescriptor, build_plugin_descriptor};
+#[doc(hidden)]
+pub use desc::PluginDescriptor;
 
 mod ffi;
 
@@ -32,12 +34,25 @@ pub trait Plugin: Default {
     const VERSION: &'static str = "";
     const DESCRIPTION: &'static str = "";
 
-    /// Arbitrary keywords separated by whitespace. For example: `"filter stereo
-    /// distortion"`. See the module [`plugin_features`] for a list of
-    /// standard feature names.
+    /// Plugin features as an arbitrary list of keywords.
+    ///
+    /// They can be matched by the host indexer and used to classify the plugin.
+    /// For some standard features, see module: [`plugin_features`].
+    ///
+    /// The default implementation returns an empty iterator.
+    ///
+    /// # Example
+    ///
+    /// ```no_compile,rust
+    /// fn features() -> impl Iterator<Item = &'static str> {
+    ///     "instrument stereo sampler".split_whitespace()
+    /// }
+    /// ```
     ///
     /// [`plugin_features`]: crate::plugin_features
-    const FEATURES: &'static str = "";
+    fn features() -> impl Iterator<Item = &'static str> {
+        empty()
+    }
 
     #[allow(unused_variables)]
     fn init(&mut self, host: Arc<Host>) -> Result<(), crate::Error> {
@@ -89,7 +104,7 @@ impl<P: Plugin> ClapPluginExtensions<P> {
 
 pub(crate) struct Runtime<P: Plugin> {
     pub(crate) audio_thread: Option<P::AudioThread>,
-    pub(crate) descriptor: PluginDescriptor<P>,
+    pub(crate) descriptor: PluginDescriptor,
     pub(crate) host: Arc<Host>,
     pub(crate) plugin: P,
     pub(crate) plugin_extensions: Mutex<ClapPluginExtensions<P>>,
@@ -98,7 +113,7 @@ pub(crate) struct Runtime<P: Plugin> {
 impl<P: Plugin> Runtime<P> {
     pub(crate) fn initialize(host: Arc<Host>) -> Result<Self, Error> {
         Ok(Self {
-            descriptor: build_plugin_descriptor()?,
+            descriptor: PluginDescriptor::new::<P>()?,
             plugin: P::default(),
             audio_thread: None,
             host,
@@ -227,6 +242,12 @@ impl Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+impl From<NulError> for Error {
+    fn from(value: NulError) -> Self {
+        Self::NulError(value)
+    }
+}
 
 impl From<Error> for crate::Error {
     fn from(value: Error) -> Self {

@@ -1,7 +1,6 @@
 use std::{
     ffi::CStr,
     ops::{Deref, DerefMut},
-    pin::Pin,
     sync::{
         Arc, LazyLock,
         atomic::{AtomicU32, AtomicU64, Ordering},
@@ -15,17 +14,17 @@ use clap_clap::{
         Extensions,
         audio_ports::{AudioPortInfo, AudioPorts},
     },
-    factory::{Factory, FactoryHost, FactoryPluginDescriptor},
+    factory::{Factory, FactoryHost, FactoryPluginPrototype},
     ffi::{CLAP_EXT_AUDIO_PORTS, clap_plugin_audio_ports},
     host::Host,
     plugin::{AudioThread, ClapPlugin, Plugin},
     process::{Process, Status, Status::Continue},
 };
 
-use crate::{
-    host::{TestHost, TestHostConfig},
-    process::TestProcessConfig,
-};
+use crate::{plugin::dummy_host::DUMMY_HOST, process::TestProcessConfig};
+
+#[cfg(test)]
+mod desc;
 
 #[derive(Default)]
 pub struct TestPlugin {
@@ -56,7 +55,10 @@ impl Plugin for TestPlugin {
     const SUPPORT_URL: &'static str = "support none";
     const VERSION: &'static str = "0.0.099";
     const DESCRIPTION: &'static str = "test plugin";
-    const FEATURES: &'static str = "test audio Allpass other features too: ⧉⧉⧉";
+
+    fn features() -> impl Iterator<Item = &'static str> {
+        "test audio Allpass other features too: ⧉⧉⧉".split_whitespace()
+    }
 
     fn init(&mut self, host: Arc<Host>) -> Result<(), Error> {
         self.id = Some(SystemTime::now());
@@ -143,24 +145,43 @@ impl AudioThread<TestPlugin> for TestAudioThread {
 
 static FACTORY: LazyLock<Factory> = LazyLock::new(|| {
     Factory::new(vec![Box::new(
-        FactoryPluginDescriptor::<TestPlugin>::build().unwrap(),
+        FactoryPluginPrototype::<TestPlugin>::build().unwrap(),
     )])
 });
 
-static HOST: LazyLock<Pin<Box<TestHost>>> = LazyLock::new(|| {
-    TestHostConfig {
-        name: "test_host",
-        vendor: "mira-merkell",
-        url: "none",
-        version: "0.0.0",
+mod dummy_host {
+    use std::{
+        ffi::{c_char, c_void},
+        ptr::{null, null_mut},
+    };
+
+    use clap_clap::ffi::{CLAP_VERSION, clap_host};
+
+    extern "C-unwind" fn get_extension(_: *const clap_host, _: *const c_char) -> *const c_void {
+        null()
     }
-    .build()
-});
+    extern "C-unwind" fn request_restart(_: *const clap_host) {}
+    extern "C-unwind" fn request_process(_: *const clap_host) {}
+    extern "C-unwind" fn request_callback(_: *const clap_host) {}
+
+    pub const DUMMY_HOST: clap_host = clap_host {
+        clap_version: CLAP_VERSION,
+        host_data: null_mut(),
+        name: c"test_host".as_ptr(),
+        vendor: c"mira-merkell".as_ptr(),
+        url: c"none".as_ptr(),
+        version: c"".as_ptr(),
+        get_extension: Some(get_extension),
+        request_restart: Some(request_restart),
+        request_process: Some(request_process),
+        request_callback: Some(request_callback),
+    };
+}
 
 unsafe fn build_plugin<P: Plugin>() -> ClapPlugin<P> {
     let plugin = FACTORY
         .create_plugin(c"clap.plugin.test", unsafe {
-            FactoryHost::new(HOST.as_clap_host())
+            FactoryHost::new_unchecked(&DUMMY_HOST)
         })
         .unwrap();
 
@@ -264,7 +285,7 @@ fn plugin_descriptor_features() {
         feat = unsafe { feat.add(1) };
     }
 
-    let plugin_features: Vec<_> = TestPlugin::FEATURES.split_whitespace().collect();
+    let plugin_features: Vec<_> = TestPlugin::features().collect();
 
     assert_eq!(features, plugin_features);
 }
