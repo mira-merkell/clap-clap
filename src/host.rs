@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    ext::host::{log, log::Log},
+    ext::{log, log::HostLog},
     ffi::{CLAP_EXT_LOG, clap_host},
     version::ClapVersion,
 };
@@ -104,14 +104,14 @@ impl<'a> HostExtensions<'a> {
         (!ext_ptr.is_null()).then_some(ext_ptr)
     }
 
-    pub fn log(&self) -> Result<Log<'a>, Error> {
+    pub fn log(&self) -> Result<HostLog<'a>, Error> {
         let clap_host_log = self
             .get_extension_ptr(CLAP_EXT_LOG)
             .ok_or(Error::ExtensionNotFound("log"))?;
 
         // SAFETY: We just checked if the pointer to clap_host_log is non-null.
         // We return a reference to log for the lifetime of Host.
-        Ok(Log::new(self.host, unsafe { &*clap_host_log.cast() }))
+        Ok(HostLog::new(self.host, unsafe { &*clap_host_log.cast() }))
     }
 }
 

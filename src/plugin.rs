@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    ext::plugin::{Extensions, audio_ports::ClapPluginAudioPorts},
+    ext::{Extensions, audio_ports::ClapPluginAudioPorts},
     ffi::clap_plugin,
     host::Host,
     process,
@@ -76,14 +76,14 @@ impl<P: Plugin> AudioThread<P> for () {
     }
 }
 
-pub(crate) struct ClapPluginExtensions<P> {
-    pub(crate) audio_ports: Option<ClapPluginAudioPorts<P>>,
+struct ClapPluginExtensions<P> {
+    audio_ports: Option<ClapPluginAudioPorts<P>>,
 }
 
 impl<P: Plugin> ClapPluginExtensions<P> {
     fn new() -> Self {
         Self {
-            audio_ports: P::Extensions::audio_ports().map(ClapPluginAudioPorts::new),
+            audio_ports: <P as Plugin>::Extensions::audio_ports().map(ClapPluginAudioPorts::new),
         }
     }
 }
@@ -93,7 +93,7 @@ pub(crate) struct Runtime<P: Plugin> {
     pub(crate) descriptor: PluginDescriptor,
     pub(crate) host: Arc<Host>,
     pub(crate) plugin: P,
-    pub(crate) plugin_extensions: Mutex<ClapPluginExtensions<P>>,
+    plugin_extensions: Mutex<ClapPluginExtensions<P>>,
 }
 
 impl<P: Plugin> Runtime<P> {
@@ -206,7 +206,7 @@ impl<P: Plugin> ClapPlugin<P> {
     }
 
     /// Obtain a mutex to plugin extensions.
-    pub(crate) const fn plugin_extensions(&mut self) -> &Mutex<ClapPluginExtensions<P>> {
+    const fn plugin_extensions(&mut self) -> &Mutex<ClapPluginExtensions<P>> {
         let runtime: *mut Runtime<P> = unsafe { *self.clap_plugin }.plugin_data as *mut _;
         unsafe { &(*runtime).plugin_extensions }
     }

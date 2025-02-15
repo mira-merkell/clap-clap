@@ -13,13 +13,13 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct Log<'a> {
+pub struct HostLog<'a> {
     host: &'a Host,
     clap_host_log: &'a clap_host_log,
 }
 
-impl<'a> Log<'a> {
-    pub const fn new(host: &'a Host, clap_host_log: &'a clap_host_log) -> Self {
+impl<'a> HostLog<'a> {
+    pub(crate) const fn new(host: &'a Host, clap_host_log: &'a clap_host_log) -> Self {
         Self {
             host,
             clap_host_log,
@@ -46,7 +46,7 @@ impl<'a> Log<'a> {
 
 macro_rules! impl_log_severity {
     ($(($method:tt, $severity:ident)),*) => {
-        impl<'a> Log<'a> {
+        impl<'a> HostLog<'a> {
             $(
                 pub fn $method(&self, msg: &str) -> Result<(), Error> {
                     self.log(Severity::$severity, msg)

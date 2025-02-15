@@ -10,7 +10,7 @@ use std::{
 
 use clap_clap::{
     Error,
-    ext::plugin::{
+    ext::{
         Extensions,
         audio_ports::{AudioPortInfo, AudioPorts},
     },

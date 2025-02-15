@@ -19,12 +19,11 @@ pub mod version;
 
 pub mod prelude {
     #[doc(inline)]
+    pub use crate::ext::audio_ports::{AudioPorts, MonoPorts, StereoPorts};
+    #[doc(inline)]
     pub use crate::{
         Error, entry,
-        ext::plugin::{
-            Extensions,
-            audio_ports::{AudioPorts, MonoPorts, StereoPorts},
-        },
+        ext::Extensions,
         host::Host,
         plugin::{AudioThread, Plugin},
         process::{Process, Status},
