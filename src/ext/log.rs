@@ -96,7 +96,7 @@ impl From<Severity> for clap_log_severity {
 }
 
 impl TryFrom<clap_log_severity> for Severity {
-    type Error = crate::ext::host::log::Error;
+    type Error = crate::ext::log::Error;
 
     fn try_from(value: clap_log_severity) -> Result<Self, Error> {
         match value {
