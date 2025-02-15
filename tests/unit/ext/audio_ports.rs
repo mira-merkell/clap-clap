@@ -77,3 +77,64 @@ mod static_ports {
     check_stereo_ports!(stereo_2_2, 2, 2);
     check_stereo_ports!(stereo_13_17, 13, 17);
 }
+
+mod host_audio_ports {
+    use clap_clap::{ext::audio_ports::RescanFlags, host::Host};
+
+    use crate::host::TestHostConfig;
+
+    #[test]
+    fn audio_port_not_impl() {
+        let test_host = TestHostConfig::default().build();
+        let host = unsafe { Host::new(test_host.clap_host()) };
+
+        let _ = host.get_extension().audio_ports().unwrap_err();
+    }
+
+    #[test]
+    fn audio_port_no_method_is_rescan() {
+        let mut test_host = TestHostConfig {
+            impl_ext_audio_ports: true,
+            ..Default::default()
+        }
+        .build();
+
+        unsafe { test_host.as_mut().get_unchecked_mut() }
+            .clap_host_audio_ports
+            .is_rescan_flag_supported = None;
+
+        let host = unsafe { Host::new(test_host.clap_host()) };
+        let _ = host.get_extension().audio_ports().unwrap_err();
+    }
+
+    #[test]
+    fn audio_port_no_method_rescan() {
+        let mut test_host = TestHostConfig {
+            impl_ext_audio_ports: true,
+            ..Default::default()
+        }
+        .build();
+
+        unsafe { test_host.as_mut().get_unchecked_mut() }
+            .clap_host_audio_ports
+            .rescan = None;
+
+        let host = unsafe { Host::new(test_host.clap_host()) };
+        let _ = host.get_extension().audio_ports().unwrap_err();
+    }
+
+    #[test]
+    fn audio_port_impl() {
+        let test_host = TestHostConfig {
+            impl_ext_audio_ports: true,
+            ..Default::default()
+        }
+        .build();
+        let host = unsafe { Host::new(test_host.clap_host()) };
+
+        let audio_ports = host.get_extension().audio_ports().unwrap();
+        assert!(audio_ports.is_rescan_flag_supported(RescanFlags::ChannelCount));
+        audio_ports.rescan(123);
+        assert_eq!(test_host.ext_audio_port_call_rescan_flags, 123);
+    }
+}

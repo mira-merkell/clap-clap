@@ -7,7 +7,10 @@ use std::{
 };
 
 use clap_clap::{
-    ffi::{CLAP_EXT_LOG, clap_host, clap_host_log, clap_log_severity},
+    ffi::{
+        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, clap_host, clap_host_audio_ports, clap_host_log,
+        clap_log_severity,
+    },
     host::Host,
     version::CLAP_VERSION,
 };
@@ -20,6 +23,7 @@ pub struct TestHostConfig<'a> {
     pub version: &'a CStr,
 
     pub impl_ext_log: bool,
+    pub impl_ext_audio_ports: bool,
 }
 
 impl<'a> TestHostConfig<'a> {
@@ -32,6 +36,9 @@ impl<'a> TestHostConfig<'a> {
 #[allow(unused)]
 pub struct TestHost<'a> {
     clap_host: clap_host,
+
+    pub clap_host_audio_ports: clap_host_audio_ports,
+    pub ext_audio_port_call_rescan_flags: u32,
 
     pub clap_host_log: clap_host_log,
     pub ext_log_messages: Mutex<Vec<(clap_log_severity, CString)>>,
@@ -50,8 +57,11 @@ impl<'a> TestHost<'a> {
             let test_host: &TestHost = unsafe { &*(*host).host_data.cast() };
             let extension_id = unsafe { CStr::from_ptr(extension_id) };
 
+            if extension_id == CLAP_EXT_AUDIO_PORTS && test_host.config.impl_ext_audio_ports {
+                return (&raw const test_host.clap_host_audio_ports).cast();
+            }
             if extension_id == CLAP_EXT_LOG && test_host.config.impl_ext_log {
-                return &raw const test_host.clap_host_log as *const _;
+                return (&raw const test_host.clap_host_log).cast();
             }
 
             null()
@@ -59,6 +69,20 @@ impl<'a> TestHost<'a> {
         extern "C-unwind" fn request_restart(_: *const clap_host) {}
         extern "C-unwind" fn request_reset(_: *const clap_host) {}
         extern "C-unwind" fn request_callback(_: *const clap_host) {}
+
+        extern "C-unwind" fn audio_ports_is_rescan_flag_supported(
+            host: *const clap_host,
+            _: u32,
+        ) -> bool {
+            assert!(!host.is_null());
+            true
+        }
+
+        extern "C-unwind" fn audio_ports_rescan(host: *const clap_host, flags: u32) {
+            assert!(!host.is_null());
+            let test_host: &mut TestHost = unsafe { &mut *(*host).host_data.cast() };
+            test_host.ext_audio_port_call_rescan_flags = flags;
+        }
 
         extern "C-unwind" fn log_log(
             host: *const clap_host,
@@ -92,6 +116,11 @@ impl<'a> TestHost<'a> {
             },
             clap_host_log: clap_host_log { log: Some(log_log) },
             ext_log_messages: Mutex::new(Vec::new()),
+            clap_host_audio_ports: clap_host_audio_ports {
+                is_rescan_flag_supported: Some(audio_ports_is_rescan_flag_supported),
+                rescan: Some(audio_ports_rescan),
+            },
+            ext_audio_port_call_rescan_flags: 0,
             config,
             _marker: PhantomPinned,
         });
@@ -102,10 +131,6 @@ impl<'a> TestHost<'a> {
 
     pub const fn clap_host(&self) -> &clap_host {
         &self.clap_host
-    }
-
-    pub const unsafe fn clap_host_mut(self: Pin<&mut Self>) -> &mut clap_host {
-        unsafe { &mut self.get_unchecked_mut().clap_host }
     }
 }
 

@@ -53,6 +53,7 @@ pub enum RescanFlags {
 
 impl_flags_u32!(RescanFlags);
 
+#[derive(Debug)]
 pub struct HostAudioPorts<'a> {
     host: &'a Host,
     clap_host_audio_ports: &'a clap_host_audio_ports,
