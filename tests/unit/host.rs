@@ -15,96 +15,46 @@ use clap_clap::{
     version::CLAP_VERSION,
 };
 
-#[derive(Debug, Default)]
-pub struct TestHostConfig<'a> {
+pub trait Test {
+    fn test(self, bed: Pin<&mut TestBed>);
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct TestBedConfig<'a> {
     pub name: &'a CStr,
     pub vendor: &'a CStr,
     pub url: &'a CStr,
     pub version: &'a CStr,
 
-    pub impl_ext_log: bool,
-    pub impl_ext_audio_ports: bool,
+    pub ext_log: Option<ExtLogConfig>,
+    pub ext_audio_ports: Option<ExtAudioPortsConfig>,
 }
 
-impl<'a> TestHostConfig<'a> {
-    pub fn build(self) -> Pin<Box<TestHost<'a>>> {
-        TestHost::new(self)
+impl<'a> TestBedConfig<'a> {
+    pub fn build(self) -> Pin<Box<TestBed<'a>>> {
+        TestBed::new(self)
     }
 }
 
 #[derive(Debug)]
-#[allow(unused)]
-pub struct TestHost<'a> {
+pub struct TestBed<'a> {
+    config: TestBedConfig<'a>,
     clap_host: clap_host,
+    host: Option<Host>,
 
-    pub clap_host_audio_ports: clap_host_audio_ports,
-    pub ext_audio_port_call_rescan_flags: u32,
+    pub ext_audio_ports: Option<ExtAudioPorts>,
+    pub ext_log: Option<ExtLog>,
 
-    pub clap_host_log: clap_host_log,
-    pub ext_log_messages: Mutex<Vec<(clap_log_severity, CString)>>,
-
-    config: TestHostConfig<'a>,
     _marker: PhantomPinned,
 }
 
-impl<'a> TestHost<'a> {
-    pub fn new(config: TestHostConfig<'a>) -> Pin<Box<Self>> {
-        extern "C-unwind" fn get_extension(
-            host: *const clap_host,
-            extension_id: *const c_char,
-        ) -> *const c_void {
-            assert!(!host.is_null());
-            let test_host: &TestHost = unsafe { &*(*host).host_data.cast() };
-            let extension_id = unsafe { CStr::from_ptr(extension_id) };
-
-            if extension_id == CLAP_EXT_AUDIO_PORTS && test_host.config.impl_ext_audio_ports {
-                return (&raw const test_host.clap_host_audio_ports).cast();
-            }
-            if extension_id == CLAP_EXT_LOG && test_host.config.impl_ext_log {
-                return (&raw const test_host.clap_host_log).cast();
-            }
-
-            null()
-        }
-        extern "C-unwind" fn request_restart(_: *const clap_host) {}
-        extern "C-unwind" fn request_reset(_: *const clap_host) {}
-        extern "C-unwind" fn request_callback(_: *const clap_host) {}
-
-        extern "C-unwind" fn audio_ports_is_rescan_flag_supported(
-            host: *const clap_host,
-            _: u32,
-        ) -> bool {
-            assert!(!host.is_null());
-            true
-        }
-
-        extern "C-unwind" fn audio_ports_rescan(host: *const clap_host, flags: u32) {
-            assert!(!host.is_null());
-            let test_host: &mut TestHost = unsafe { &mut *(*host).host_data.cast() };
-            test_host.ext_audio_port_call_rescan_flags = flags;
-        }
-
-        extern "C-unwind" fn log_log(
-            host: *const clap_host,
-            severity: clap_log_severity,
-            msg: *const c_char,
-        ) {
-            assert!(!host.is_null());
-            let test_host: &mut TestHost = unsafe { &mut *(*host).host_data.cast() };
-
-            assert!(!msg.is_null());
-            let msg = unsafe { CStr::from_ptr(msg) }.to_owned();
-
-            let mut buf = test_host.ext_log_messages.lock().unwrap();
-            buf.push((severity, msg))
-        }
-
-        let mut host = Box::new(Self {
+impl<'a> TestBed<'a> {
+    pub fn new(config: TestBedConfig<'a>) -> Pin<Box<Self>> {
+        let mut bed = Box::new(Self {
+            host: None,
             clap_host: clap_host {
                 clap_version: CLAP_VERSION,
                 host_data: null_mut(),
-                // Points to the string buffer on the heap.
-                // The string can still be moved.
                 name: config.name.as_ptr(),
                 vendor: config.vendor.as_ptr(),
                 url: config.url.as_ptr(),
@@ -114,45 +64,176 @@ impl<'a> TestHost<'a> {
                 request_process: Some(request_reset),
                 request_callback: Some(request_callback),
             },
-            clap_host_log: clap_host_log { log: Some(log_log) },
-            ext_log_messages: Mutex::new(Vec::new()),
-            clap_host_audio_ports: clap_host_audio_ports {
-                is_rescan_flag_supported: Some(audio_ports_is_rescan_flag_supported),
-                rescan: Some(audio_ports_rescan),
-            },
-            ext_audio_port_call_rescan_flags: 0,
+            ext_audio_ports: config.ext_audio_ports.map(ExtAudioPorts::new),
+            ext_log: config.ext_log.map(ExtLog::new),
+
             config,
             _marker: PhantomPinned,
         });
 
-        host.clap_host.host_data = (&raw mut *host).cast();
-        host.into()
+        // Self-referential fields.
+        bed.clap_host.host_data = (&raw mut *bed).cast();
+        bed.host = Some(unsafe { Host::new(&raw mut bed.clap_host) });
+
+        Box::into_pin(bed)
     }
 
-    pub const fn clap_host(&self) -> &clap_host {
-        &self.clap_host
+    pub const fn host_mut(self: Pin<&mut Self>) -> &mut Host {
+        unsafe { self.get_unchecked_mut().host.as_mut().unwrap() }
     }
 }
 
-unsafe impl Send for TestHost<'_> {}
-unsafe impl Sync for TestHost<'_> {}
+unsafe impl Send for TestBed<'_> {}
+unsafe impl Sync for TestBed<'_> {}
+
+extern "C-unwind" fn get_extension(
+    host: *const clap_host,
+    extension_id: *const c_char,
+) -> *const c_void {
+    assert!(!host.is_null());
+    let test_host: &TestBed = unsafe { &*(*host).host_data.cast() };
+    let extension_id = unsafe { CStr::from_ptr(extension_id) };
+
+    if extension_id == CLAP_EXT_AUDIO_PORTS {
+        if let Some(ext) = &test_host.ext_audio_ports {
+            return (&raw const ext.clap_host_audio_ports).cast();
+        }
+    }
+    if extension_id == CLAP_EXT_LOG {
+        if let Some(ext) = &test_host.ext_log {
+            return (&raw const ext.clap_host_log).cast();
+        }
+    }
+
+    null()
+}
+
+extern "C-unwind" fn request_restart(_: *const clap_host) {}
+extern "C-unwind" fn request_reset(_: *const clap_host) {}
+extern "C-unwind" fn request_callback(_: *const clap_host) {}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct ExtAudioPortsConfig {
+    pub supported_flags: u32,
+    pub null_is_rescan_flag_supported: bool,
+    pub null_rescan: bool,
+}
+
+#[derive(Debug)]
+pub struct ExtAudioPorts {
+    config: ExtAudioPortsConfig,
+    pub clap_host_audio_ports: clap_host_audio_ports,
+    pub call_rescan_flags: u32,
+}
+
+impl ExtAudioPorts {
+    fn new(config: ExtAudioPortsConfig) -> Self {
+        Self {
+            config,
+            clap_host_audio_ports: clap_host_audio_ports {
+                is_rescan_flag_supported: (!config.null_is_rescan_flag_supported)
+                    .then_some(ext_audio_ports_is_rescan_flag_supported),
+                rescan: (!config.null_rescan).then_some(ext_audio_ports_rescan),
+            },
+            call_rescan_flags: 0,
+        }
+    }
+}
+
+extern "C-unwind" fn ext_audio_ports_is_rescan_flag_supported(
+    host: *const clap_host,
+    flag: u32,
+) -> bool {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    if let Some(ext) = &bed.ext_audio_ports {
+        ext.config.supported_flags & flag != 0
+    } else {
+        false
+    }
+}
+
+extern "C-unwind" fn ext_audio_ports_rescan(host: *const clap_host, flags: u32) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    if let Some(ext) = &mut bed.ext_audio_ports {
+        ext.call_rescan_flags |= flags;
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct ExtLogConfig {
+    pub null_callback: bool,
+}
+
+#[derive(Debug)]
+pub struct ExtLog {
+    clap_host_log: clap_host_log,
+    pub log_msg: Mutex<Vec<(clap_log_severity, CString)>>,
+}
+
+impl ExtLog {
+    fn new(config: ExtLogConfig) -> Self {
+        Self {
+            clap_host_log: clap_host_log {
+                log: (!config.null_callback).then_some(ext_log_log),
+            },
+            log_msg: Mutex::new(Vec::new()),
+        }
+    }
+}
+
+extern "C-unwind" fn ext_log_log(
+    host: *const clap_host,
+    severity: clap_log_severity,
+    msg: *const c_char,
+) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+
+    assert!(!msg.is_null());
+    let msg = unsafe { CStr::from_ptr(msg) }.to_owned();
+
+    if let Some(ext) = &bed.ext_log {
+        let mut buf = ext.log_msg.lock().unwrap();
+        buf.push((severity, msg))
+    }
+}
+
+struct CheckDescription;
+
+impl Test for CheckDescription {
+    fn test(self, bed: Pin<&mut TestBed>) {
+        let name = bed.config.name.to_str().unwrap();
+        let vendor = bed.config.vendor.to_str().unwrap();
+        let url = bed.config.url.to_str().unwrap();
+        let version = bed.config.version.to_str().unwrap();
+
+        let host = bed.host_mut();
+
+        assert_eq!(host.name(), name);
+        assert_eq!(host.vendor(), vendor);
+        assert_eq!(host.url(), url);
+        assert_eq!(host.version(), version);
+    }
+}
 
 #[test]
-fn host_new() {
-    let test_host = TestHostConfig {
-        name: c"test_host",
-        url: c"test_url",
-        vendor: c"test_vendor",
-        version: c"test_version",
-        impl_ext_log: false,
-        ..Default::default()
-    }
-    .build();
+fn check_description_01() {
+    CheckDescription {}.test(TestBedConfig::default().build().as_mut());
+}
 
-    let host = unsafe { Host::new(test_host.clap_host()) };
-
-    assert_eq!(host.name(), "test_host");
-    assert_eq!(host.url(), "test_url");
-    assert_eq!(host.vendor(), "test_vendor");
-    assert_eq!(host.version(), "test_version");
+#[test]
+fn check_description_02() {
+    CheckDescription {}.test(
+        TestBedConfig {
+            name: c"test_name",
+            vendor: c"test_vendor",
+            url: c"test_url",
+            version: c"test_version",
+            ..Default::default()
+        }
+        .build()
+        .as_mut(),
+    );
 }
