@@ -9,12 +9,16 @@ use std::{
 use crate::{
     ffi::{
         CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, CLAP_EVENT_MIDI2, CLAP_EVENT_PARAM_MOD,
-        CLAP_EVENT_PARAM_VALUE, CLAP_EVENT_TRANSPORT, clap_event_header, clap_event_midi,
-        clap_event_midi2, clap_event_param_mod, clap_event_param_value, clap_event_transport,
-        clap_input_events, clap_output_events,
+        CLAP_EVENT_PARAM_VALUE, CLAP_EVENT_TRANSPORT, CLAP_TRANSPORT_HAS_BEATS_TIMELINE,
+        CLAP_TRANSPORT_HAS_SECONDS_TIMELINE, CLAP_TRANSPORT_HAS_TEMPO,
+        CLAP_TRANSPORT_HAS_TIME_SIGNATURE, CLAP_TRANSPORT_IS_LOOP_ACTIVE,
+        CLAP_TRANSPORT_IS_PLAYING, CLAP_TRANSPORT_IS_RECORDING, CLAP_TRANSPORT_IS_WITHIN_PRE_ROLL,
+        clap_event_header, clap_event_midi, clap_event_midi2, clap_event_param_mod,
+        clap_event_param_value, clap_event_transport, clap_input_events, clap_output_events,
     },
     fixedpoint::{BeatTime, SecTime},
     id::ClapId,
+    impl_flags_u32,
 };
 
 macro_rules! impl_event_cast_methods {
@@ -424,6 +428,32 @@ impl From<clap_event_param_mod> for ParamModBuilder {
 }
 
 impl_event_builder!(ParamModBuilder, ParamMod<'a>, param_mod_unchecked);
+
+/// Transport flags.
+///
+/// # Example
+///
+/// ```rust
+/// # use clap_clap::events::TransportFlags;
+/// assert_eq!(TransportFlags::HasTempo as u32, 0b1);
+/// assert!(TransportFlags::HasTempo.is_set(0b101));
+/// assert_eq!(TransportFlags::HasTempo.set(0b100), 0b101);
+/// assert_eq!(TransportFlags::HasTempo.clear(0b101), 0b100);
+/// ```
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[repr(u32)]
+pub enum TransportFlags {
+    HasTempo = CLAP_TRANSPORT_HAS_TEMPO,
+    HasBeatsTimeline = CLAP_TRANSPORT_HAS_BEATS_TIMELINE,
+    HasSecondsTimeline = CLAP_TRANSPORT_HAS_SECONDS_TIMELINE,
+    HasTimeSignature = CLAP_TRANSPORT_HAS_TIME_SIGNATURE,
+    IsPlaying = CLAP_TRANSPORT_IS_PLAYING,
+    IsRecording = CLAP_TRANSPORT_IS_RECORDING,
+    IsLoopActive = CLAP_TRANSPORT_IS_LOOP_ACTIVE,
+    IsWithinPreRoll = CLAP_TRANSPORT_IS_WITHIN_PRE_ROLL,
+}
+
+impl_flags_u32!(TransportFlags);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Transport<'a> {

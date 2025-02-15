@@ -30,6 +30,33 @@ pub mod prelude {
     };
 }
 
+#[doc(hidden)]
+#[macro_export]
+// The type Flags must be #[repr(u32)].
+macro_rules! impl_flags_u32 {
+    ($($Flags:ty),* $(,)?) => {$(
+        impl $Flags {
+            pub const fn set(&self, flags: u32) -> u32 {
+                *self as u32 | flags
+            }
+
+            pub const fn is_set(&self, flags: u32) -> bool {
+                *self as u32 & flags != 0
+            }
+
+            pub const fn clear(&self, flags: u32) -> u32 {
+                !(*self as u32) & flags
+            }
+        }
+
+        impl From<$Flags> for u32 {
+            fn from(value: $Flags) -> Self {
+                value as u32
+            }
+        }
+    )*};
+}
+
 #[derive(Debug)]
 pub enum Error {
     Factory(factory::Error),

@@ -1,4 +1,4 @@
-use crate::{ffi::clap_host_audio_ports, plugin::Plugin, prelude::Host};
+use crate::{ffi::clap_host_audio_ports, impl_flags_u32, plugin::Plugin, prelude::Host};
 
 mod ffi;
 pub(crate) use ffi::ClapPluginAudioPorts;
@@ -23,6 +23,17 @@ where
     fn get(plugin: &P, index: u32, is_input: bool) -> Option<AudioPortInfo>;
 }
 
+/// Port rescan flags.
+///
+/// # Example
+///
+/// ```rust
+/// # use clap_clap::ext::audio_ports::RescanFlags;
+/// assert_eq!(RescanFlags::Names as u32, 0b1);
+/// assert!(RescanFlags::Names.is_set(0b101));
+/// assert_eq!(RescanFlags::Names.set(0b100), 0b101);
+/// assert_eq!(RescanFlags::Names.clear(0b101), 0b100);
+/// ```
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u32)]
 pub enum RescanFlags {
@@ -34,25 +45,13 @@ pub enum RescanFlags {
     ChannelCount = CLAP_AUDIO_PORTS_RESCAN_CHANNEL_COUNT,
     ///  The port type did change
     PortType = CLAP_AUDIO_PORTS_RESCAN_PORT_TYPE,
-    ///  The in-place pair did change, this requires.
+    ///  The in-place pair did change
     InPlacePair = CLAP_AUDIO_PORTS_RESCAN_IN_PLACE_PAIR,
     ///  The list of ports have changed: entries have been removed/added.
     List = CLAP_AUDIO_PORTS_RESCAN_LIST,
 }
 
-impl RescanFlags {
-    pub fn set(&self, flags: u32) -> u32 {
-        *self as u32 | flags
-    }
-
-    pub fn is_set(&self, flags: u32) -> bool {
-        *self as u32 & flags != 0
-    }
-
-    pub fn clear(&self, flags: u32) -> u32 {
-        !(*self as u32) & flags
-    }
-}
+impl_flags_u32!(RescanFlags);
 
 pub struct HostAudioPorts<'a> {
     host: &'a Host,
