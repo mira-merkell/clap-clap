@@ -1,5 +1,5 @@
 use std::{
-    ffi::{CString, NulError},
+    ffi::{CStr, CString, NulError},
     fmt::{Display, Formatter},
 };
 
@@ -19,27 +19,31 @@ pub struct HostLog<'a> {
 }
 
 impl<'a> HostLog<'a> {
-    pub(crate) const fn new(host: &'a Host, clap_host_log: &'a clap_host_log) -> Self {
+    /// # Safety
+    ///
+    /// All extension interface function pointers must be non-null (Some), and
+    /// the functions must be thread-safe.
+    pub(crate) const unsafe fn new_unchecked(
+        host: &'a Host,
+        clap_host_log: &'a clap_host_log,
+    ) -> Self {
         Self {
             host,
             clap_host_log,
         }
     }
 
-    pub fn log(&self, severity: Severity, msg: &str) -> Result<(), Error> {
-        let msg = CString::new(msg)?;
-        let callback = self.clap_host_log.log.ok_or(Error::Callback)?;
+    /// This function logs a `CStr` by the host.  It avoids memory allocation,
+    /// and fallible Rust string to C string conversion.
+    pub fn log_cstr(&self, severity: Severity, msg: &CStr) {
+        // SAFETY: By construction, the callback must be a valid function pointer,
+        // and the call is thread-safe.
+        let callback = self.clap_host_log.log.unwrap();
+        unsafe { callback(self.host.clap_host(), severity.into(), msg.as_ptr()) }
+    }
 
-        // SAFETY: We just checked if callback is non-null.  The callback is
-        // thread-safe, and we own the reference to msg until the callback
-        // returns. So the call is safe.
-        unsafe {
-            callback(
-                &raw const *self.host.clap_host(),
-                severity.into(),
-                msg.as_ptr(),
-            )
-        };
+    pub fn log(&self, severity: Severity, msg: &str) -> Result<(), Error> {
+        self.log_cstr(severity, &CString::new(msg)?);
         Ok(())
     }
 }
@@ -93,14 +97,12 @@ impl From<Severity> for clap_log_severity {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
-    Callback,
     NulError(NulError),
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Callback => write!(f, "callback not found"),
             Error::NulError(e) => write!(f, "error converting to C string: {e}"),
         }
     }

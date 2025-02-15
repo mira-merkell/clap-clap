@@ -4,8 +4,8 @@ use std::{
 };
 
 use crate::{
-    ext::{log, log::HostLog},
-    ffi::{CLAP_EXT_LOG, clap_host},
+    ext::{audio_ports::HostAudioPorts, log, log::HostLog},
+    ffi::{CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, clap_host, clap_host_audio_ports, clap_host_log},
     version::ClapVersion,
 };
 
@@ -42,7 +42,8 @@ impl Host {
     }
 
     pub const fn get_extension(&self) -> HostExtensions {
-        HostExtensions::new(self)
+        // SAFETY: By construction, the function pointer to `get_extension()` is valid.
+        unsafe { HostExtensions::new_unchecked(self) }
     }
 }
 
@@ -92,14 +93,17 @@ pub struct HostExtensions<'a> {
 }
 
 impl<'a> HostExtensions<'a> {
-    const fn new(host: &'a Host) -> Self {
+    /// # Safety
+    ///
+    /// The function pointer:  `host.clap_host().get_extension()` must be Some.
+    const unsafe fn new_unchecked(host: &'a Host) -> Self {
         Self { host }
     }
 
     fn get_extension_ptr(&self, extension_id: &CStr) -> Option<*const c_void> {
-        // HostExtensions::new() guarantees that unwrap won't panic.
+        // HostExtensions constructor guarantees that unwrap won't panic.
         let callback = self.host.clap_host().get_extension.unwrap();
-        // SAFETY: ClapHost::try_new() guarantees that the call is safe.
+        // SAFETY: Host constructor guarantees that the call is safe.
         let ext_ptr = unsafe { callback(self.host.clap_host(), extension_id.as_ptr()) };
         (!ext_ptr.is_null()).then_some(ext_ptr)
     }
@@ -109,15 +113,43 @@ impl<'a> HostExtensions<'a> {
             .get_extension_ptr(CLAP_EXT_LOG)
             .ok_or(Error::ExtensionNotFound("log"))?;
 
+        // SAFETY: We just checked if the pointer to clap_log is non-null. We return a
+        // reference to it for the lifetime of Host.
+        let clap_host_log: &clap_host_log = unsafe { &*clap_host_log.cast() };
+
+        let _ = clap_host_log.log.ok_or(Error::Callback("log"))?;
+
         // SAFETY: We just checked if the pointer to clap_host_log is non-null.
-        // We return a reference to log for the lifetime of Host.
-        Ok(HostLog::new(self.host, unsafe { &*clap_host_log.cast() }))
+        // We return a reference to it for the lifetime of Host.
+        Ok(unsafe { HostLog::new_unchecked(self.host, clap_host_log) })
+    }
+
+    pub fn audio_ports(&self) -> Result<HostAudioPorts<'a>, Error> {
+        let clap_host_audio_ports = self
+            .get_extension_ptr(CLAP_EXT_AUDIO_PORTS)
+            .ok_or(Error::ExtensionNotFound("audio_ports"))?;
+
+        // SAFETY: We just checked if the pointer to clap_host_audio_ports
+        // is non-null. We return a reference to it for the lifetime of Host.
+        let clap_host_audio_ports: &clap_host_audio_ports =
+            unsafe { &*clap_host_audio_ports.cast() };
+
+        let _ = clap_host_audio_ports
+            .is_rescan_flag_supported
+            .ok_or(Error::Callback("is_rescan_flag_supported"))?;
+        let _ = clap_host_audio_ports
+            .rescan
+            .ok_or(Error::Callback("rescan"))?;
+
+        // SAFETY: We just checked if the methods are non-null (Some).
+        Ok(unsafe { HostAudioPorts::new_unchecked(self.host, clap_host_audio_ports) })
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
     ExtensionNotFound(&'static str),
+    Callback(&'static str),
     Log(log::Error),
 }
 
@@ -125,6 +157,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::ExtensionNotFound(name) => write!(f, "extension not found: {name}"),
+            Error::Callback(name) => write!(f, "extension callback not found: {name}"),
             Error::Log(e) => write!(f, "extension 'host_log': {e}"),
         }
     }

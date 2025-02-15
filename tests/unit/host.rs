@@ -6,12 +6,12 @@ use std::{
 };
 
 use clap_clap::{
-    ext::log::{Error::Callback, Severity},
+    ext::log::Severity,
     ffi::{
         CLAP_LOG_DEBUG, CLAP_LOG_ERROR, CLAP_LOG_FATAL, CLAP_LOG_HOST_MISBEHAVING, CLAP_LOG_INFO,
         CLAP_LOG_PLUGIN_MISBEHAVING, CLAP_LOG_WARNING, clap_host, clap_host_log, clap_log_severity,
     },
-    host::Host,
+    host::{Error::Callback, Host},
     version::CLAP_VERSION,
 };
 
@@ -164,9 +164,7 @@ fn host_implements_log_null_callback() {
     unsafe { test_host.as_mut().get_unchecked_mut().clap_host_log.log = None };
 
     let host = unsafe { Host::new(test_host.as_clap_host()) };
-    let log = host.get_extension().log().unwrap();
-
-    assert_eq!(log.error("").unwrap_err(), Callback);
+    assert_eq!(host.get_extension().log().unwrap_err(), Callback("log"));
 }
 
 #[test]
