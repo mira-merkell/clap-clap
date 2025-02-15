@@ -20,7 +20,7 @@
 use std::sync::Arc;
 
 use clap_clap::{
-    plugin_features::{CLAP_PLUGIN_FEATURE_AUDIO_EFFECT, CLAP_PLUGIN_FEATURE_STEREO},
+    plugin_features::{PLUGIN_FEATURE_AUDIO_EFFECT, PLUGIN_FEATURE_STEREO},
     prelude as clap,
 };
 
@@ -54,7 +54,7 @@ impl clap::Plugin for MyPlug {
     const DESCRIPTION: &'static str = "The plugin description.";
 
     fn features() -> impl Iterator<Item = &'static str> {
-        [CLAP_PLUGIN_FEATURE_AUDIO_EFFECT, CLAP_PLUGIN_FEATURE_STEREO].into_iter()
+        [PLUGIN_FEATURE_AUDIO_EFFECT, PLUGIN_FEATURE_STEREO].into_iter()
     }
 
     fn init(&mut self, host: Arc<clap::Host>) -> Result<(), clap::Error> {
