@@ -1,12 +1,17 @@
 use crate::{
-    ext::audio_ports::{AudioPortInfo, AudioPortType},
+    ext::audio_ports::{AudioPortInfo, AudioPortType, AudioPorts},
     plugin::Plugin,
-    prelude::AudioPorts,
 };
 
 /// Static mono ports, in and out.
-#[derive(Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct MonoPorts<const IN: u32, const OUT: u32>;
+
+impl<const IN: u32, const OUT: u32> MonoPorts<IN, OUT> {
+    pub const fn new() -> Self {
+        Self {}
+    }
+}
 
 impl<P, const IN: u32, const OUT: u32> AudioPorts<P> for MonoPorts<IN, OUT>
 where

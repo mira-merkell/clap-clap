@@ -135,3 +135,21 @@ pub mod process {
         out_events: SHIM_CLAP_OUTPUT_EVENTS.as_ref(),
     });
 }
+
+pub mod plugin {
+    use clap_clap::{Error, plugin::Plugin};
+
+    #[derive(Default)]
+    pub struct ShimPlugin;
+
+    impl Plugin for ShimPlugin {
+        type AudioThread = ();
+        type Extensions = ();
+        const ID: &'static str = "";
+        const NAME: &'static str = "";
+
+        fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread, Error> {
+            Ok(())
+        }
+    }
+}

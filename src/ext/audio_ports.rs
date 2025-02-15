@@ -7,7 +7,7 @@ mod static_ports;
 pub use static_ports::{MonoPorts, StereoPorts};
 
 mod port_info;
-pub use port_info::{AudioPortInfo, AudioPortInfoBuilder, AudioPortType};
+pub use port_info::{AudioPortFlags, AudioPortInfo, AudioPortInfoBuilder, AudioPortType};
 
 use crate::ffi::{
     CLAP_AUDIO_PORTS_RESCAN_CHANNEL_COUNT, CLAP_AUDIO_PORTS_RESCAN_FLAGS,

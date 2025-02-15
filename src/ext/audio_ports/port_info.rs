@@ -8,18 +8,38 @@ use crate::{
         clap_audio_port_info,
     },
     id::ClapId,
+    impl_flags_u32,
     plugin::Plugin,
     prelude::AudioPorts,
 };
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[repr(u32)]
+pub enum AudioPortFlags {
+    /// This port is the main audio input or output. There can be only one main
+    /// input and main output. Main port must be at index 0.
+    IsMain = CLAP_AUDIO_PORT_IS_MAIN,
+    /// This port can be used with 64 bits audio
+    Supports64bits = CLAP_AUDIO_PORT_SUPPORTS_64BITS,
+    /// 64 bits audio is preferred with this port
+    Prefers64bits = CLAP_AUDIO_PORT_PREFERS_64BITS,
+    /// This port must be used with the same sample size as all the other ports
+    /// which have this flag. In other words if all ports have this flag then
+    /// the plugin may either be used entirely with 64 bits audio or 32 bits
+    /// audio, but it can't be mixed.
+    RequiresCommonSampleSize = CLAP_AUDIO_PORT_REQUIRES_COMMON_SAMPLE_SIZE,
+}
+
+impl_flags_u32!(AudioPortFlags);
+
 #[derive(Debug, Default, Clone)]
 pub struct AudioPortInfo {
-    id: ClapId,
-    name: Option<String>,
-    flags: u32,
-    channel_count: Option<u32>,
-    port_type: Option<AudioPortType>,
-    in_place_pair: Option<ClapId>,
+    pub id: ClapId,
+    pub name: Option<String>,
+    pub flags: u32,
+    pub channel_count: Option<u32>,
+    pub port_type: Option<AudioPortType>,
+    pub in_place_pair: Option<ClapId>,
 }
 
 impl AudioPortInfo {
@@ -118,7 +138,7 @@ impl AudioPortInfoBuilder {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AudioPortType {
     Mono,
     Stereo,
