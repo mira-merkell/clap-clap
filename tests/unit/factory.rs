@@ -1,18 +1,15 @@
-use std::{ffi::CStr, pin::Pin};
+use std::ffi::CStr;
 
 use clap_clap::{
     Error,
     factory::{
         Error::{IndexOutOfBounds, PluginIdNotFound},
-        Factory, FactoryHost, FactoryPluginDescriptor,
+        Factory, FactoryHost, FactoryPluginPrototype,
     },
     plugin::Plugin,
 };
 
-use crate::{
-    host::{TestHost, TestHostConfig},
-    plugin::TestPlugin,
-};
+use crate::{plugin::TestPlugin, shims::host::SHIM_CLAP_HOST};
 
 #[test]
 pub fn empty() {
@@ -26,7 +23,7 @@ pub fn empty() {
 fn dummy(n: usize) -> Factory {
     Factory::new(
         (0..n)
-            .map(|_| Box::new(FactoryPluginDescriptor::<TestPlugin>::build().unwrap()) as _)
+            .map(|_| Box::new(FactoryPluginPrototype::<TestPlugin>::build().unwrap()) as _)
             .collect(),
     )
 }
@@ -42,24 +39,13 @@ fn dummy_desc() {
     assert_eq!(unsafe { CStr::from_ptr((*desc).id) }, c"clap.plugin.test");
 }
 
-fn dummy_host() -> Pin<Box<TestHost>> {
-    TestHostConfig {
-        name: "",
-        vendor: "",
-        url: "",
-        version: "",
-    }
-    .build()
-}
-
 #[test]
 fn dummy_create() {
     let factory = dummy(1);
-    let test_host = dummy_host();
 
     let plugin = factory
         .create_plugin(c"clap.plugin.test", unsafe {
-            FactoryHost::new(test_host.as_clap_host())
+            FactoryHost::new_unchecked(SHIM_CLAP_HOST.as_ref())
         })
         .unwrap();
 
@@ -85,8 +71,8 @@ impl Plugin for Dummy {
 
 fn two_dummies() -> Factory {
     Factory::new(vec![
-        Box::new(FactoryPluginDescriptor::<TestPlugin>::build().unwrap()),
-        Box::new(FactoryPluginDescriptor::<Dummy>::build().unwrap()),
+        Box::new(FactoryPluginPrototype::<TestPlugin>::build().unwrap()),
+        Box::new(FactoryPluginPrototype::<Dummy>::build().unwrap()),
     ])
 }
 
@@ -122,11 +108,10 @@ fn two_dummies_desc1() {
 #[test]
 fn two_dummies_create0() {
     let factory = two_dummies();
-    let test_host = dummy_host();
 
     let plugin = factory
         .create_plugin(c"dummy", unsafe {
-            FactoryHost::new(test_host.as_clap_host())
+            FactoryHost::new_unchecked(SHIM_CLAP_HOST.as_ref())
         })
         .unwrap();
 
@@ -139,11 +124,10 @@ fn two_dummies_create0() {
 #[test]
 fn two_dummies_create1() {
     let factory = two_dummies();
-    let test_host = dummy_host();
 
     let plugin = factory
         .create_plugin(c"dummy", unsafe {
-            FactoryHost::new(test_host.as_clap_host())
+            FactoryHost::new_unchecked(SHIM_CLAP_HOST.as_ref())
         })
         .unwrap();
 
@@ -156,11 +140,10 @@ fn two_dummies_create1() {
 #[test]
 fn two_dummies_create_badid() {
     let factory = two_dummies();
-    let test_host = dummy_host();
 
     let err = factory
         .create_plugin(c"noname", unsafe {
-            FactoryHost::new(test_host.as_clap_host())
+            FactoryHost::new_unchecked(SHIM_CLAP_HOST.as_ref())
         })
         .unwrap_err();
 

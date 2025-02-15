@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     ext::host::{log, log::Log},
-    ffi::{CLAP_EXT_LOG, clap_host, clap_host_log},
+    ffi::{CLAP_EXT_LOG, clap_host},
     version::ClapVersion,
 };
 
@@ -31,14 +31,14 @@ impl Host {
         Self { clap_host }
     }
 
-    pub const fn as_clap_host(&self) -> &clap_host {
+    pub const fn clap_host(&self) -> &clap_host {
         // SAFETY: by construction, we can obtain a shared reference to clap_host for
         // the lifetime of self.
         unsafe { &*self.clap_host }
     }
 
     pub const fn clap_version(&self) -> ClapVersion {
-        self.as_clap_host().clap_version
+        self.clap_host().clap_version
     }
 
     pub const fn get_extension(&self) -> HostExtensions {
@@ -54,7 +54,7 @@ macro_rules! impl_host_get_str {
                 ///
                 /// This method will panic if the host returns an invalid UTF-8 string.
                 pub fn $description(&self) -> &str {
-                    unsafe { CStr::from_ptr(self.as_clap_host().$description)
+                    unsafe { CStr::from_ptr(self.clap_host().$description)
                                 .to_str()
                                 .expect("host description must be a valid UTF-8 string")
                     }
@@ -71,13 +71,13 @@ macro_rules! impl_host_request {
         impl Host {
             $(
                 pub fn $request_method(&self) {
-                    let clap_host = self.as_clap_host();
+                    let clap_host = self.clap_host();
                     if let Some(callback) = clap_host.$request_method {
                         // SAFETY: The Host constructor checks if callback is
                         // non-null during the initialization. The pointer is a valid function
                         // obtained from the CLAP host. It is guaranteed be the host that the call
                         // is safe.
-                        unsafe { callback(&raw const *self.as_clap_host()) }
+                        unsafe { callback(&raw const *self.clap_host()) }
                     }
                 }
             )*
@@ -98,10 +98,9 @@ impl<'a> HostExtensions<'a> {
 
     fn get_extension_ptr(&self, extension_id: &CStr) -> Option<*const c_void> {
         // HostExtensions::new() guarantees that unwrap won't panic.
-        let callback = self.host.as_clap_host().get_extension.unwrap();
+        let callback = self.host.clap_host().get_extension.unwrap();
         // SAFETY: ClapHost::try_new() guarantees that the call is safe.
-        let ext_ptr =
-            unsafe { callback(&raw const *self.host.as_clap_host(), extension_id.as_ptr()) };
+        let ext_ptr = unsafe { callback(self.host.clap_host(), extension_id.as_ptr()) };
         (!ext_ptr.is_null()).then_some(ext_ptr)
     }
 
@@ -109,10 +108,10 @@ impl<'a> HostExtensions<'a> {
         let clap_host_log = self
             .get_extension_ptr(CLAP_EXT_LOG)
             .ok_or(Error::ExtensionNotFound("log"))?;
-        let clap_host_log = clap_host_log as *const clap_host_log;
 
         // SAFETY: We just checked if the pointer to clap_host_log is non-null.
-        Ok(unsafe { Log::new(self.host, clap_host_log) })
+        // We return a reference to log for the lifetime of Host.
+        Ok(Log::new(self.host, unsafe { &*clap_host_log.cast() }))
     }
 }
 

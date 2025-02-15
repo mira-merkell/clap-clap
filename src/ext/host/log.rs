@@ -12,16 +12,14 @@ use crate::{
     host::Host,
 };
 
+#[derive(Debug)]
 pub struct Log<'a> {
     host: &'a Host,
-    clap_host_log: *const clap_host_log,
+    clap_host_log: &'a clap_host_log,
 }
 
 impl<'a> Log<'a> {
-    /// # Safety
-    ///
-    /// The pointer to clap_host_log must be non-null
-    pub(crate) const unsafe fn new(host: &'a Host, clap_host_log: *const clap_host_log) -> Self {
+    pub const fn new(host: &'a Host, clap_host_log: &'a clap_host_log) -> Self {
         Self {
             host,
             clap_host_log,
@@ -30,14 +28,14 @@ impl<'a> Log<'a> {
 
     pub fn log(&self, severity: Severity, msg: &str) -> Result<(), Error> {
         let msg = CString::new(msg)?;
-        let callback = unsafe { *self.clap_host_log }.log.ok_or(Error::Callback)?;
+        let callback = self.clap_host_log.log.ok_or(Error::Callback)?;
 
         // SAFETY: We just checked if callback is non-null.  The callback is
         // thread-safe, and we own the reference to msg until the callback
         // returns. So the call is safe.
         unsafe {
             callback(
-                &raw const *self.host.as_clap_host(),
+                &raw const *self.host.clap_host(),
                 severity.into(),
                 msg.as_ptr(),
             )
