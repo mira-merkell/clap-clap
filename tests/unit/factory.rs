@@ -1,15 +1,14 @@
 use std::ffi::CStr;
 
-use clap_clap::{
-    Error,
-    factory::{
-        Error::{IndexOutOfBounds, PluginIdNotFound},
-        Factory, FactoryHost, FactoryPluginPrototype,
-    },
-    plugin::Plugin,
+use clap_clap::factory::{
+    Error::{IndexOutOfBounds, PluginIdNotFound},
+    Factory, FactoryHost, FactoryPluginPrototype,
 };
 
-use crate::{plugin::TestPlugin, shims::host::SHIM_CLAP_HOST};
+use crate::{
+    plugin::TestPlugin,
+    shims::{host::SHIM_CLAP_HOST, plugin::ShimPlugin},
+};
 
 #[test]
 pub fn empty() {
@@ -55,24 +54,10 @@ fn dummy_create() {
     unsafe { (*plugin).destroy.unwrap()(plugin) }
 }
 
-#[derive(Default)]
-struct Dummy;
-
-impl Plugin for Dummy {
-    type AudioThread = ();
-    type Extensions = ();
-    const ID: &'static str = "dummy";
-    const NAME: &'static str = "Dummy";
-
-    fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread, Error> {
-        Ok(())
-    }
-}
-
 fn two_dummies() -> Factory {
     Factory::new(vec![
         Box::new(FactoryPluginPrototype::<TestPlugin>::build().unwrap()),
-        Box::new(FactoryPluginPrototype::<Dummy>::build().unwrap()),
+        Box::new(FactoryPluginPrototype::<ShimPlugin>::build().unwrap()),
     ])
 }
 
@@ -102,7 +87,7 @@ fn two_dummies_desc1() {
     let desc = factory.descriptor(1).unwrap();
     let id = unsafe { *desc }.id;
     let id = unsafe { CStr::from_ptr(id) };
-    assert_eq!(id, c"dummy");
+    assert_eq!(id, c"");
 }
 
 #[test]
@@ -110,13 +95,13 @@ fn two_dummies_create0() {
     let factory = two_dummies();
 
     let plugin = factory
-        .create_plugin(c"dummy", unsafe {
+        .create_plugin(c"", unsafe {
             FactoryHost::new_unchecked(SHIM_CLAP_HOST.as_ref())
         })
         .unwrap();
 
     let id = unsafe { CStr::from_ptr((*(*plugin).desc).id) };
-    assert_eq!(id, c"dummy");
+    assert_eq!(id, c"");
 
     unsafe { (*plugin).destroy.unwrap()(plugin) }
 }
@@ -126,13 +111,13 @@ fn two_dummies_create1() {
     let factory = two_dummies();
 
     let plugin = factory
-        .create_plugin(c"dummy", unsafe {
+        .create_plugin(c"", unsafe {
             FactoryHost::new_unchecked(SHIM_CLAP_HOST.as_ref())
         })
         .unwrap();
 
     let id = unsafe { CStr::from_ptr((*(*plugin).desc).id) };
-    assert_eq!(id, c"dummy");
+    assert_eq!(id, c"");
 
     unsafe { (*plugin).destroy.unwrap()(plugin) }
 }
