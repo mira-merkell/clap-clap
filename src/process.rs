@@ -20,6 +20,7 @@ pub mod frame;
 
 pub struct Process {
     clap_process: NonNull<clap_process>,
+    ev_size: u32,
 }
 
 impl Process {
@@ -39,7 +40,7 @@ impl Process {
     ///    must be non-null.  These structures must be valid, in the sense that
     ///    the function pointers that are their fields must be non-null (Some).
     #[doc(hidden)]
-    pub const unsafe fn new_unchecked(clap_process: NonNull<clap_process>) -> Self {
+    pub unsafe fn new_unchecked(clap_process: NonNull<clap_process>) -> Self {
         #[cfg(debug_assertions)]
         {
             let clap_process = unsafe { clap_process.as_ref() };
@@ -55,7 +56,13 @@ impl Process {
             assert!(out_events.try_push.is_some());
         }
 
-        Self { clap_process }
+        let in_events = unsafe { &*clap_process.as_ref().in_events };
+        let ev_size = unsafe { in_events.size.unwrap()(in_events) };
+
+        Self {
+            clap_process,
+            ev_size,
+        }
     }
 
     const fn clap_process(&self) -> &clap_process {
@@ -78,7 +85,7 @@ impl Process {
         self.clap_process().frames_count
     }
 
-    pub const fn frames(&mut self) -> FramesMut<'_> {
+    pub fn frames(&mut self) -> FramesMut<'_> {
         FramesMut::new(self)
     }
 
