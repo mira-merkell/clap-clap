@@ -1,16 +1,28 @@
-use crate::process::{AudioBuffer, AudioBufferMut, Process};
+use crate::{
+    events::{Header, InputEvents},
+    process::{AudioBuffer, AudioBufferMut, Process},
+};
 
 pub struct Frame<'a> {
     process: &'a mut Process,
     index: u32,
+    in_events: Option<(u32, u32)>,
 }
 
 impl<'a> Frame<'a> {
     /// # Safety
     ///
     /// 1. `index` must be less that `process.frames_count()`.
-    pub(crate) const unsafe fn new_unchecked(process: &'a mut Process, index: u32) -> Self {
-        Self { process, index }
+    pub(crate) const unsafe fn new_unchecked(
+        process: &'a mut Process,
+        index: u32,
+        in_events: Option<(u32, u32)>,
+    ) -> Self {
+        Self {
+            process,
+            index,
+            in_events,
+        }
     }
 
     /// # Safety
@@ -52,6 +64,14 @@ impl<'a> Frame<'a> {
             unsafe { Frame::audio_output_unchecked(self, n) }
         } else {
             panic!("the audio output number must be less than the number of available output ports")
+        }
+    }
+
+    pub const fn in_events(&self) -> Option<FrameInputEvents> {
+        if let Some((start, end)) = self.in_events {
+            Some(FrameInputEvents::new(self, start, end))
+        } else {
+            None
         }
     }
 }
@@ -200,23 +220,64 @@ impl<'a: 'b, 'b> FrameOutput<'a, 'b> {
     }
 }
 
+pub struct FrameInputEvents<'a: 'b, 'b> {
+    frame: &'b Frame<'a>,
+    in_events: InputEvents<'b>,
+    index: u32,
+    end: u32,
+}
+
+impl<'a: 'b, 'b> FrameInputEvents<'a, 'b> {
+    const fn new(frame: &'b Frame<'a>, start: u32, end: u32) -> Self {
+        Self {
+            frame,
+            in_events: frame.process.in_events(),
+            index: start,
+            end,
+        }
+    }
+
+    fn next(&mut self) -> Option<&Header> {
+        if self.index >= self.end {
+            return None;
+        }
+        let header = self.in_events.get(self.index);
+        if header.time() > self.frame.index {
+            return None;
+        }
+        self.index += 1;
+        Some(header)
+    }
+}
+
 /// Lending iterator over frames from Process.
 pub struct FramesMut<'a> {
     frame: Option<Frame<'a>>,
     index: u32,
+    in_events: Option<(u32, u32)>,
 }
 
 impl<'a> FramesMut<'a> {
     pub const fn new(process: &'a mut Process) -> Self {
-        let frame = if process.frames_count() > 0 {
-            // SAFETY: we just checked if number of frames in the process
-            // is greater than zero.
-            Some(unsafe { Frame::new_unchecked(process, 0) })
+        let in_events = if process.ev_size > 0 {
+            Some((0, process.ev_size))
         } else {
             None
         };
 
-        Self { frame, index: 0 }
+        let frame = if process.frames_count() > 0 {
+            // SAFETY: we just checked if number of frames in the process
+            // is greater than zero.
+            Some(unsafe { Frame::new_unchecked(process, 0, None) })
+        } else {
+            None
+        };
+
+        Self {
+            frame,
+            index: 0,
+            in_events,
+        }
     }
 
     /// Generate mutable references to consecutive frames in the `process`.
@@ -263,15 +324,44 @@ impl<'a> FramesMut<'a> {
     /// you will most probably end up with an infinite loop, as the iterator is
     /// created anew each time we enter the `while` block.
     #[allow(clippy::should_implement_trait)]
-    pub const fn next(&mut self) -> Option<&mut Frame<'a>> {
+    pub fn next(&mut self) -> Option<&mut Frame<'a>> {
+        let ev_list = find_frame_events(self);
+
         if let Some(frame) = self.frame.take() {
             let process = frame.process;
             if self.index < process.frames_count() {
-                self.frame = Some(unsafe { Frame::new_unchecked(process, self.index) });
+                self.frame = Some(unsafe { Frame::new_unchecked(process, self.index, ev_list) });
                 self.index += 1;
             }
         }
 
         self.frame.as_mut()
     }
+}
+
+fn find_frame_events(iter: &mut FramesMut) -> Option<(u32, u32)> {
+    let frame = iter.frame.as_mut()?;
+    let in_events = iter.in_events.as_mut()?;
+    if in_events.0 >= in_events.1 {
+        return None;
+    }
+    let list = frame.process.in_events();
+    let start = in_events.0;
+    let start_time = list.get(start).time();
+    if start_time > frame.index {
+        return None;
+    }
+
+    let mut end = start;
+    let mut end_time = start_time;
+    while end_time <= frame.index {
+        end += 1;
+        if end >= in_events.1 {
+            break;
+        }
+        end_time = list.get(end).time();
+    }
+    in_events.0 = end;
+
+    Some((start, end))
 }
