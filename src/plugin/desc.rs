@@ -1,10 +1,10 @@
 use std::{
-    ffi::{c_char, CStr, CString},
+    ffi::{CStr, CString, c_char},
     ptr::null,
 };
 
 use crate::{
-    ffi::{clap_plugin_descriptor, CLAP_VERSION},
+    ffi::{CLAP_VERSION, clap_plugin_descriptor},
     plugin::{Error, Plugin},
 };
 
