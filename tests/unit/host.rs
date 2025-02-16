@@ -1,104 +1,70 @@
 use std::{
-    ffi::{CStr, CString},
+    ffi::{CStr, CString, c_char, c_void},
     marker::PhantomPinned,
     pin::Pin,
-    ptr::null_mut,
+    ptr::{null, null_mut},
+    sync::Mutex,
 };
 
 use clap_clap::{
-    ext::host::log::{Error::Callback, Severity},
     ffi::{
-        CLAP_LOG_DEBUG, CLAP_LOG_ERROR, CLAP_LOG_FATAL, CLAP_LOG_HOST_MISBEHAVING, CLAP_LOG_INFO,
-        CLAP_LOG_PLUGIN_MISBEHAVING, CLAP_LOG_WARNING, clap_host, clap_host_log, clap_log_severity,
+        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, clap_host, clap_host_audio_ports, clap_host_log,
+        clap_log_severity,
     },
     host::Host,
     version::CLAP_VERSION,
 };
 
-use crate::host::test_host_ffi::{
-    get_extension, log_log, request_callback, request_process, request_restart,
-};
+pub trait Test {
+    fn test(self, bed: Pin<&mut TestBed>);
+}
 
-#[derive(Debug, Default)]
-pub struct TestHostConfig<'a> {
+#[derive(Debug, Default, Copy, Clone)]
+pub struct TestConfig<'a> {
     pub name: &'a CStr,
     pub vendor: &'a CStr,
     pub url: &'a CStr,
     pub version: &'a CStr,
 
-    pub log_implements: bool,
-    pub log_messages: Option<&'a mut Vec<(clap_log_severity, CString)>>,
+    pub ext_log: Option<ExtLogConfig>,
+    pub ext_audio_ports: Option<ExtAudioPortsConfig>,
 }
 
-impl<'a> TestHostConfig<'a> {
-    pub fn build(self) -> Pin<Box<TestHost<'a>>> {
-        TestHost::new(self)
+impl TestConfig<'_> {
+    pub fn test(self, case: impl Test) -> Self {
+        TestBed::new(self).as_mut().test(case);
+        self
     }
+}
+
+#[derive(Debug, Default, PartialEq)]
+struct CallRequest {
+    restart: bool,
+    process: bool,
+    callback: bool,
 }
 
 #[derive(Debug)]
-#[allow(unused)]
-pub struct TestHost<'a> {
+pub struct TestBed<'a> {
+    config: TestConfig<'a>,
     clap_host: clap_host,
-    clap_host_log: clap_host_log,
-    config: TestHostConfig<'a>,
+    host: Option<Host>,
+
+    call_request: CallRequest,
+
+    pub ext_audio_ports: Option<ExtAudioPorts>,
+    pub ext_log: Option<ExtLog>,
+
     _marker: PhantomPinned,
 }
 
-mod test_host_ffi {
-    use std::{
-        ffi::{CStr, c_char, c_void},
-        ptr::null,
-    };
-
-    use clap_clap::ffi::{CLAP_EXT_LOG, clap_host, clap_log_severity};
-
-    use crate::host::TestHost;
-
-    pub extern "C-unwind" fn get_extension(
-        host: *const clap_host,
-        extension_id: *const c_char,
-    ) -> *const c_void {
-        assert!(!host.is_null());
-        let test_host: &TestHost = unsafe { &*((*host).host_data as *const _) };
-        let extension_id = unsafe { CStr::from_ptr(extension_id) };
-
-        if extension_id == CLAP_EXT_LOG && test_host.config.log_implements {
-            return &raw const test_host.clap_host_log as *const _;
-        }
-
-        null()
-    }
-
-    pub extern "C-unwind" fn request_restart(_: *const clap_host) {}
-
-    pub extern "C-unwind" fn request_process(_: *const clap_host) {}
-
-    pub extern "C-unwind" fn request_callback(_: *const clap_host) {}
-
-    pub extern "C-unwind" fn log_log(
-        host: *const clap_host,
-        severity: clap_log_severity,
-        msg: *const c_char,
-    ) {
-        assert!(!host.is_null());
-        let test_host: &mut TestHost = unsafe { &mut *((*host).host_data as *mut _) };
-        if let Some(buf) = &mut test_host.config.log_messages {
-            assert!(!msg.is_null());
-            let msg = unsafe { CStr::from_ptr(msg) }.to_owned();
-            buf.push((severity, msg));
-        }
-    }
-}
-
-impl<'a> TestHost<'a> {
-    fn new(config: TestHostConfig<'a>) -> Pin<Box<TestHost<'a>>> {
-        let mut host = Box::new(Self {
+impl<'a> TestBed<'a> {
+    pub fn new(config: TestConfig<'a>) -> Pin<Box<Self>> {
+        let mut bed = Box::new(Self {
+            host: None,
             clap_host: clap_host {
                 clap_version: CLAP_VERSION,
                 host_data: null_mut(),
-                // Points to the string buffer on the heap.
-                // The string can still be moved.
                 name: config.name.as_ptr(),
                 vendor: config.vendor.as_ptr(),
                 url: config.url.as_ptr(),
@@ -108,161 +74,265 @@ impl<'a> TestHost<'a> {
                 request_process: Some(request_process),
                 request_callback: Some(request_callback),
             },
-            clap_host_log: clap_host_log { log: Some(log_log) },
+            call_request: CallRequest::default(),
+
+            ext_audio_ports: config.ext_audio_ports.map(ExtAudioPorts::new),
+            ext_log: config.ext_log.map(ExtLog::new),
+
             config,
             _marker: PhantomPinned,
         });
-        host.clap_host.host_data = &raw mut *host as *mut _;
-        Box::into_pin(host)
+
+        // Self-referential fields.
+        bed.clap_host.host_data = (&raw mut *bed).cast();
+        bed.host = Some(unsafe { Host::new(&raw mut bed.clap_host) });
+
+        Box::into_pin(bed)
     }
 
-    pub const fn as_clap_host(&self) -> &clap_host {
-        &self.clap_host
+    /// # Safety
+    ///
+    /// You must not use Host to get a pointer to this test bed and move it
+    /// out ouf the Pin.
+    pub const unsafe fn host_mut(self: Pin<&mut Self>) -> &mut Host {
+        unsafe { self.get_unchecked_mut().host.as_mut().unwrap() }
+    }
+
+    pub fn test(mut self: Pin<&mut Self>, case: impl Test) -> Pin<&mut Self> {
+        case.test(self.as_mut());
+        self
+    }
+}
+
+extern "C-unwind" fn get_extension(
+    host: *const clap_host,
+    extension_id: *const c_char,
+) -> *const c_void {
+    assert!(!host.is_null());
+    let bed: &TestBed = unsafe { &*(*host).host_data.cast() };
+    let extension_id = unsafe { CStr::from_ptr(extension_id) };
+
+    if extension_id == CLAP_EXT_AUDIO_PORTS {
+        if let Some(ext) = &bed.ext_audio_ports {
+            return (&raw const ext.clap_host_audio_ports).cast();
+        }
+    }
+    if extension_id == CLAP_EXT_LOG {
+        if let Some(ext) = &bed.ext_log {
+            return (&raw const ext.clap_host_log).cast();
+        }
+    }
+
+    null()
+}
+
+extern "C-unwind" fn request_restart(host: *const clap_host) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    bed.call_request.restart = true;
+}
+
+extern "C-unwind" fn request_process(host: *const clap_host) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    bed.call_request.process = true;
+}
+
+extern "C-unwind" fn request_callback(host: *const clap_host) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    bed.call_request.callback = true;
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct ExtAudioPortsConfig {
+    pub supported_flags: u32,
+    pub null_is_rescan_flag_supported: bool,
+    pub null_rescan: bool,
+}
+
+#[derive(Debug)]
+pub struct ExtAudioPorts {
+    config: ExtAudioPortsConfig,
+    pub clap_host_audio_ports: clap_host_audio_ports,
+    pub call_rescan_flags: u32,
+}
+
+impl ExtAudioPorts {
+    fn new(config: ExtAudioPortsConfig) -> Self {
+        Self {
+            config,
+            clap_host_audio_ports: clap_host_audio_ports {
+                is_rescan_flag_supported: (!config.null_is_rescan_flag_supported)
+                    .then_some(ext_audio_ports_is_rescan_flag_supported),
+                rescan: (!config.null_rescan).then_some(ext_audio_ports_rescan),
+            },
+            call_rescan_flags: 0,
+        }
+    }
+}
+
+extern "C-unwind" fn ext_audio_ports_is_rescan_flag_supported(
+    host: *const clap_host,
+    flag: u32,
+) -> bool {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    if let Some(ext) = &bed.ext_audio_ports {
+        ext.config.supported_flags & flag != 0
+    } else {
+        false
+    }
+}
+
+extern "C-unwind" fn ext_audio_ports_rescan(host: *const clap_host, flags: u32) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    if let Some(ext) = &mut bed.ext_audio_ports {
+        ext.call_rescan_flags = flags;
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct ExtLogConfig {
+    pub null_callback: bool,
+}
+
+#[derive(Debug)]
+pub struct ExtLog {
+    clap_host_log: clap_host_log,
+    pub log_msg: Mutex<Vec<(clap_log_severity, CString)>>,
+}
+
+impl ExtLog {
+    fn new(config: ExtLogConfig) -> Self {
+        Self {
+            clap_host_log: clap_host_log {
+                log: (!config.null_callback).then_some(ext_log_log),
+            },
+            log_msg: Mutex::new(Vec::new()),
+        }
+    }
+}
+
+extern "C-unwind" fn ext_log_log(
+    host: *const clap_host,
+    severity: clap_log_severity,
+    msg: *const c_char,
+) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+
+    assert!(!msg.is_null());
+    let msg = unsafe { CStr::from_ptr(msg) }.to_owned();
+
+    if let Some(ext) = &bed.ext_log {
+        let mut buf = ext.log_msg.lock().unwrap();
+        buf.push((severity, msg))
+    }
+}
+
+struct CheckDescription;
+
+impl Test for CheckDescription {
+    fn test(self, bed: Pin<&mut TestBed>) {
+        let name = bed.config.name.to_str().unwrap();
+        let vendor = bed.config.vendor.to_str().unwrap();
+        let url = bed.config.url.to_str().unwrap();
+        let version = bed.config.version.to_str().unwrap();
+
+        let host = unsafe { bed.host_mut() };
+
+        assert_eq!(host.name(), name);
+        assert_eq!(host.vendor(), vendor);
+        assert_eq!(host.url(), url);
+        assert_eq!(host.version(), version);
     }
 }
 
 #[test]
-fn host_new() {
-    let test_host = TestHostConfig {
-        name: c"test_host",
+fn check_description_01() {
+    TestConfig::default()
+        .test(CheckDescription)
+        .test(CheckDescription);
+}
+
+#[test]
+fn check_description_02() {
+    TestConfig {
+        name: c"test_name",
+        vendor: c"⧉⧉⧉",
         url: c"test_url",
-        vendor: c"test_vendor",
-        version: c"test_version",
-        log_implements: false,
+        version: c"82[p",
         ..Default::default()
     }
-    .build();
+    .test(CheckDescription);
+}
 
-    let host = unsafe { Host::new(test_host.as_clap_host()) };
+enum CheckRequest {
+    Restart,
+    Process,
+    Callback,
+}
 
-    assert_eq!(host.name(), "test_host");
-    assert_eq!(host.url(), "test_url");
-    assert_eq!(host.vendor(), "test_vendor");
-    assert_eq!(host.version(), "test_version");
+impl Test for CheckRequest {
+    fn test(self, mut bed: Pin<&mut TestBed>) {
+        assert_eq!(bed.call_request, CallRequest::default());
+
+        let host = unsafe { bed.as_mut().host_mut() };
+
+        match self {
+            CheckRequest::Restart => {
+                host.request_restart();
+
+                assert_eq!(
+                    bed.call_request,
+                    CallRequest {
+                        restart: true,
+                        process: false,
+                        callback: false,
+                    }
+                );
+            }
+            CheckRequest::Process => {
+                host.request_process();
+
+                assert_eq!(
+                    bed.call_request,
+                    CallRequest {
+                        restart: false,
+                        process: true,
+                        callback: false,
+                    }
+                );
+            }
+            CheckRequest::Callback => {
+                host.request_callback();
+
+                assert_eq!(
+                    bed.call_request,
+                    CallRequest {
+                        restart: false,
+                        process: false,
+                        callback: true,
+                    }
+                );
+            }
+        }
+    }
 }
 
 #[test]
-fn host_doesnt_implement_log() {
-    let test_host = TestHostConfig {
-        log_implements: false,
-        ..Default::default()
-    }
-    .build();
-
-    let host = unsafe { Host::new(test_host.as_clap_host()) };
-
-    let _ = host.get_extension().log().unwrap_err();
+fn check_request_restart() {
+    TestConfig::default().test(CheckRequest::Restart);
 }
 
 #[test]
-fn host_implements_log_null_callback() {
-    let mut test_host = TestHostConfig {
-        log_implements: true,
-        ..Default::default()
-    }
-    .build();
-    unsafe { test_host.as_mut().get_unchecked_mut().clap_host_log.log = None };
-
-    let host = unsafe { Host::new(test_host.as_clap_host()) };
-    let log = host.get_extension().log().unwrap();
-
-    assert_eq!(log.error("").unwrap_err(), Callback);
+fn check_request_process() {
+    TestConfig::default().test(CheckRequest::Process);
 }
 
 #[test]
-fn host_implements_log() {
-    let test_host = TestHostConfig {
-        log_implements: true,
-        ..Default::default()
-    }
-    .build();
-
-    let host = unsafe { Host::new(test_host.as_clap_host()) };
-    let log = host.get_extension().log().unwrap();
-
-    log.warning("this is a warning").unwrap();
-}
-
-#[test]
-fn host_log_01() {
-    let mut buf = Vec::new();
-    let test_host = TestHostConfig {
-        log_implements: true,
-        log_messages: Some(&mut buf),
-        ..Default::default()
-    }
-    .build();
-
-    let host = unsafe { Host::new(test_host.as_clap_host()) };
-    let log = host.get_extension().log().unwrap();
-
-    log.warning("this is a warning").unwrap();
-
-    assert_eq!(buf.len(), 1);
-    assert_eq!(buf[0], (CLAP_LOG_WARNING, c"this is a warning".to_owned()));
-}
-
-#[test]
-fn host_log_02() {
-    let mut buf = Vec::new();
-    let test_host = TestHostConfig {
-        log_implements: true,
-        log_messages: Some(&mut buf),
-        ..Default::default()
-    }
-    .build();
-
-    let host = unsafe { Host::new(test_host.as_clap_host()) };
-    let log = host.get_extension().log().unwrap();
-
-    log.debug("this is a debug").unwrap();
-    log.info("this is an info").unwrap();
-    log.warning("this is a warning").unwrap();
-    log.error("this is an error").unwrap();
-    log.fatal("this is a fatal").unwrap();
-
-    assert_eq!(buf.len(), 5);
-    assert_eq!(buf[0], (CLAP_LOG_DEBUG, c"this is a debug".to_owned()));
-    assert_eq!(buf[1], (CLAP_LOG_INFO, c"this is an info".to_owned()));
-    assert_eq!(buf[2], (CLAP_LOG_WARNING, c"this is a warning".to_owned()));
-    assert_eq!(buf[3], (CLAP_LOG_ERROR, c"this is an error".to_owned()));
-    assert_eq!(buf[4], (CLAP_LOG_FATAL, c"this is a fatal".to_owned()));
-}
-
-#[test]
-fn host_log_03() {
-    let mut buf = Vec::new();
-    let test_host = TestHostConfig {
-        log_implements: true,
-        log_messages: Some(&mut buf),
-        ..Default::default()
-    }
-    .build();
-
-    let host = unsafe { Host::new(test_host.as_clap_host()) };
-    let log = host.get_extension().log().unwrap();
-
-    log.log(Severity::ClapHostMisbehaving, "this is host misbehaving")
-        .unwrap();
-    log.log(
-        Severity::ClapPluginMisbehaving,
-        "this is plugin misbehaving",
-    )
-    .unwrap();
-
-    assert_eq!(buf.len(), 2);
-    assert_eq!(
-        buf[0],
-        (
-            CLAP_LOG_HOST_MISBEHAVING,
-            c"this is host misbehaving".to_owned()
-        )
-    );
-    assert_eq!(
-        buf[1],
-        (
-            CLAP_LOG_PLUGIN_MISBEHAVING,
-            c"this is plugin misbehaving".to_owned()
-        )
-    );
+fn check_request_callback() {
+    TestConfig::default().test(CheckRequest::Callback);
 }

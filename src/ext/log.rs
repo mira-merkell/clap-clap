@@ -1,5 +1,5 @@
 use std::{
-    ffi::{CString, NulError},
+    ffi::{CStr, CString, NulError},
     fmt::{Display, Formatter},
 };
 
@@ -8,45 +8,48 @@ use crate::{
         CLAP_LOG_DEBUG, CLAP_LOG_ERROR, CLAP_LOG_FATAL, CLAP_LOG_HOST_MISBEHAVING, CLAP_LOG_INFO,
         CLAP_LOG_PLUGIN_MISBEHAVING, CLAP_LOG_WARNING, clap_host_log, clap_log_severity,
     },
-    host,
     host::Host,
 };
 
 #[derive(Debug)]
-pub struct Log<'a> {
+pub struct HostLog<'a> {
     host: &'a Host,
     clap_host_log: &'a clap_host_log,
 }
 
-impl<'a> Log<'a> {
-    pub const fn new(host: &'a Host, clap_host_log: &'a clap_host_log) -> Self {
+impl<'a> HostLog<'a> {
+    /// # Safety
+    ///
+    /// All extension interface function pointers must be non-null (Some), and
+    /// the functions must be thread-safe.
+    pub(crate) const unsafe fn new_unchecked(
+        host: &'a Host,
+        clap_host_log: &'a clap_host_log,
+    ) -> Self {
         Self {
             host,
             clap_host_log,
         }
     }
 
-    pub fn log(&self, severity: Severity, msg: &str) -> Result<(), Error> {
-        let msg = CString::new(msg)?;
-        let callback = self.clap_host_log.log.ok_or(Error::Callback)?;
+    /// This function logs a `CStr` by the host.  It avoids memory allocation,
+    /// and fallible Rust string to C string conversion.
+    pub fn log_cstr(&self, severity: Severity, msg: &CStr) {
+        // SAFETY: By construction, the callback must be a valid function pointer,
+        // and the call is thread-safe.
+        let callback = self.clap_host_log.log.unwrap();
+        unsafe { callback(self.host.clap_host(), severity.into(), msg.as_ptr()) }
+    }
 
-        // SAFETY: We just checked if callback is non-null.  The callback is
-        // thread-safe, and we own the reference to msg until the callback
-        // returns. So the call is safe.
-        unsafe {
-            callback(
-                &raw const *self.host.clap_host(),
-                severity.into(),
-                msg.as_ptr(),
-            )
-        };
+    pub fn log(&self, severity: Severity, msg: &str) -> Result<(), Error> {
+        self.log_cstr(severity, &CString::new(msg)?);
         Ok(())
     }
 }
 
 macro_rules! impl_log_severity {
     ($(($method:tt, $severity:ident)),*) => {
-        impl<'a> Log<'a> {
+        impl<'a> HostLog<'a> {
             $(
                 pub fn $method(&self, msg: &str) -> Result<(), Error> {
                     self.log(Severity::$severity, msg)
@@ -91,17 +94,34 @@ impl From<Severity> for clap_log_severity {
     }
 }
 
+impl TryFrom<clap_log_severity> for Severity {
+    type Error = crate::ext::log::Error;
+
+    fn try_from(value: clap_log_severity) -> Result<Self, Error> {
+        match value {
+            CLAP_LOG_DEBUG => Ok(Severity::Debug),
+            CLAP_LOG_INFO => Ok(Severity::Info),
+            CLAP_LOG_WARNING => Ok(Severity::Warning),
+            CLAP_LOG_ERROR => Ok(Severity::Error),
+            CLAP_LOG_FATAL => Ok(Severity::Fatal),
+            CLAP_LOG_HOST_MISBEHAVING => Ok(Severity::ClapHostMisbehaving),
+            CLAP_LOG_PLUGIN_MISBEHAVING => Ok(Severity::ClapPluginMisbehaving),
+            _ => Err(Error::Severity(value)),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
-    Callback,
     NulError(NulError),
+    Severity(i32),
 }
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Callback => write!(f, "callback not found"),
             Error::NulError(e) => write!(f, "error converting to C string: {e}"),
+            Error::Severity(v) => write!(f, "unknown severity level: {v}"),
         }
     }
 }
@@ -116,6 +136,6 @@ impl From<NulError> for Error {
 
 impl From<Error> for crate::Error {
     fn from(value: Error) -> Self {
-        host::Error::Log(value).into()
+        crate::ext::Error::Log(value).into()
     }
 }

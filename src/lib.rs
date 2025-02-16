@@ -19,22 +19,49 @@ pub mod version;
 
 pub mod prelude {
     #[doc(inline)]
+    pub use crate::ext::audio_ports::{AudioPorts, MonoPorts, StereoPorts};
+    #[doc(inline)]
     pub use crate::{
         Error, entry,
-        ext::plugin::{
-            Extensions,
-            audio_ports::{AudioPorts, MonoPorts, StereoPorts},
-        },
+        ext::Extensions,
         host::Host,
         plugin::{AudioThread, Plugin},
         process::{Process, Status},
     };
 }
 
+#[doc(hidden)]
+#[macro_export]
+// The type Flags must be #[repr(u32)].
+macro_rules! impl_flags_u32 {
+    ($($Flags:ty),* $(,)?) => {$(
+        impl $Flags {
+            pub const fn set(&self, flags: u32) -> u32 {
+                *self as u32 | flags
+            }
+
+            pub const fn is_set(&self, flags: u32) -> bool {
+                *self as u32 & flags != 0
+            }
+
+            pub const fn clear(&self, flags: u32) -> u32 {
+                !(*self as u32) & flags
+            }
+        }
+
+        impl From<$Flags> for u32 {
+            fn from(value: $Flags) -> Self {
+                value as u32
+            }
+        }
+    )*};
+}
+
 #[derive(Debug)]
 pub enum Error {
     Factory(factory::Error),
     Events(events::Error),
+    Extension(ext::Error),
     Host(host::Error),
     Id(id::Error),
     Plugin(plugin::Error),
@@ -49,6 +76,7 @@ impl std::fmt::Display for Error {
             Factory(e) => write!(f, "factory error: {e}"),
             Plugin(e) => write!(f, "plugin error: {e}"),
             Events(e) => write!(f, "events error {e}"),
+            Extension(e) => write!(f, "extension error {e}"),
             Host(e) => write!(f, "host error: {e}"),
             Process(e) => write!(f, "process error: {e}"),
             Id(e) => write!(f, "id error: {e}"),

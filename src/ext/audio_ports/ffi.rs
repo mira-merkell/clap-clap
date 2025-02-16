@@ -1,5 +1,7 @@
+use std::marker::PhantomData;
+
 use crate::{
-    ext::plugin::audio_ports::AudioPorts,
+    ext::audio_ports::AudioPorts,
     ffi::{clap_audio_port_info, clap_plugin, clap_plugin_audio_ports},
     plugin::{ClapPlugin, Plugin},
 };
@@ -58,13 +60,20 @@ where
         .is_some()
 }
 
-pub(crate) const fn clap_plugin_audio_ports<A, P>() -> clap_plugin_audio_ports
-where
-    P: Plugin,
-    A: AudioPorts<P>,
-{
-    clap_plugin_audio_ports {
-        count: Some(count::<A, P>),
-        get: Some(get::<A, P>),
+pub struct ClapPluginAudioPorts<P> {
+    #[allow(unused)]
+    clap_plugin_audio_ports: clap_plugin_audio_ports,
+    _marker: PhantomData<P>,
+}
+
+impl<P: Plugin> ClapPluginAudioPorts<P> {
+    pub fn new<A: AudioPorts<P>>(_: A) -> Self {
+        Self {
+            clap_plugin_audio_ports: clap_plugin_audio_ports {
+                count: Some(count::<A, P>),
+                get: Some(get::<A, P>),
+            },
+            _marker: PhantomData,
+        }
     }
 }

@@ -1,21 +1,52 @@
 //! CLAP Extensions.
 //!
-//! The [CLAP API] defines the interface between plugins and hosts, treating
-//! both extensions equally—there's no distinction in how extensions are used by
-//! either.
+//! The [CLAP API] defines the interface between plugins and hosts as similarly
+//! structured C interfaces. This library adopts the plugin's perspective,
+//! meaning that host extensions can be implemented as concrete types that the
+//! plugin can use by querying: [`Host::get_extension()']. Plugin extensions, on
+//! the other hand, are to be specified by the user as trait implementations.
+//! The traits describing plugin extensions are declared in this module.
 //!
-//! This library adopts the plugin's perspective, meaning there is only one
-//! host. Host extensions are concrete types found in the [`ext::host`] module.
-//!
-//! Plugin extensions, on the other hand, are implemented by the library user as
-//! traits in the [`ext::plugin`] module. This module also provides some
-//! concrete implementations for convenience, such as the [`StereoPorts`] type,
-//! which defines a static stereo port layout.
+//! You can also find here some concrete implementations provided as a
+//! convenience -- e.g., [`StereoPorts`]  defines a static stereo port layout.
 //!
 //! [CLAP API]: https://github.com/free-audio/clap/tree/main/include/clap
-//! [`ext::host`]: crate::ext::host
-//! [`ext::plugin`]: crate::ext::plugin
-//! [`StereoPorts`]: crate::ext::plugin::audio_ports::StereoPorts
+//! [`Host::get_extension()']: crate::host::Host::get_extension
+//! [`StereoPorts`]: audio_ports::StereoPorts
 
-pub mod host;
-pub mod plugin;
+pub mod audio_ports;
+pub mod log;
+
+use std::fmt::{Display, Formatter};
+
+use crate::{ext::audio_ports::AudioPorts, plugin::Plugin};
+
+/// Plugin extensions.
+pub trait Extensions<P: Plugin> {
+    fn audio_ports() -> Option<impl AudioPorts<P>> {
+        None::<()>
+    }
+}
+
+impl<P: Plugin> Extensions<P> for () {}
+
+#[derive(Debug)]
+pub enum Error {
+    Log(log::Error),
+    AudioPorts(audio_ports::Error),
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::Log(e) => write!(f, "log: {e}"),
+            Error::AudioPorts(e) => write!(f, "audio_ports: {e}"),
+        }
+    }
+}
+
+impl From<Error> for crate::Error {
+    fn from(value: Error) -> Self {
+        Self::Extension(value)
+    }
+}

@@ -1,12 +1,13 @@
 use std::{
     ffi::NulError,
     fmt::Display,
+    iter::empty,
     marker::PhantomData,
     sync::{Arc, Mutex},
 };
 
 use crate::{
-    ext::plugin::{Extensions, audio_ports::ClapPluginAudioPorts},
+    ext::{Extensions, audio_ports::ClapPluginAudioPorts},
     ffi::clap_plugin,
     host::Host,
     process,
@@ -33,12 +34,25 @@ pub trait Plugin: Default {
     const VERSION: &'static str = "";
     const DESCRIPTION: &'static str = "";
 
-    /// Arbitrary keywords separated by whitespace. For example: `"filter stereo
-    /// distortion"`. See the module [`plugin_features`] for a list of
-    /// standard feature names.
+    /// Plugin features as an arbitrary list of keywords.
+    ///
+    /// They can be matched by the host indexer and used to classify the plugin.
+    /// For some standard features, see module: [`plugin_features`].
+    ///
+    /// The default implementation returns an empty iterator.
+    ///
+    /// # Example
+    ///
+    /// ```no_compile,rust
+    /// fn features() -> impl Iterator<Item = &'static str> {
+    ///     "instrument stereo sampler".split_whitespace()
+    /// }
+    /// ```
     ///
     /// [`plugin_features`]: crate::plugin_features
-    const FEATURES: &'static str = "";
+    fn features() -> impl Iterator<Item = &'static str> {
+        empty()
+    }
 
     #[allow(unused_variables)]
     fn init(&mut self, host: Arc<Host>) -> Result<(), crate::Error> {
@@ -76,14 +90,14 @@ impl<P: Plugin> AudioThread<P> for () {
     }
 }
 
-pub(crate) struct ClapPluginExtensions<P> {
-    pub(crate) audio_ports: Option<ClapPluginAudioPorts<P>>,
+struct ClapPluginExtensions<P> {
+    audio_ports: Option<ClapPluginAudioPorts<P>>,
 }
 
 impl<P: Plugin> ClapPluginExtensions<P> {
     fn new() -> Self {
         Self {
-            audio_ports: P::Extensions::audio_ports().map(ClapPluginAudioPorts::new),
+            audio_ports: <P as Plugin>::Extensions::audio_ports().map(ClapPluginAudioPorts::new),
         }
     }
 }
@@ -93,7 +107,7 @@ pub(crate) struct Runtime<P: Plugin> {
     pub(crate) descriptor: PluginDescriptor,
     pub(crate) host: Arc<Host>,
     pub(crate) plugin: P,
-    pub(crate) plugin_extensions: Mutex<ClapPluginExtensions<P>>,
+    plugin_extensions: Mutex<ClapPluginExtensions<P>>,
 }
 
 impl<P: Plugin> Runtime<P> {
@@ -206,7 +220,7 @@ impl<P: Plugin> ClapPlugin<P> {
     }
 
     /// Obtain a mutex to plugin extensions.
-    pub(crate) const fn plugin_extensions(&mut self) -> &Mutex<ClapPluginExtensions<P>> {
+    const fn plugin_extensions(&mut self) -> &Mutex<ClapPluginExtensions<P>> {
         let runtime: *mut Runtime<P> = unsafe { *self.clap_plugin }.plugin_data as *mut _;
         unsafe { &(*runtime).plugin_extensions }
     }

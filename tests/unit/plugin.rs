@@ -10,7 +10,7 @@ use std::{
 
 use clap_clap::{
     Error,
-    ext::plugin::{
+    ext::{
         Extensions,
         audio_ports::{AudioPortInfo, AudioPorts},
     },
@@ -21,7 +21,7 @@ use clap_clap::{
     process::{Process, Status, Status::Continue},
 };
 
-use crate::{plugin::dummy_host::DUMMY_HOST, process::TestProcessConfig};
+use crate::{process::TestProcessConfig, shims::host::SHIM_CLAP_HOST};
 
 #[cfg(test)]
 mod desc;
@@ -55,7 +55,10 @@ impl Plugin for TestPlugin {
     const SUPPORT_URL: &'static str = "support none";
     const VERSION: &'static str = "0.0.099";
     const DESCRIPTION: &'static str = "test plugin";
-    const FEATURES: &'static str = "test audio Allpass other features too: ⧉⧉⧉";
+
+    fn features() -> impl Iterator<Item = &'static str> {
+        "test audio Allpass other features too: ⧉⧉⧉".split_whitespace()
+    }
 
     fn init(&mut self, host: Arc<Host>) -> Result<(), Error> {
         self.id = Some(SystemTime::now());
@@ -146,39 +149,10 @@ static FACTORY: LazyLock<Factory> = LazyLock::new(|| {
     )])
 });
 
-mod dummy_host {
-    use std::{
-        ffi::{c_char, c_void},
-        ptr::{null, null_mut},
-    };
-
-    use clap_clap::ffi::{CLAP_VERSION, clap_host};
-
-    extern "C-unwind" fn get_extension(_: *const clap_host, _: *const c_char) -> *const c_void {
-        null()
-    }
-    extern "C-unwind" fn request_restart(_: *const clap_host) {}
-    extern "C-unwind" fn request_process(_: *const clap_host) {}
-    extern "C-unwind" fn request_callback(_: *const clap_host) {}
-
-    pub const DUMMY_HOST: clap_host = clap_host {
-        clap_version: CLAP_VERSION,
-        host_data: null_mut(),
-        name: c"test_host".as_ptr(),
-        vendor: c"mira-merkell".as_ptr(),
-        url: c"none".as_ptr(),
-        version: c"".as_ptr(),
-        get_extension: Some(get_extension),
-        request_restart: Some(request_restart),
-        request_process: Some(request_process),
-        request_callback: Some(request_callback),
-    };
-}
-
 unsafe fn build_plugin<P: Plugin>() -> ClapPlugin<P> {
     let plugin = FACTORY
         .create_plugin(c"clap.plugin.test", unsafe {
-            FactoryHost::new_unchecked(&DUMMY_HOST)
+            FactoryHost::new_unchecked(SHIM_CLAP_HOST.as_ref())
         })
         .unwrap();
 
@@ -282,7 +256,7 @@ fn plugin_descriptor_features() {
         feat = unsafe { feat.add(1) };
     }
 
-    let plugin_features: Vec<_> = TestPlugin::FEATURES.split_whitespace().collect();
+    let plugin_features: Vec<_> = TestPlugin::features().collect();
 
     assert_eq!(features, plugin_features);
 }
@@ -296,7 +270,7 @@ fn call_init() {
 
     let plugin = unsafe { wrap.plugin() };
     let host = plugin.call_init.as_ref().unwrap();
-    assert_eq!(host.name(), "test_host");
+    assert_eq!(host.name(), "");
 }
 
 #[test]
