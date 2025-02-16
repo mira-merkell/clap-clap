@@ -1,34 +1,43 @@
 use std::{ffi::CString, pin::Pin};
 
-use clap_clap::{ext::log::Severity, host::Error::Callback};
+use clap_clap::{
+    ext::log::Severity,
+    host,
+    host::Error::{Callback, ExtensionNotFound},
+};
 
-use crate::host::{ExtLogConfig, Test, TestBed, TestBedConfig};
+use crate::host::{ExtLogConfig, Test, TestBed, TestConfig};
+
+struct CheckImplLog {
+    error: host::Error,
+}
+
+impl Test for CheckImplLog {
+    fn test(self, bed: Pin<&mut TestBed>) {
+        let host = unsafe { bed.host_mut() };
+
+        assert_eq!(host.get_extension().log().unwrap_err(), self.error);
+    }
+}
 
 #[test]
 fn host_doesnt_implement_log() {
-    let mut bed = TestBedConfig {
-        ext_log: None,
-        ..Default::default()
-    }
-    .build();
-
-    let host = bed.as_mut().host_mut();
-
-    let _ = host.get_extension().log().unwrap_err();
+    TestConfig::default().test(CheckImplLog {
+        error: ExtensionNotFound("log"),
+    });
 }
 
 #[test]
 fn host_implements_log_null_callback() {
-    let mut bed = TestBedConfig {
+    TestConfig {
         ext_log: Some(ExtLogConfig {
             null_callback: true,
         }),
         ..Default::default()
     }
-    .build();
-
-    let host = bed.as_mut().host_mut();
-    assert_eq!(host.get_extension().log().unwrap_err(), Callback("log"));
+    .test(CheckImplLog {
+        error: Callback("log"),
+    });
 }
 
 struct CheckLogMsg<'a> {
@@ -43,7 +52,7 @@ impl Test for CheckLogMsg<'_> {
             buf.clear();
         }
 
-        let host = bed.as_mut().host_mut();
+        let host = unsafe { bed.as_mut().host_mut() };
         let log = host.get_extension().log().unwrap();
 
         match self.severity {
@@ -67,35 +76,28 @@ impl Test for CheckLogMsg<'_> {
 
 #[test]
 fn host_implements_log() {
-    CheckLogMsg {
+    TestConfig {
+        ext_log: Some(ExtLogConfig::default()),
+        ..Default::default()
+    }
+    .test(CheckLogMsg {
         severity: Severity::Warning,
         msg: "this is a warning",
-    }
-    .test(
-        TestBedConfig {
-            ext_log: Some(ExtLogConfig::default()),
-            ..Default::default()
-        }
-        .build()
-        .as_mut(),
-    );
+    });
 }
 
 macro_rules! check_host_log {
     ($name:tt, $severity:ident, $msg:literal) => {
         #[test]
         fn $name() {
-            let mut bed = TestBedConfig {
+            TestConfig {
                 ext_log: Some(ExtLogConfig::default()),
                 ..Default::default()
             }
-            .build();
-
-            CheckLogMsg {
+            .test(CheckLogMsg {
                 severity: Severity::$severity,
                 msg: $msg,
-            }
-            .test(bed.as_mut());
+            });
         }
     };
 }
@@ -108,21 +110,16 @@ check_host_log!(host_log_fatal, Fatal, "this as a fatal");
 
 #[test]
 fn host_log_misbehaving() {
-    let mut bed = TestBedConfig {
+    TestConfig {
         ext_log: Some(ExtLogConfig::default()),
         ..Default::default()
     }
-    .build();
-
-    CheckLogMsg {
+    .test(CheckLogMsg {
         severity: Severity::ClapHostMisbehaving,
         msg: "this is a host misbehaving",
-    }
-    .test(bed.as_mut());
-
-    CheckLogMsg {
+    })
+    .test(CheckLogMsg {
         severity: Severity::ClapPluginMisbehaving,
         msg: "this is a plugin misbehaving",
-    }
-    .test(bed.as_mut());
+    });
 }

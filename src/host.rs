@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    ext::{audio_ports::HostAudioPorts, log, log::HostLog},
+    ext::{audio_ports::HostAudioPorts, log::HostLog},
     ffi::{CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, clap_host, clap_host_audio_ports, clap_host_log},
     version::ClapVersion,
 };
@@ -153,7 +153,6 @@ impl<'a> HostExtensions<'a> {
 pub enum Error {
     ExtensionNotFound(&'static str),
     Callback(&'static str),
-    Log(log::Error),
 }
 
 impl Display for Error {
@@ -161,7 +160,6 @@ impl Display for Error {
         match self {
             Error::ExtensionNotFound(name) => write!(f, "extension not found: {name}"),
             Error::Callback(name) => write!(f, "extension callback not found: {name}"),
-            Error::Log(e) => write!(f, "extension 'host_log': {e}"),
         }
     }
 }
