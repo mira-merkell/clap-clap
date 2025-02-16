@@ -79,92 +79,148 @@ mod static_ports {
 }
 
 mod host_audio_ports {
+    use std::{error::Error, pin::Pin};
+
     use clap_clap::{
         ext::audio_ports::RescanFlags,
+        host,
         host::Error::{Callback, ExtensionNotFound},
     };
 
-    use crate::host::{ExtAudioPortsConfig, TestBedConfig};
+    use crate::host::{ExtAudioPortsConfig, Test, TestBed, TestConfig};
+
+    struct CheckAudioPortNotImpl<E: Error> {
+        error: E,
+    }
+
+    impl Test for CheckAudioPortNotImpl<host::Error> {
+        fn test(self, bed: Pin<&mut TestBed>) {
+            let host = bed.host_mut();
+            let err = host.get_extension().audio_ports().unwrap_err();
+            assert_eq!(err, self.error);
+        }
+    }
 
     #[test]
     fn audio_port_not_impl() {
-        let mut bed = TestBedConfig::default().build();
-        let host = bed.as_mut().host_mut();
-
-        let err = host.get_extension().audio_ports().unwrap_err();
-        assert_eq!(err, ExtensionNotFound("audio_ports"));
+        TestConfig::default().test(CheckAudioPortNotImpl {
+            error: ExtensionNotFound("audio_ports"),
+        });
     }
 
     #[test]
     fn audio_port_no_method_is_rescan() {
-        let mut bed = TestBedConfig {
+        TestConfig {
             ext_audio_ports: Some(ExtAudioPortsConfig {
                 null_is_rescan_flag_supported: true,
                 ..Default::default()
             }),
             ..Default::default()
         }
-        .build();
-
-        let host = bed.as_mut().host_mut();
-        let err = host.get_extension().audio_ports().unwrap_err();
-        assert_eq!(err, Callback("is_rescan_flag_supported"));
+        .test(CheckAudioPortNotImpl {
+            error: Callback("is_rescan_flag_supported"),
+        });
     }
 
     #[test]
     fn audio_port_no_method_rescan() {
-        let mut bed = TestBedConfig {
+        TestConfig {
             ext_audio_ports: Some(ExtAudioPortsConfig {
                 null_rescan: true,
                 ..Default::default()
             }),
             ..Default::default()
         }
-        .build();
+        .test(CheckAudioPortNotImpl {
+            error: Callback("rescan"),
+        });
+    }
 
-        let host = bed.as_mut().host_mut();
-        let err = host.get_extension().audio_ports().unwrap_err();
-        assert_eq!(err, Callback("rescan"));
+    struct CheckSupportedFlag {
+        supported: RescanFlags,
+        not_supported: Option<RescanFlags>,
+    }
+
+    impl Test for CheckSupportedFlag {
+        fn test(self, mut bed: Pin<&mut TestBed>) {
+            let host = bed.as_mut().host_mut();
+            let audio_ports = host.get_extension().audio_ports().unwrap();
+
+            assert!(audio_ports.is_rescan_flag_supported(self.supported));
+
+            if let Some(flag) = self.not_supported {
+                assert!(!audio_ports.is_rescan_flag_supported(flag));
+            }
+        }
     }
 
     #[test]
-    fn audio_port_impl() {
-        let mut bed = TestBedConfig {
+    fn audio_port_supported_flag_01() {
+        TestConfig {
             ext_audio_ports: Some(ExtAudioPortsConfig {
                 supported_flags: !0, // all flags supported
                 ..Default::default()
             }),
             ..Default::default()
         }
-        .build();
+        .test(CheckSupportedFlag {
+            supported: RescanFlags::ChannelCount,
+            not_supported: None,
+        })
+        .test(CheckSupportedFlag {
+            supported: RescanFlags::PortType,
+            not_supported: None,
+        });
+    }
 
-        let host = bed.as_mut().host_mut();
+    #[test]
+    fn audio_port_supported_flag_02() {
+        TestConfig {
+            ext_audio_ports: Some(ExtAudioPortsConfig {
+                supported_flags: !(RescanFlags::Names as u32),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+        .test(CheckSupportedFlag {
+            supported: RescanFlags::ChannelCount,
+            not_supported: Some(RescanFlags::Names),
+        })
+        .test(CheckSupportedFlag {
+            supported: RescanFlags::PortType,
+            not_supported: Some(RescanFlags::Names),
+        });
+    }
 
-        let audio_ports = host.get_extension().audio_ports().unwrap();
-        assert!(audio_ports.is_rescan_flag_supported(RescanFlags::ChannelCount));
-        audio_ports.rescan(123);
+    struct CheckRescanFlags {
+        flags: u32,
+    }
 
-        assert_eq!(bed.ext_audio_ports.as_ref().unwrap().call_rescan_flags, 123);
+    impl Test for CheckRescanFlags {
+        fn test(self, mut bed: Pin<&mut TestBed>) {
+            let host = bed.as_mut().host_mut();
+            let audio_ports = host.get_extension().audio_ports().unwrap();
+
+            audio_ports.rescan(self.flags);
+
+            assert_eq!(
+                bed.ext_audio_ports.as_ref().unwrap().call_rescan_flags,
+                self.flags
+            );
+        }
     }
 
     #[test]
     fn audio_port_impl_flag_channel_count() {
-        let mut bed = TestBedConfig {
+        TestConfig {
             ext_audio_ports: Some(ExtAudioPortsConfig {
                 supported_flags: RescanFlags::ChannelCount as u32,
                 ..Default::default()
             }),
             ..Default::default()
         }
-        .build();
-
-        let host = bed.as_mut().host_mut();
-
-        let audio_ports = host.get_extension().audio_ports().unwrap();
-        assert!(audio_ports.is_rescan_flag_supported(RescanFlags::ChannelCount));
-        assert!(!audio_ports.is_rescan_flag_supported(RescanFlags::PortType));
-        audio_ports.rescan(127);
-
-        assert_eq!(bed.ext_audio_ports.as_ref().unwrap().call_rescan_flags, 127);
+        .test(CheckRescanFlags { flags: 0 })
+        .test(CheckRescanFlags { flags: 127 })
+        .test(CheckRescanFlags { flags: 128 });
     }
 }

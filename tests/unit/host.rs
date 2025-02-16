@@ -15,12 +15,12 @@ use clap_clap::{
     version::CLAP_VERSION,
 };
 
-pub trait Test {
+pub trait Test: Sized {
     fn test(self, bed: Pin<&mut TestBed>);
 }
 
 #[derive(Debug, Default, Copy, Clone)]
-pub struct TestBedConfig<'a> {
+pub struct TestConfig<'a> {
     pub name: &'a CStr,
     pub vendor: &'a CStr,
     pub url: &'a CStr,
@@ -30,15 +30,16 @@ pub struct TestBedConfig<'a> {
     pub ext_audio_ports: Option<ExtAudioPortsConfig>,
 }
 
-impl<'a> TestBedConfig<'a> {
-    pub fn build(self) -> Pin<Box<TestBed<'a>>> {
-        TestBed::new(self)
+impl TestConfig<'_> {
+    pub fn test(self, case: impl Test) -> Self {
+        TestBed::new(self).as_mut().test(case);
+        self
     }
 }
 
 #[derive(Debug)]
 pub struct TestBed<'a> {
-    config: TestBedConfig<'a>,
+    config: TestConfig<'a>,
     clap_host: clap_host,
     host: Option<Host>,
 
@@ -49,7 +50,7 @@ pub struct TestBed<'a> {
 }
 
 impl<'a> TestBed<'a> {
-    pub fn new(config: TestBedConfig<'a>) -> Pin<Box<Self>> {
+    pub fn new(config: TestConfig<'a>) -> Pin<Box<Self>> {
         let mut bed = Box::new(Self {
             host: None,
             clap_host: clap_host {
@@ -80,6 +81,11 @@ impl<'a> TestBed<'a> {
 
     pub const fn host_mut(self: Pin<&mut Self>) -> &mut Host {
         unsafe { self.get_unchecked_mut().host.as_mut().unwrap() }
+    }
+
+    pub fn test(mut self: Pin<&mut Self>, case: impl Test) -> Pin<&mut Self> {
+        case.test(self.as_mut());
+        self
     }
 }
 
@@ -157,7 +163,7 @@ extern "C-unwind" fn ext_audio_ports_rescan(host: *const clap_host, flags: u32) 
     assert!(!host.is_null());
     let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
     if let Some(ext) = &mut bed.ext_audio_ports {
-        ext.call_rescan_flags |= flags;
+        ext.call_rescan_flags = flags;
     }
 }
 
@@ -220,20 +226,19 @@ impl Test for CheckDescription {
 
 #[test]
 fn check_description_01() {
-    CheckDescription {}.test(TestBedConfig::default().build().as_mut());
+    TestConfig::default()
+        .test(CheckDescription)
+        .test(CheckDescription);
 }
 
 #[test]
 fn check_description_02() {
-    CheckDescription {}.test(
-        TestBedConfig {
-            name: c"test_name",
-            vendor: c"test_vendor",
-            url: c"test_url",
-            version: c"test_version",
-            ..Default::default()
-        }
-        .build()
-        .as_mut(),
-    );
+    TestConfig {
+        name: c"test_name",
+        vendor: c"⧉⧉⧉",
+        url: c"test_url",
+        version: c"82[p",
+        ..Default::default()
+    }
+    .test(CheckDescription);
 }
