@@ -1,11 +1,17 @@
 mod plugin_audio_ports {
-    use std::{ffi::CStr, marker::PhantomData, ptr::null};
+    use std::{ffi::CStr, marker::PhantomData, mem::MaybeUninit, ptr::null};
 
     use clap_clap::{
-        ext::Extensions,
+        Error,
+        ext::{
+            Extensions,
+            audio_ports::{AudioPortInfo, AudioPortType},
+        },
         factory::{Factory, FactoryHost, FactoryPluginPrototype},
-        ffi::{CLAP_EXT_AUDIO_PORTS, clap_plugin, clap_plugin_audio_ports},
+        ffi::{CLAP_EXT_AUDIO_PORTS, clap_audio_port_info, clap_plugin, clap_plugin_audio_ports},
+        id::ClapId,
         plugin::Plugin,
+        prelude::AudioPorts,
     };
 
     use crate::shims::{host::SHIM_CLAP_HOST, plugin::ShimPlugin};
@@ -27,9 +33,9 @@ mod plugin_audio_ports {
     }
 
     #[derive(Debug)]
-    struct TestBed<P> {
+    pub struct TestBed<P> {
         clap_plugin: *const clap_plugin,
-        clap_plugin_audio_ports: *const clap_plugin_audio_ports,
+        pub ext_audio_ports: Option<ExtAudioPorts>,
         _config: TestConfig<P>,
     }
 
@@ -51,20 +57,13 @@ mod plugin_audio_ports {
                 .unwrap();
             assert!(!clap_plugin.is_null());
 
-            let clap_plugin_audio_ports = unsafe {
-                (*clap_plugin).get_extension.unwrap()(clap_plugin, CLAP_EXT_AUDIO_PORTS.as_ptr())
+            unsafe {
+                Self {
+                    clap_plugin,
+                    ext_audio_ports: ExtAudioPorts::try_new_unchecked(clap_plugin),
+                    _config: config,
+                }
             }
-            .cast();
-
-            Self {
-                clap_plugin,
-                clap_plugin_audio_ports,
-                _config: config,
-            }
-        }
-
-        fn has_audio_ports(&self) -> bool {
-            !self.clap_plugin_audio_ports.is_null()
         }
 
         fn test(&mut self, case: impl Test<P>) -> &mut Self {
@@ -83,6 +82,61 @@ mod plugin_audio_ports {
         }
     }
 
+    #[derive(Debug)]
+    pub struct ExtAudioPorts {
+        clap_plugin: *const clap_plugin,
+        clap_plugin_audio_ports: *const clap_plugin_audio_ports,
+    }
+
+    impl ExtAudioPorts {
+        /// # Safety
+        ///
+        /// clap_plugin must be non-null.
+        pub unsafe fn try_new_unchecked(clap_plugin: *const clap_plugin) -> Option<Self> {
+            assert!(!clap_plugin.is_null());
+            let extension = unsafe {
+                (*clap_plugin).get_extension.unwrap()(clap_plugin, CLAP_EXT_AUDIO_PORTS.as_ptr())
+            };
+
+            (!extension.is_null()).then_some(Self {
+                clap_plugin,
+                clap_plugin_audio_ports: extension.cast(),
+            })
+        }
+
+        pub fn count(&self, is_input: bool) -> u32 {
+            let audio_ports = unsafe { self.clap_plugin_audio_ports.as_ref() }.unwrap();
+            unsafe { audio_ports.count.unwrap()(self.clap_plugin, is_input) }
+        }
+
+        pub fn get(&self, index: u32, is_input: bool) -> Option<AudioPortInfo> {
+            let audio_ports = unsafe { self.clap_plugin_audio_ports.as_ref() }.unwrap();
+            let mut info = MaybeUninit::<clap_audio_port_info>::uninit();
+
+            if unsafe {
+                audio_ports.get.unwrap()(self.clap_plugin, index, is_input, info.as_mut_ptr())
+            } {
+                let info = unsafe { info.assume_init() };
+
+                let name = unsafe { CStr::from_ptr(info.name.as_ptr()) };
+                let port_type = (!info.port_type.is_null())
+                    .then(|| unsafe { CStr::from_ptr(info.port_type) })
+                    .and_then(|s| s.to_str().ok())?;
+
+                Some(AudioPortInfo {
+                    id: ClapId::try_from(info.id).unwrap_or(ClapId::invalid_id()),
+                    name: name.to_str().ok().map(|s| s.to_owned()),
+                    flags: info.flags,
+                    channel_count: info.channel_count,
+                    port_type: port_type.try_into().ok(),
+                    in_place_pair: ClapId::try_from(info.in_place_pair).ok(),
+                })
+            } else {
+                None
+            }
+        }
+    }
+
     #[derive(Debug, Default)]
     struct CheckNoPorts<P> {
         _marker: PhantomData<P>,
@@ -91,9 +145,9 @@ mod plugin_audio_ports {
     impl<P: Plugin + 'static> Test<P> for CheckNoPorts<P> {
         fn test(self, bed: &mut TestBed<P>) {
             if P::Extensions::audio_ports().is_some() {
-                assert!(bed.has_audio_ports())
+                assert!(bed.ext_audio_ports.is_some());
             } else {
-                assert!(!bed.has_audio_ports())
+                assert!(bed.ext_audio_ports.is_none());
             }
         }
     }
@@ -103,7 +157,95 @@ mod plugin_audio_ports {
         TestConfig::<ShimPlugin>::default().test(CheckNoPorts::default());
     }
 
+    #[derive(Default, Copy, Clone)]
     struct Ports;
+
+    impl Plugin for Ports {
+        type AudioThread = ();
+        type Extensions = Self;
+        const ID: &'static str = "";
+        const NAME: &'static str = "";
+
+        fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread, Error> {
+            Ok(())
+        }
+    }
+
+    impl Extensions<Self> for Ports {
+        fn audio_ports() -> Option<impl AudioPorts<Self>> {
+            Some(Self {})
+        }
+    }
+
+    impl AudioPorts<Self> for Ports {
+        fn count(_: &Self, _: bool) -> u32 {
+            1
+        }
+
+        fn get(_: &Self, index: u32, is_input: bool) -> Option<AudioPortInfo> {
+            if is_input && index == 0 {
+                Some(
+                    AudioPortInfo::builder()
+                        .port_type(AudioPortType::Surround)
+                        .name("input 1")
+                        .port_is_main()
+                        .id(ClapId::from(0))
+                        .build(),
+                )
+            } else if !is_input && index == 0 {
+                Some(
+                    AudioPortInfo::builder()
+                        .port_type(AudioPortType::Mono)
+                        .name("output 0")
+                        .id(ClapId::from(11))
+                        .channel_count(7)
+                        .in_place_pair(ClapId::from(2))
+                        .build(),
+                )
+            } else {
+                None
+            }
+        }
+    }
+
+    #[test]
+    fn no_ports_ports() {
+        TestConfig::<Ports>::default().test(CheckNoPorts::default());
+    }
+
+    #[test]
+    fn ports_input_output_count() {
+        let bed = &mut TestBed::new(TestConfig::<Ports>::default());
+
+        let audio_ports = bed.ext_audio_ports.as_ref().unwrap();
+
+        assert_eq!(audio_ports.count(false), 1);
+        assert_eq!(audio_ports.count(true), 1);
+        assert_eq!(audio_ports.get(1, false), None);
+        assert_eq!(audio_ports.get(1, true), None);
+    }
+
+    #[test]
+    fn ports_input_info() {
+        let bed = &mut TestBed::new(TestConfig::<Ports>::default());
+
+        let audio_ports = bed.ext_audio_ports.as_ref().unwrap();
+
+        let plug = Ports::default();
+        let port_info = Ports::get(&plug, 0, true);
+        assert_eq!(audio_ports.get(0, true), port_info);
+    }
+
+    #[test]
+    fn ports_output_info() {
+        let bed = &mut TestBed::new(TestConfig::<Ports>::default());
+
+        let audio_ports = bed.ext_audio_ports.as_ref().unwrap();
+
+        let plug = Ports::default();
+        let port_info = Ports::get(&plug, 0, false);
+        assert_eq!(audio_ports.get(0, false), port_info);
+    }
 }
 
 mod static_ports {

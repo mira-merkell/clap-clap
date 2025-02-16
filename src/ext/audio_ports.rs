@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 use crate::{ffi::clap_host_audio_ports, impl_flags_u32, plugin::Plugin, prelude::Host};
 
 mod ffi;
@@ -86,5 +88,28 @@ impl<'a> HostAudioPorts<'a> {
         // and the call is thread-safe.
         let callback = self.clap_host_audio_ports.rescan.unwrap();
         unsafe { callback(self.host.clap_host(), flags) };
+    }
+}
+
+#[derive(Debug)]
+pub enum Error {
+    PortType,
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::PortType => write!(f, "unknown port type"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<Error> for crate::Error {
+    fn from(value: Error) -> Self {
+        match value {
+            Error::PortType => crate::ext::Error::AudioPorts(value).into(),
+        }
     }
 }
