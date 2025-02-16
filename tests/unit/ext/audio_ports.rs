@@ -95,7 +95,7 @@ mod host_audio_ports {
 
     impl Test for CheckAudioPortNotImpl<host::Error> {
         fn test(self, bed: Pin<&mut TestBed>) {
-            let host = bed.host_mut();
+            let host = unsafe { bed.host_mut() };
             let err = host.get_extension().audio_ports().unwrap_err();
             assert_eq!(err, self.error);
         }
@@ -143,7 +143,7 @@ mod host_audio_ports {
 
     impl Test for CheckSupportedFlag {
         fn test(self, mut bed: Pin<&mut TestBed>) {
-            let host = bed.as_mut().host_mut();
+            let host = unsafe { bed.as_mut().host_mut() };
             let audio_ports = host.get_extension().audio_ports().unwrap();
 
             assert!(audio_ports.is_rescan_flag_supported(self.supported));
@@ -198,7 +198,7 @@ mod host_audio_ports {
 
     impl Test for CheckRescanFlags {
         fn test(self, mut bed: Pin<&mut TestBed>) {
-            let host = bed.as_mut().host_mut();
+            let host = unsafe { bed.as_mut().host_mut() };
             let audio_ports = host.get_extension().audio_ports().unwrap();
 
             audio_ports.rescan(self.flags);

@@ -15,7 +15,7 @@ use clap_clap::{
     version::CLAP_VERSION,
 };
 
-pub trait Test: Sized {
+pub trait Test {
     fn test(self, bed: Pin<&mut TestBed>);
 }
 
@@ -37,11 +37,20 @@ impl TestConfig<'_> {
     }
 }
 
+#[derive(Debug, Default, PartialEq)]
+struct CallRequest {
+    restart: bool,
+    process: bool,
+    callback: bool,
+}
+
 #[derive(Debug)]
 pub struct TestBed<'a> {
     config: TestConfig<'a>,
     clap_host: clap_host,
     host: Option<Host>,
+
+    call_request: CallRequest,
 
     pub ext_audio_ports: Option<ExtAudioPorts>,
     pub ext_log: Option<ExtLog>,
@@ -62,9 +71,11 @@ impl<'a> TestBed<'a> {
                 version: config.version.as_ptr(),
                 get_extension: Some(get_extension),
                 request_restart: Some(request_restart),
-                request_process: Some(request_reset),
+                request_process: Some(request_process),
                 request_callback: Some(request_callback),
             },
+            call_request: CallRequest::default(),
+
             ext_audio_ports: config.ext_audio_ports.map(ExtAudioPorts::new),
             ext_log: config.ext_log.map(ExtLog::new),
 
@@ -79,7 +90,11 @@ impl<'a> TestBed<'a> {
         Box::into_pin(bed)
     }
 
-    pub const fn host_mut(self: Pin<&mut Self>) -> &mut Host {
+    /// # Safety
+    ///
+    /// You must not use Host to get a pointer to this test bed and move it
+    /// out ouf the Pin.
+    pub const unsafe fn host_mut(self: Pin<&mut Self>) -> &mut Host {
         unsafe { self.get_unchecked_mut().host.as_mut().unwrap() }
     }
 
@@ -89,24 +104,21 @@ impl<'a> TestBed<'a> {
     }
 }
 
-unsafe impl Send for TestBed<'_> {}
-unsafe impl Sync for TestBed<'_> {}
-
 extern "C-unwind" fn get_extension(
     host: *const clap_host,
     extension_id: *const c_char,
 ) -> *const c_void {
     assert!(!host.is_null());
-    let test_host: &TestBed = unsafe { &*(*host).host_data.cast() };
+    let bed: &TestBed = unsafe { &*(*host).host_data.cast() };
     let extension_id = unsafe { CStr::from_ptr(extension_id) };
 
     if extension_id == CLAP_EXT_AUDIO_PORTS {
-        if let Some(ext) = &test_host.ext_audio_ports {
+        if let Some(ext) = &bed.ext_audio_ports {
             return (&raw const ext.clap_host_audio_ports).cast();
         }
     }
     if extension_id == CLAP_EXT_LOG {
-        if let Some(ext) = &test_host.ext_log {
+        if let Some(ext) = &bed.ext_log {
             return (&raw const ext.clap_host_log).cast();
         }
     }
@@ -114,9 +126,23 @@ extern "C-unwind" fn get_extension(
     null()
 }
 
-extern "C-unwind" fn request_restart(_: *const clap_host) {}
-extern "C-unwind" fn request_reset(_: *const clap_host) {}
-extern "C-unwind" fn request_callback(_: *const clap_host) {}
+extern "C-unwind" fn request_restart(host: *const clap_host) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    bed.call_request.restart = true;
+}
+
+extern "C-unwind" fn request_process(host: *const clap_host) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    bed.call_request.process = true;
+}
+
+extern "C-unwind" fn request_callback(host: *const clap_host) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    bed.call_request.callback = true;
+}
 
 #[derive(Debug, Default, Copy, Clone)]
 pub struct ExtAudioPortsConfig {
@@ -215,7 +241,7 @@ impl Test for CheckDescription {
         let url = bed.config.url.to_str().unwrap();
         let version = bed.config.version.to_str().unwrap();
 
-        let host = bed.host_mut();
+        let host = unsafe { bed.host_mut() };
 
         assert_eq!(host.name(), name);
         assert_eq!(host.vendor(), vendor);
@@ -241,4 +267,72 @@ fn check_description_02() {
         ..Default::default()
     }
     .test(CheckDescription);
+}
+
+enum CheckRequest {
+    Restart,
+    Process,
+    Callback,
+}
+
+impl Test for CheckRequest {
+    fn test(self, mut bed: Pin<&mut TestBed>) {
+        assert_eq!(bed.call_request, CallRequest::default());
+
+        let host = unsafe { bed.as_mut().host_mut() };
+
+        match self {
+            CheckRequest::Restart => {
+                host.request_restart();
+
+                assert_eq!(
+                    bed.call_request,
+                    CallRequest {
+                        restart: true,
+                        process: false,
+                        callback: false,
+                    }
+                );
+            }
+            CheckRequest::Process => {
+                host.request_process();
+
+                assert_eq!(
+                    bed.call_request,
+                    CallRequest {
+                        restart: false,
+                        process: true,
+                        callback: false,
+                    }
+                );
+            }
+            CheckRequest::Callback => {
+                host.request_callback();
+
+                assert_eq!(
+                    bed.call_request,
+                    CallRequest {
+                        restart: false,
+                        process: false,
+                        callback: true,
+                    }
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn check_request_restart() {
+    TestConfig::default().test(CheckRequest::Restart);
+}
+
+#[test]
+fn check_request_process() {
+    TestConfig::default().test(CheckRequest::Process);
+}
+
+#[test]
+fn check_request_callback() {
+    TestConfig::default().test(CheckRequest::Callback);
 }

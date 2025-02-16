@@ -14,7 +14,7 @@ struct CheckImplLog {
 
 impl Test for CheckImplLog {
     fn test(self, bed: Pin<&mut TestBed>) {
-        let host = bed.host_mut();
+        let host = unsafe { bed.host_mut() };
 
         assert_eq!(host.get_extension().log().unwrap_err(), self.error);
     }
@@ -52,7 +52,7 @@ impl Test for CheckLogMsg<'_> {
             buf.clear();
         }
 
-        let host = bed.as_mut().host_mut();
+        let host = unsafe { bed.as_mut().host_mut() };
         let log = host.get_extension().log().unwrap();
 
         match self.severity {
