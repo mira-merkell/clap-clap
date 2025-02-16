@@ -61,6 +61,7 @@ macro_rules! impl_flags_u32 {
 pub enum Error {
     Factory(factory::Error),
     Events(events::Error),
+    Extension(ext::Error),
     Host(host::Error),
     Id(id::Error),
     Plugin(plugin::Error),
@@ -75,6 +76,7 @@ impl std::fmt::Display for Error {
             Factory(e) => write!(f, "factory error: {e}"),
             Plugin(e) => write!(f, "plugin error: {e}"),
             Events(e) => write!(f, "events error {e}"),
+            Extension(e) => write!(f, "extension error {e}"),
             Host(e) => write!(f, "host error: {e}"),
             Process(e) => write!(f, "process error: {e}"),
             Id(e) => write!(f, "id error: {e}"),

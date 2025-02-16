@@ -139,7 +139,7 @@ pub mod process {
 pub mod plugin {
     use clap_clap::{Error, plugin::Plugin};
 
-    #[derive(Default)]
+    #[derive(Default, Copy, Clone)]
     pub struct ShimPlugin;
 
     impl Plugin for ShimPlugin {

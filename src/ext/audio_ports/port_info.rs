@@ -32,12 +32,12 @@ pub enum AudioPortFlags {
 
 impl_flags_u32!(AudioPortFlags);
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct AudioPortInfo {
     pub id: ClapId,
     pub name: Option<String>,
     pub flags: u32,
-    pub channel_count: Option<u32>,
+    pub channel_count: u32,
     pub port_type: Option<AudioPortType>,
     pub in_place_pair: Option<ClapId>,
 }
@@ -62,7 +62,7 @@ impl AudioPortInfo {
 
         info.flags = self.flags;
 
-        info.channel_count = self.channel_count.unwrap_or(0);
+        info.channel_count = self.channel_count;
 
         info.port_type = match self.port_type {
             Some(AudioPortType::Mono) => CLAP_PORT_MONO.as_ptr(),
@@ -119,7 +119,7 @@ impl AudioPortInfoBuilder {
     }
 
     pub fn channel_count(&mut self, n: u32) -> &mut Self {
-        self.info.channel_count = Some(n);
+        self.info.channel_count = n;
         self
     }
 
@@ -144,6 +144,24 @@ pub enum AudioPortType {
     Stereo,
     Surround,
     Ambisonic,
+}
+
+impl TryFrom<&str> for AudioPortType {
+    type Error = crate::ext::audio_ports::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if value == "mono" {
+            Ok(AudioPortType::Mono)
+        } else if value == "stereo" {
+            Ok(AudioPortType::Stereo)
+        } else if value == "ambisonic" {
+            Ok(AudioPortType::Ambisonic)
+        } else if value == "surround" {
+            Ok(AudioPortType::Surround)
+        } else {
+            Err(Self::Error::PortType)
+        }
+    }
 }
 
 impl<P: Plugin> AudioPorts<P> for () {

@@ -17,6 +17,8 @@
 pub mod audio_ports;
 pub mod log;
 
+use std::fmt::{Display, Formatter};
+
 use crate::{ext::audio_ports::AudioPorts, plugin::Plugin};
 
 /// Plugin extensions.
@@ -27,3 +29,24 @@ pub trait Extensions<P: Plugin> {
 }
 
 impl<P: Plugin> Extensions<P> for () {}
+
+#[derive(Debug)]
+pub enum Error {
+    Log(log::Error),
+    AudioPorts(audio_ports::Error),
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::Log(e) => write!(f, "log: {e}"),
+            Error::AudioPorts(e) => write!(f, "audio_ports: {e}"),
+        }
+    }
+}
+
+impl From<Error> for crate::Error {
+    fn from(value: Error) -> Self {
+        Self::Extension(value)
+    }
+}
