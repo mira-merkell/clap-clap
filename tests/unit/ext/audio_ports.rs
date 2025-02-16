@@ -1,3 +1,111 @@
+mod plugin_audio_ports {
+    use std::{ffi::CStr, marker::PhantomData, ptr::null};
+
+    use clap_clap::{
+        ext::Extensions,
+        factory::{Factory, FactoryHost, FactoryPluginPrototype},
+        ffi::{CLAP_EXT_AUDIO_PORTS, clap_plugin, clap_plugin_audio_ports},
+        plugin::Plugin,
+    };
+
+    use crate::shims::{host::SHIM_CLAP_HOST, plugin::ShimPlugin};
+
+    trait Test<P: Plugin> {
+        fn test(self, bed: &mut TestBed<P>);
+    }
+
+    #[derive(Debug, Default, Copy, Clone)]
+    struct TestConfig<P> {
+        _marker: PhantomData<P>,
+    }
+
+    impl<P: Plugin + Copy + 'static> TestConfig<P> {
+        fn test(self, case: impl Test<P>) -> Self {
+            TestBed::new(self).test(case);
+            self
+        }
+    }
+
+    #[derive(Debug)]
+    struct TestBed<P> {
+        clap_plugin: *const clap_plugin,
+        clap_plugin_audio_ports: *const clap_plugin_audio_ports,
+        _config: TestConfig<P>,
+    }
+
+    impl<P: Plugin + 'static> TestBed<P> {
+        fn new(config: TestConfig<P>) -> Self {
+            let factory = Factory::new(vec![Box::new(
+                FactoryPluginPrototype::<P>::build().unwrap(),
+            )]);
+
+            assert_eq!(factory.plugins_count(), 1);
+            let plugin_desc = factory.descriptor(0).unwrap();
+            assert!(!plugin_desc.is_null());
+            let plugin_id = unsafe { (*plugin_desc).id };
+            assert!(!plugin_id.is_null());
+
+            let host = unsafe { FactoryHost::new_unchecked(SHIM_CLAP_HOST.as_ref()) };
+            let clap_plugin = factory
+                .create_plugin(unsafe { CStr::from_ptr(plugin_id) }, host)
+                .unwrap();
+            assert!(!clap_plugin.is_null());
+
+            let clap_plugin_audio_ports = unsafe {
+                (*clap_plugin).get_extension.unwrap()(clap_plugin, CLAP_EXT_AUDIO_PORTS.as_ptr())
+            }
+            .cast();
+
+            Self {
+                clap_plugin,
+                clap_plugin_audio_ports,
+                _config: config,
+            }
+        }
+
+        fn has_audio_ports(&self) -> bool {
+            !self.clap_plugin_audio_ports.is_null()
+        }
+
+        fn test(&mut self, case: impl Test<P>) -> &mut Self {
+            case.test(self);
+            self
+        }
+    }
+
+    impl<P> Drop for TestBed<P> {
+        fn drop(&mut self) {
+            assert!(!self.clap_plugin.is_null());
+            let clap_plugin = unsafe { &*self.clap_plugin };
+            unsafe { clap_plugin.destroy.unwrap()(clap_plugin) };
+
+            self.clap_plugin = null();
+        }
+    }
+
+    #[derive(Debug, Default)]
+    struct CheckNoPorts<P> {
+        _marker: PhantomData<P>,
+    }
+
+    impl<P: Plugin + 'static> Test<P> for CheckNoPorts<P> {
+        fn test(self, bed: &mut TestBed<P>) {
+            if P::Extensions::audio_ports().is_some() {
+                assert!(bed.has_audio_ports())
+            } else {
+                assert!(!bed.has_audio_ports())
+            }
+        }
+    }
+
+    #[test]
+    fn no_ports_shim() {
+        TestConfig::<ShimPlugin>::default().test(CheckNoPorts::default());
+    }
+
+    struct Ports;
+}
+
 mod static_ports {
     use clap_clap::ext::audio_ports::{
         AudioPortFlags, AudioPortType, AudioPorts, MonoPorts, StereoPorts,
