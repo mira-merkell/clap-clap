@@ -11,7 +11,6 @@ pub mod ffi;
 pub mod fixedpoint;
 pub mod host;
 pub mod id;
-pub mod params;
 pub mod plugin;
 pub mod plugin_features;
 pub mod process;

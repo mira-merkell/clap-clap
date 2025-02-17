@@ -16,6 +16,7 @@
 
 pub mod audio_ports;
 pub mod log;
+pub mod params;
 
 use std::fmt::{Display, Formatter};
 
