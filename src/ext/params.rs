@@ -257,7 +257,7 @@ pub struct ParamInfo {
     ///  - Many plugins will process the parameter events more quickly if the
     ///    host can provide the cookie in a faster time than a hashmap lookup
     ///    per param per event.
-    cookie: NonNull<c_void>,
+    pub cookie: Option<NonNull<c_void>>,
 
     /// The display name. eg: "Volume". This does not need to be unique. Do not
     /// include the module text in this. The host should concatenate/format
@@ -270,11 +270,11 @@ pub struct ParamInfo {
     pub module: String,
 
     /// Minimum plain value. Must be finite.
-    min_value: f64,
-    /// Maximum plain value. Must be finite
-    max_value: f64,
+    pub min_value: f64,
+    /// Maximum plain value. Must be finite.
+    pub max_value: f64,
     /// Default plain value. Must be in [min, max] range.
-    default_value: f64,
+    pub default_value: f64,
 }
 
 pub trait Params<P: Plugin> {
