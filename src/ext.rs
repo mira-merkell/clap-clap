@@ -20,11 +20,18 @@ pub mod params;
 
 use std::fmt::{Display, Formatter};
 
-use crate::{ext::audio_ports::AudioPorts, plugin::Plugin};
+use crate::{
+    ext::{audio_ports::AudioPorts, params::Params},
+    plugin::Plugin,
+};
 
 /// Plugin extensions.
 pub trait Extensions<P: Plugin> {
     fn audio_ports() -> Option<impl AudioPorts<P>> {
+        None::<()>
+    }
+
+    fn params() -> Option<impl Params<P>> {
         None::<()>
     }
 }
@@ -35,6 +42,7 @@ impl<P: Plugin> Extensions<P> for () {}
 pub enum Error {
     Log(log::Error),
     AudioPorts(audio_ports::Error),
+    Params(params::Error),
 }
 
 impl Display for Error {
@@ -42,6 +50,7 @@ impl Display for Error {
         match self {
             Error::Log(e) => write!(f, "log: {e}"),
             Error::AudioPorts(e) => write!(f, "audio_ports: {e}"),
+            Error::Params(e) => write!(f, "params: {e}"),
         }
     }
 }

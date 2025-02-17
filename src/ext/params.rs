@@ -130,7 +130,15 @@
 //! - if you plan to use adapters for other plugin formats, then you need to pay
 //!   extra attention to the adapter requirements
 
+use std::{
+    ffi::c_void,
+    fmt::{Display, Formatter},
+    ptr::NonNull,
+};
+
 use crate::{
+    events::{InputEvents, OutputEvents},
+    ext,
     ffi::{
         CLAP_PARAM_CLEAR_ALL, CLAP_PARAM_CLEAR_AUTOMATIONS, CLAP_PARAM_CLEAR_MODULATIONS,
         CLAP_PARAM_IS_AUTOMATABLE, CLAP_PARAM_IS_AUTOMATABLE_PER_CHANNEL,
@@ -140,9 +148,12 @@ use crate::{
         CLAP_PARAM_IS_MODULATABLE_PER_KEY, CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID,
         CLAP_PARAM_IS_MODULATABLE_PER_PORT, CLAP_PARAM_IS_PERIODIC, CLAP_PARAM_IS_READONLY,
         CLAP_PARAM_IS_STEPPED, CLAP_PARAM_REQUIRES_PROCESS, CLAP_PARAM_RESCAN_ALL,
-        CLAP_PARAM_RESCAN_INFO, CLAP_PARAM_RESCAN_TEXT, CLAP_PARAM_RESCAN_VALUES,
+        CLAP_PARAM_RESCAN_INFO, CLAP_PARAM_RESCAN_TEXT, CLAP_PARAM_RESCAN_VALUES, clap_host_params,
     },
+    id::ClapId,
     impl_flags_u32,
+    plugin::Plugin,
+    prelude::Host,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -210,6 +221,120 @@ pub enum ParamInfoFlags {
 
 impl_flags_u32!(ParamInfoFlags);
 
+/// Describes a parameter.
+#[derive(Debug, Clone)]
+pub struct ParamInfo {
+    /// Stable parameter identifier, it must never change.
+    pub id: ClapId,
+
+    pub flags: ParamInfoFlags,
+
+    /// This value is optional and set by the plugin.
+    /// Its purpose is to provide fast access to the plugin parameter object by
+    /// caching its pointer. For instance:
+    ///
+    /// in clap_plugin_params.get_info():
+    ///    Parameter *p = findParameter(param_id);
+    ///    param_info->cookie = p;
+    ///
+    /// later, in clap_plugin.process():
+    ///
+    ///    Parameter *p = (Parameter *)event->cookie;
+    ///    if (!p) [[unlikely]]
+    ///       p = findParameter(event->param_id);
+    ///
+    /// where findParameter() is a function the plugin implements to map
+    /// parameter ids to internal objects.
+    ///
+    /// Important:
+    ///  - The cookie is invalidated by a call to
+    ///    clap_host_params->rescan(CLAP_PARAM_RESCAN_ALL) or when the plugin is
+    ///    destroyed.
+    ///  - The host will either provide the cookie as issued or nullptr in
+    ///    events addressing parameters.
+    ///  - The plugin must gracefully handle the case of a cookie which is
+    ///    nullptr.
+    ///  - Many plugins will process the parameter events more quickly if the
+    ///    host can provide the cookie in a faster time than a hashmap lookup
+    ///    per param per event.
+    cookie: NonNull<c_void>,
+
+    /// The display name. eg: "Volume". This does not need to be unique. Do not
+    /// include the module text in this. The host should concatenate/format
+    /// the module + name in the case where showing the name alone would be
+    /// too vague.
+    pub name: String,
+
+    // The module path containing the param, eg: "Oscillators/Wavetable 1".
+    // '/' will be used as a separator to show a tree-like structure.
+    pub module: String,
+
+    /// Minimum plain value. Must be finite.
+    min_value: f64,
+    /// Maximum plain value. Must be finite
+    max_value: f64,
+    /// Default plain value. Must be in [min, max] range.
+    default_value: f64,
+}
+
+pub trait Params<P: Plugin> {
+    fn count(plugin: &P) -> u32;
+
+    fn get_info(plugin: &P, index: u32) -> Option<ParamInfo>;
+
+    fn get_value(plugin: &P, param_id: ClapId) -> Option<f64>;
+
+    /// Fills out_buffer with a null-terminated UTF-8 string that represents the
+    /// parameter at the given 'value' argument. eg: "2.3 kHz". The host
+    /// should always use this to format parameter values before displaying
+    /// it to the user.
+    fn value_to_text(
+        plugin: &P,
+        param_id: ClapId,
+        value: f64,
+        out_buf: &mut [u8],
+    ) -> Result<(), Error>;
+
+    /// Converts the null-terminated UTF-8 param_value_text into a double and
+    /// writes it to out_value. The host can use this to convert user input
+    /// into a parameter value.
+    fn text_to_value(plugin: &P, param_id: ClapId, param_value_text: &str) -> Result<f64, Error>;
+
+    /// Flushes a set of parameter changes.
+    /// This method must not be called concurrently to clap_plugin->process().
+    ///
+    /// Note: if the plugin is processing, then the process() call will already
+    /// achieve the parameter update (bidirectional), so a call to flush
+    /// isn't required, also be aware that the plugin may use the sample
+    /// offset in process(), while this information would be lost within
+    /// flush().
+    fn flush(plugin: &P, in_events: &InputEvents, out_events: &OutputEvents);
+}
+
+impl<P: Plugin> Params<P> for () {
+    fn count(_: &P) -> u32 {
+        0
+    }
+
+    fn get_info(_: &P, _: u32) -> Option<ParamInfo> {
+        None
+    }
+
+    fn get_value(_: &P, _: ClapId) -> Option<f64> {
+        None
+    }
+
+    fn value_to_text(_: &P, _: ClapId, value: f64, _: &mut [u8]) -> Result<(), Error> {
+        Err(Error::ConvertToText(value))
+    }
+
+    fn text_to_value(_: &P, _: ClapId, _: &str) -> Result<f64, Error> {
+        Err(Error::ConvertToValue)
+    }
+
+    fn flush(_: &P, _: &InputEvents, _: &OutputEvents) {}
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u32)]
 pub enum ParamRescanFlags {
@@ -265,3 +390,70 @@ pub enum ParamClearFlags {
 }
 
 impl_flags_u32!(ParamClearFlags);
+
+pub struct HostParams<'a> {
+    host: &'a Host,
+    clap_host_params: &'a clap_host_params,
+}
+
+impl<'a> HostParams<'a> {
+    /// # Safety
+    ///
+    /// All extension interface function pointers must be non-null (Some), and
+    /// the functions must be thread-safe.
+    pub(crate) const unsafe fn new_unchecked(
+        host: &'a Host,
+        clap_host_params: &'a clap_host_params,
+    ) -> Self {
+        Self {
+            host,
+            clap_host_params,
+        }
+    }
+
+    /// Rescan the full list of parameters according to the flags.
+    pub fn rescan(&self, flags: u32) {
+        todo!()
+    }
+
+    /// Clears references to a parameter.
+    pub fn clear(&self, param_id: ClapId, flags: u32) {
+        todo!()
+    }
+
+    /// Request a parameter flush.
+    ///
+    /// The host will then schedule a call to either:
+    /// - clap_plugin.process()
+    /// - clap_plugin_params.flush()
+    ///
+    /// This function is always safe to use and should not be called from an
+    /// audio-thread as the plugin would already be within process() or
+    /// flush().
+    pub fn request_flush(&self) {
+        todo!()
+    }
+}
+
+#[derive(Debug)]
+pub enum Error {
+    ConvertToText(f64),
+    ConvertToValue,
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::ConvertToText(val) => write!(f, "conversion from value to text: {val}"),
+            Error::ConvertToValue => write!(f, "conversion from text to value"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<Error> for crate::Error {
+    fn from(value: Error) -> Self {
+        ext::Error::Params(value).into()
+    }
+}
