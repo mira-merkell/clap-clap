@@ -150,10 +150,11 @@ use crate::{
         CLAP_PARAM_IS_STEPPED, CLAP_PARAM_REQUIRES_PROCESS, CLAP_PARAM_RESCAN_ALL,
         CLAP_PARAM_RESCAN_INFO, CLAP_PARAM_RESCAN_TEXT, CLAP_PARAM_RESCAN_VALUES, clap_host_params,
     },
+    host::Host,
+    id,
     id::ClapId,
     impl_flags_u32,
     plugin::Plugin,
-    prelude::Host,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -339,11 +340,11 @@ mod ffi {
     use std::{
         ffi::{CStr, c_char},
         marker::PhantomData,
-        ptr::null_mut,
+        ptr::{NonNull, null_mut},
     };
 
     use crate::{
-        ext::params::Params,
+        ext::params::{Error, Params},
         ffi::{clap_id, clap_param_info, clap_plugin, clap_plugin_params},
         plugin::{ClapPlugin, Plugin},
     };
@@ -491,22 +492,17 @@ mod ffi {
         // safe.
         let plugin = unsafe { clap_plugin.plugin() };
 
-        let Ok(param_id) = param_id.try_into() else {
-            return false;
-        };
-        if param_value_text.is_null() {
-            return false;
-        }
-        let Ok(param_value_text) = unsafe { CStr::from_ptr(param_value_text) }.to_str() else {
-            return false;
-        };
-        let Ok(value) = E::text_to_value(plugin, param_id, param_value_text) else {
-            return false;
+        let write_value = || -> Result<(), Error> {
+            let param_value_text =
+                NonNull::new(param_value_text as *mut _).ok_or(Error::Nullptr)?;
+            let param_value_text = unsafe { CStr::from_ptr(param_value_text.as_ptr()) }.to_str()?;
+            let value = E::text_to_value(plugin, param_id.try_into()?, param_value_text)?;
+            (!out_value.is_null())
+                .then(|| unsafe { *out_value = value })
+                .ok_or(Error::Nullptr)
         };
 
-        (!out_value.is_null())
-            .then(|| unsafe { *out_value = value })
-            .is_some()
+        write_value().is_ok()
     }
 
     pub struct ClapPluginParams<P> {
@@ -636,6 +632,9 @@ impl<'a> HostParams<'a> {
 pub enum Error {
     ConvertToText(f64),
     ConvertToValue,
+    Nullptr,
+    Utf8Error(std::str::Utf8Error),
+    IdError(id::Error),
 }
 
 impl Display for Error {
@@ -643,11 +642,27 @@ impl Display for Error {
         match self {
             Error::ConvertToText(val) => write!(f, "conversion from value to text: {val}"),
             Error::ConvertToValue => write!(f, "conversion from text to value"),
+
+            Error::Nullptr => todo!(),
+            Error::Utf8Error(_) => todo!(),
+            Error::IdError(_) => todo!(),
         }
     }
 }
 
 impl std::error::Error for Error {}
+
+impl From<std::str::Utf8Error> for Error {
+    fn from(value: std::str::Utf8Error) -> Self {
+        Self::Utf8Error(value)
+    }
+}
+
+impl From<id::Error> for Error {
+    fn from(value: id::Error) -> Self {
+        Self::IdError(value)
+    }
+}
 
 impl From<Error> for crate::Error {
     fn from(value: Error) -> Self {
