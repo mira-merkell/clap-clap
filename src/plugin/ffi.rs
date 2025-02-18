@@ -2,6 +2,7 @@ use std::{
     ffi::{CStr, c_char, c_void},
     mem,
     ptr::{NonNull, null},
+    sync::atomic::Ordering,
 };
 
 use crate::{
@@ -71,7 +72,9 @@ extern "C-unwind" fn activate<P: Plugin>(
             .ok(),
     );
 
-    should_be_none.is_none() && audio_thread.is_some()
+    (should_be_none.is_none() && audio_thread.is_some())
+        .then(|| runtime.active.store(true, Ordering::Release))
+        .is_some()
 }
 
 extern "C-unwind" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
@@ -93,6 +96,8 @@ extern "C-unwind" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
     if let Some(audio_thread) = runtime.audio_thread.take() {
         audio_thread.deactivate(&mut runtime.plugin);
     }
+
+    runtime.active.store(false, Ordering::Release)
 }
 
 extern "C-unwind" fn start_processing<P: Plugin>(plugin: *const clap_plugin) -> bool {

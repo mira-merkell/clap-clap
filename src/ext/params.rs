@@ -309,7 +309,9 @@ pub trait Params<P: Plugin> {
     /// isn't required, also be aware that the plugin may use the sample
     /// offset in process(), while this information would be lost within
     /// flush().
-    fn flush(plugin: &P, in_events: &InputEvents, out_events: &OutputEvents);
+    fn flush_inactive(plugin: &P, in_events: &InputEvents, out_events: &OutputEvents);
+
+    fn flush(audio_thread: &P::AudioThread, in_events: &InputEvents, out_events: &OutputEvents);
 }
 
 impl<P: Plugin> Params<P> for () {
@@ -333,7 +335,9 @@ impl<P: Plugin> Params<P> for () {
         Err(Error::ConvertToValue)
     }
 
-    fn flush(_: &P, _: &InputEvents, _: &OutputEvents) {}
+    fn flush_inactive(_: &P, _: &InputEvents, _: &OutputEvents) {}
+
+    fn flush(_: &P::AudioThread, _: &InputEvents, _: &OutputEvents) {}
 }
 
 mod ffi {
@@ -344,8 +348,12 @@ mod ffi {
     };
 
     use crate::{
+        events::{InputEvents, OutputEvents},
         ext::params::{Error, Params},
-        ffi::{clap_id, clap_param_info, clap_plugin, clap_plugin_params},
+        ffi::{
+            clap_id, clap_input_events, clap_output_events, clap_param_info, clap_plugin,
+            clap_plugin_params,
+        },
         plugin::{ClapPlugin, Plugin},
     };
 
@@ -555,6 +563,45 @@ mod ffi {
         write_value().is_ok()
     }
 
+    extern "C-unwind" fn flush<E, P>(
+        plugin: *const clap_plugin,
+        r#in: *const clap_input_events,
+        out: *const clap_output_events,
+    ) where
+        P: Plugin,
+        E: Params<P>,
+    {
+        let in_events = if !r#in.is_null() {
+            unsafe { InputEvents::new_unchecked(&*r#in) }
+        } else {
+            return;
+        };
+        let out_events = if !out.is_null() {
+            unsafe { OutputEvents::new_unchecked(&*out) }
+        } else {
+            return;
+        };
+
+        if plugin.is_null() {
+            return;
+        }
+        // SAFETY: We just checked that the pointer is non-null and the plugin
+        // has been obtained from host and is tied to type P.
+        let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+
+        if !clap_plugin.is_active() {
+            // SAFETY: This function is called on the main thread.
+            // It is guaranteed that we are the only function accessing the plugin now.
+            // So the mutable reference to plugin for the duration of this call is
+            // safe.
+            let plugin = unsafe { clap_plugin.plugin() };
+            E::flush_inactive(plugin, &in_events, &out_events);
+        } else {
+            let audio_thread = unsafe { clap_plugin.audio_thread() }.unwrap();
+            E::flush(audio_thread, &in_events, &out_events)
+        }
+    }
+
     pub struct ClapPluginParams<P> {
         #[allow(unused)]
         clap_plugin_params: clap_plugin_params,
@@ -570,7 +617,7 @@ mod ffi {
                     get_value: Some(get_value::<E, P>),
                     value_to_text: Some(value_to_text::<E, P>),
                     text_to_value: Some(text_to_value::<E, P>),
-                    flush: None,
+                    flush: Some(flush::<E, P>),
                 },
                 _marker: PhantomData,
             }
@@ -682,9 +729,9 @@ impl<'a> HostParams<'a> {
 pub enum Error {
     ConvertToText(f64),
     ConvertToValue,
+    IdError(id::Error),
     Nullptr,
     Utf8Error(std::str::Utf8Error),
-    IdError(id::Error),
 }
 
 impl Display for Error {
@@ -692,10 +739,9 @@ impl Display for Error {
         match self {
             Error::ConvertToText(val) => write!(f, "conversion from value to text: {val}"),
             Error::ConvertToValue => write!(f, "conversion from text to value"),
-
-            Error::Nullptr => todo!(),
-            Error::Utf8Error(_) => todo!(),
-            Error::IdError(_) => todo!(),
+            Error::IdError(e) => write!(f, "ClapId error: {e}"),
+            Error::Nullptr => write!(f, "null pointer"),
+            Error::Utf8Error(e) => write!(f, "UTF-8 encoding error: {e}"),
         }
     }
 }
