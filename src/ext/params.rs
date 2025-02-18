@@ -227,7 +227,7 @@ pub struct ParamInfo {
     /// Stable parameter identifier, it must never change.
     pub id: ClapId,
 
-    pub flags: ParamInfoFlags,
+    pub flags: u32,
 
     /// This value is optional and set by the plugin.
     /// Its purpose is to provide fast access to the plugin parameter object by
@@ -280,7 +280,7 @@ pub struct ParamInfo {
 pub trait Params<P: Plugin> {
     fn count(plugin: &P) -> u32;
 
-    fn get_info(plugin: &P, index: u32) -> Option<ParamInfo>;
+    fn get_info(plugin: &P, param_index: u32) -> Option<ParamInfo>;
 
     fn get_value(plugin: &P, param_id: ClapId) -> Option<f64>;
 
@@ -333,6 +333,203 @@ impl<P: Plugin> Params<P> for () {
     }
 
     fn flush(_: &P, _: &InputEvents, _: &OutputEvents) {}
+}
+
+mod ffi {
+    use std::{
+        ffi::{CStr, c_char},
+        marker::PhantomData,
+        ptr::null_mut,
+    };
+
+    use crate::{
+        ext::params::Params,
+        ffi::{clap_id, clap_param_info, clap_plugin, clap_plugin_params},
+        plugin::{ClapPlugin, Plugin},
+    };
+
+    extern "C-unwind" fn count<E, P>(plugin: *const clap_plugin) -> u32
+    where
+        P: Plugin,
+        E: Params<P>,
+    {
+        if plugin.is_null() {
+            return 0;
+        }
+        // SAFETY: We just checked that the pointer is non-null and the plugin
+        // has been obtained from host and is tied to type P.
+        let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+
+        // SAFETY: This function is called on the main thread.
+        // It is guaranteed that we are the only function accessing the plugin now.
+        // So the mutable reference to plugin for the duration of this call is
+        // safe.
+        let plugin = unsafe { clap_plugin.plugin() };
+
+        E::count(plugin)
+    }
+
+    extern "C-unwind" fn get_info<E, P>(
+        plugin: *const clap_plugin,
+        param_index: u32,
+        param_info: *mut clap_param_info,
+    ) -> bool
+    where
+        P: Plugin,
+        E: Params<P>,
+    {
+        if plugin.is_null() {
+            return false;
+        }
+        // SAFETY: We just checked that the pointer is non-null and the plugin
+        // has been obtained from host and is tied to type P.
+        let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+
+        // SAFETY: This function is called on the main thread.
+        // It is guaranteed that we are the only function accessing the plugin now.
+        // So the mutable reference to plugin for the duration of this call is
+        // safe.
+        let plugin = unsafe { clap_plugin.plugin() };
+
+        if param_info.is_null() {
+            return false;
+        }
+        // SAFETY: We just checked if parm_info is non-null.
+        let param_info = unsafe { &mut *param_info };
+        let Some(info) = E::get_info(plugin, param_index) else {
+            return false;
+        };
+
+        param_info.id = info.id.into();
+        param_info.flags = info.flags;
+        param_info.cookie = if let Some(cookie) = info.cookie {
+            cookie.as_ptr()
+        } else {
+            null_mut()
+        };
+
+        let n = info.name.len().min(param_info.name.len());
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                info.name.as_ptr(),
+                param_info.name.as_mut_ptr() as *mut _,
+                n,
+            )
+        }
+        param_info.name[n] = b'\0' as _;
+
+        let n = info.module.len().min(param_info.module.len());
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                info.module.as_ptr(),
+                param_info.module.as_mut_ptr() as *mut _,
+                n,
+            )
+        }
+        param_info.module[n] = b'\0' as _;
+
+        param_info.default_value = info.default_value;
+        param_info.min_value = info.min_value;
+        param_info.max_value = info.max_value;
+        true
+    }
+
+    extern "C-unwind" fn get_value<E, P>(
+        plugin: *const clap_plugin,
+        param_id: clap_id,
+        out_value: *mut f64,
+    ) -> bool
+    where
+        P: Plugin,
+        E: Params<P>,
+    {
+        if plugin.is_null() {
+            return false;
+        }
+        // SAFETY: We just checked that the pointer is non-null and the plugin
+        // has been obtained from host and is tied to type P.
+        let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+
+        // SAFETY: This function is called on the main thread.
+        // It is guaranteed that we are the only function accessing the plugin now.
+        // So the mutable reference to plugin for the duration of this call is
+        // safe.
+        let plugin = unsafe { clap_plugin.plugin() };
+
+        let Ok(param_id) = param_id.try_into() else {
+            return false;
+        };
+        let Some(value) = E::get_value(plugin, param_id) else {
+            return false;
+        };
+
+        (!out_value.is_null())
+            .then(|| unsafe { *out_value = value })
+            .is_some()
+    }
+
+    extern "C-unwind" fn text_to_value<E, P>(
+        plugin: *const clap_plugin,
+        param_id: clap_id,
+        param_value_text: *const c_char,
+        out_value: *mut f64,
+    ) -> bool
+    where
+        P: Plugin,
+        E: Params<P>,
+    {
+        if plugin.is_null() {
+            return false;
+        }
+        // SAFETY: We just checked that the pointer is non-null and the plugin
+        // has been obtained from host and is tied to type P.
+        let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+
+        // SAFETY: This function is called on the main thread.
+        // It is guaranteed that we are the only function accessing the plugin now.
+        // So the mutable reference to plugin for the duration of this call is
+        // safe.
+        let plugin = unsafe { clap_plugin.plugin() };
+
+        let Ok(param_id) = param_id.try_into() else {
+            return false;
+        };
+        if param_value_text.is_null() {
+            return false;
+        }
+        let Ok(param_value_text) = unsafe { CStr::from_ptr(param_value_text) }.to_str() else {
+            return false;
+        };
+        let Ok(value) = E::text_to_value(plugin, param_id, param_value_text) else {
+            return false;
+        };
+
+        (!out_value.is_null())
+            .then(|| unsafe { *out_value = value })
+            .is_some()
+    }
+
+    pub struct ClapPluginParams<P> {
+        #[allow(unused)]
+        clap_plugin_params: clap_plugin_params,
+        _marker: PhantomData<P>,
+    }
+
+    impl<P: Plugin> ClapPluginParams<P> {
+        pub fn new<E: Params<P>>(_: P) -> Self {
+            Self {
+                clap_plugin_params: clap_plugin_params {
+                    count: Some(count::<E, P>),
+                    get_info: Some(get_info::<E, P>),
+                    get_value: Some(get_value::<E, P>),
+                    value_to_text: None,
+                    text_to_value: Some(text_to_value::<E, P>),
+                    flush: None,
+                },
+                _marker: PhantomData,
+            }
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
