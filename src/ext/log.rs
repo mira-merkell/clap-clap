@@ -5,8 +5,8 @@ use std::{
 
 use crate::{
     ffi::{
-        CLAP_LOG_DEBUG, CLAP_LOG_ERROR, CLAP_LOG_FATAL, CLAP_LOG_HOST_MISBEHAVING, CLAP_LOG_INFO,
-        CLAP_LOG_PLUGIN_MISBEHAVING, CLAP_LOG_WARNING, clap_host_log, clap_log_severity,
+        clap_host_log, clap_log_severity, CLAP_LOG_DEBUG, CLAP_LOG_ERROR, CLAP_LOG_FATAL,
+        CLAP_LOG_HOST_MISBEHAVING, CLAP_LOG_INFO, CLAP_LOG_PLUGIN_MISBEHAVING, CLAP_LOG_WARNING,
     },
     host::Host,
 };
@@ -95,7 +95,7 @@ impl From<Severity> for clap_log_severity {
 }
 
 impl TryFrom<clap_log_severity> for Severity {
-    type Error = crate::ext::host::log::Error;
+    type Error = crate::ext::log::Error;
 
     fn try_from(value: clap_log_severity) -> Result<Self, Error> {
         match value {
