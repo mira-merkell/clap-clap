@@ -400,11 +400,10 @@ mod ffi {
         // safe.
         let plugin = unsafe { clap_plugin.plugin() };
 
-        if param_info.is_null() {
-            return false;
-        }
         // SAFETY: We just checked if parm_info is non-null.
-        let param_info = unsafe { &mut *param_info };
+        let Some(param_info) = (unsafe { param_info.as_mut() }) else {
+            return false;
+        };
         let Some(info) = E::get_info(plugin, param_index) else {
             return false;
         };
@@ -472,9 +471,7 @@ mod ffi {
             return false;
         };
 
-        (!out_value.is_null())
-            .then(|| unsafe { *out_value = value })
-            .is_some()
+        unsafe { out_value.as_mut() }.map(|v| *v = value).is_some()
     }
 
     extern "C-unwind" fn value_to_text<E, P>(
@@ -551,12 +548,12 @@ mod ffi {
         let plugin = unsafe { clap_plugin.plugin() };
 
         let write_value = || -> Result<(), Error> {
-            let text = (!param_value_text.is_null())
-                .then(|| unsafe { CStr::from_ptr(param_value_text) }.to_str())
+            let text = unsafe { param_value_text.as_ref() }
+                .map(|p| unsafe { CStr::from_ptr(p) }.to_str())
                 .ok_or(Error::Nullptr)??;
             let value = E::text_to_value(plugin, param_id.try_into()?, text)?;
-            (!out_value.is_null())
-                .then(|| unsafe { *out_value = value })
+            unsafe { out_value.as_mut() }
+                .map(|v| *v = value)
                 .ok_or(Error::Nullptr)
         };
 
@@ -571,13 +568,20 @@ mod ffi {
         P: Plugin,
         E: Params<P>,
     {
-        let in_events = if !r#in.is_null() {
+        let Some(r#in) = (unsafe { r#in.as_ref() }) else {
+            return;
+        };
+        let in_events = if r#in.size.is_some() && r#in.get.is_some() {
             unsafe { InputEvents::new_unchecked(&*r#in) }
         } else {
             return;
         };
-        let out_events = if !out.is_null() {
-            unsafe { OutputEvents::new_unchecked(&*out) }
+
+        let Some(r#out) = (unsafe { out.as_ref() }) else {
+            return;
+        };
+        let out_events = if out.try_push.is_some() {
+            unsafe { OutputEvents::new_unchecked(out) }
         } else {
             return;
         };
@@ -589,16 +593,19 @@ mod ffi {
         // has been obtained from host and is tied to type P.
         let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
 
-        if !clap_plugin.is_active() {
+        if clap_plugin.is_active() {
+            // SAFETY: This function is called on the audio thread.  It is guaranteed that
+            // we are the only function accessing audio_thread now. So a mutable reference
+            // to audio_thread for the duration of this call is safe.
+            let audio_thread = unsafe { clap_plugin.audio_thread() }.unwrap();
+            E::flush(audio_thread, &in_events, &out_events)
+        } else {
             // SAFETY: This function is called on the main thread.
             // It is guaranteed that we are the only function accessing the plugin now.
             // So the mutable reference to plugin for the duration of this call is
             // safe.
             let plugin = unsafe { clap_plugin.plugin() };
             E::flush_inactive(plugin, &in_events, &out_events);
-        } else {
-            let audio_thread = unsafe { clap_plugin.audio_thread() }.unwrap();
-            E::flush(audio_thread, &in_events, &out_events)
         }
     }
 
