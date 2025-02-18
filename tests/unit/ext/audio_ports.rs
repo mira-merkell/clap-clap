@@ -5,7 +5,7 @@ mod plugin_audio_ports {
         Error,
         ext::{
             Extensions,
-            audio_ports::{AudioPortInfo, AudioPortType},
+            audio_ports::{AudioPortFlags, AudioPortInfo, AudioPortType},
         },
         factory::{Factory, FactoryHost, FactoryPluginPrototype},
         ffi::{CLAP_EXT_AUDIO_PORTS, clap_audio_port_info, clap_plugin, clap_plugin_audio_ports},
@@ -125,7 +125,7 @@ mod plugin_audio_ports {
 
                 Some(AudioPortInfo {
                     id: ClapId::try_from(info.id).unwrap_or(ClapId::invalid_id()),
-                    name: name.to_str().ok().map(|s| s.to_owned()),
+                    name: name.to_str().ok().unwrap().to_owned(),
                     flags: info.flags,
                     channel_count: info.channel_count,
                     port_type: port_type.try_into().ok(),
@@ -144,7 +144,7 @@ mod plugin_audio_ports {
 
     impl<P: Plugin + 'static> Test<P> for CheckNoPorts<P> {
         fn test(self, bed: &mut TestBed<P>) {
-            if P::Extensions::audio_ports().is_some() {
+            if <P as Plugin>::Extensions::audio_ports().is_some() {
                 assert!(bed.ext_audio_ports.is_some());
             } else {
                 assert!(bed.ext_audio_ports.is_none());
@@ -187,24 +187,23 @@ mod plugin_audio_ports {
 
         fn get(_: &Self, index: u32, is_input: bool) -> Option<AudioPortInfo> {
             if is_input && index == 0 {
-                Some(
-                    AudioPortInfo::builder()
-                        .port_type(AudioPortType::Surround)
-                        .name("input 1")
-                        .port_is_main()
-                        .id(ClapId::from(0))
-                        .build(),
-                )
+                Some(AudioPortInfo {
+                    port_type: Some(AudioPortType::Surround),
+                    name: "input 1".to_owned(),
+                    flags: AudioPortFlags::IsMain as u32,
+                    id: ClapId::from(0),
+                    channel_count: 0,
+                    in_place_pair: None,
+                })
             } else if !is_input && index == 0 {
-                Some(
-                    AudioPortInfo::builder()
-                        .port_type(AudioPortType::Mono)
-                        .name("output 0")
-                        .id(ClapId::from(11))
-                        .channel_count(7)
-                        .in_place_pair(ClapId::from(2))
-                        .build(),
-                )
+                Some(AudioPortInfo {
+                    port_type: Some(AudioPortType::Mono),
+                    name: "output 0".to_owned(),
+                    id: ClapId::from(11),
+                    channel_count: 7,
+                    in_place_pair: Some(ClapId::from(2)),
+                    flags: 0,
+                })
             } else {
                 None
             }
@@ -234,7 +233,7 @@ mod plugin_audio_ports {
 
         let audio_ports = bed.ext_audio_ports.as_ref().unwrap();
 
-        let plug = Ports::default();
+        let plug = Ports {};
         let port_info = Ports::get(&plug, 0, true);
         assert_eq!(audio_ports.get(0, true), port_info);
     }
@@ -245,7 +244,7 @@ mod plugin_audio_ports {
 
         let audio_ports = bed.ext_audio_ports.as_ref().unwrap();
 
-        let plug = Ports::default();
+        let plug = Ports {};
         let port_info = Ports::get(&plug, 0, false);
         assert_eq!(audio_ports.get(0, false), port_info);
     }
