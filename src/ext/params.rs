@@ -340,7 +340,7 @@ mod ffi {
     use std::{
         ffi::{CStr, c_char},
         marker::PhantomData,
-        ptr::{NonNull, null_mut},
+        ptr::{null_mut, slice_from_raw_parts_mut},
     };
 
     use crate::{
@@ -469,6 +469,56 @@ mod ffi {
             .is_some()
     }
 
+    extern "C-unwind" fn value_to_text<E, P>(
+        plugin: *const clap_plugin,
+        param_id: clap_id,
+        value: f64,
+        out_buffer: *mut c_char,
+        out_buffer_capacity: u32,
+    ) -> bool
+    where
+        P: Plugin,
+        E: Params<P>,
+    {
+        if plugin.is_null() {
+            return false;
+        }
+        // SAFETY: We just checked that the pointer is non-null and the plugin
+        // has been obtained from host and is tied to type P.
+        let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+
+        // SAFETY: This function is called on the main thread.
+        // It is guaranteed that we are the only function accessing the plugin now.
+        // So the mutable reference to plugin for the duration of this call is
+        // safe.
+        let plugin = unsafe { clap_plugin.plugin() };
+
+        let out_buffer_capacity = if out_buffer_capacity > 0 {
+            debug_assert!((out_buffer_capacity as u64) < usize::MAX as u64);
+            out_buffer_capacity as usize
+        } else {
+            return true;
+        };
+        let buf = if !out_buffer.is_null() {
+            unsafe { &mut *slice_from_raw_parts_mut(out_buffer as *mut u8, out_buffer_capacity) }
+        } else {
+            return false;
+        };
+        let Ok(param_id) = param_id.try_into() else {
+            return false;
+        };
+        E::value_to_text(
+            plugin,
+            param_id,
+            value,
+            &mut buf[0..out_buffer_capacity - 1],
+        )
+        .map(|_| {
+            buf[out_buffer_capacity - 1] = b'\0';
+        })
+        .is_ok()
+    }
+
     extern "C-unwind" fn text_to_value<E, P>(
         plugin: *const clap_plugin,
         param_id: clap_id,
@@ -493,10 +543,10 @@ mod ffi {
         let plugin = unsafe { clap_plugin.plugin() };
 
         let write_value = || -> Result<(), Error> {
-            let param_value_text =
-                NonNull::new(param_value_text as *mut _).ok_or(Error::Nullptr)?;
-            let param_value_text = unsafe { CStr::from_ptr(param_value_text.as_ptr()) }.to_str()?;
-            let value = E::text_to_value(plugin, param_id.try_into()?, param_value_text)?;
+            let text = (!param_value_text.is_null())
+                .then(|| unsafe { CStr::from_ptr(param_value_text) }.to_str())
+                .ok_or(Error::Nullptr)??;
+            let value = E::text_to_value(plugin, param_id.try_into()?, text)?;
             (!out_value.is_null())
                 .then(|| unsafe { *out_value = value })
                 .ok_or(Error::Nullptr)
@@ -518,7 +568,7 @@ mod ffi {
                     count: Some(count::<E, P>),
                     get_info: Some(get_info::<E, P>),
                     get_value: Some(get_value::<E, P>),
-                    value_to_text: None,
+                    value_to_text: Some(value_to_text::<E, P>),
                     text_to_value: Some(text_to_value::<E, P>),
                     flush: None,
                 },
