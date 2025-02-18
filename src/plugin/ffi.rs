@@ -7,7 +7,8 @@ use std::{
 
 use crate::{
     ffi::{
-        CLAP_EXT_AUDIO_PORTS, CLAP_PROCESS_ERROR, clap_plugin, clap_process, clap_process_status,
+        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_PARAMS, CLAP_PROCESS_ERROR, clap_plugin, clap_process,
+        clap_process_status,
     },
     plugin::{AudioThread, ClapPlugin, Plugin, Runtime},
     process::Process,
@@ -213,6 +214,10 @@ extern "C-unwind" fn get_extension<P: Plugin>(
     if id == CLAP_EXT_AUDIO_PORTS {
         if let Some(audio_ports) = &extensions.audio_ports {
             return &raw const *audio_ports as *const c_void;
+        }
+    } else if id == CLAP_EXT_PARAMS {
+        if let Some(params) = &extensions.params {
+            return (&raw const *params).cast();
         }
     }
 

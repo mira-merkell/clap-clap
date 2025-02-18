@@ -161,12 +161,15 @@ mod plugin_audio_ports {
     struct Ports;
 
     impl Plugin for Ports {
-        type AudioThread = ();
+        type AudioThread<'a>
+            = ()
+        where
+            Self: 'a;
         type Extensions = Self;
         const ID: &'static str = "";
         const NAME: &'static str = "";
 
-        fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread, Error> {
+        fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread<'_>, Error> {
             Ok(())
         }
     }

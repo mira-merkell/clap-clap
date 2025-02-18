@@ -143,12 +143,15 @@ pub mod plugin {
     pub struct ShimPlugin;
 
     impl Plugin for ShimPlugin {
-        type AudioThread = ();
+        type AudioThread<'a>
+            = ()
+        where
+            Self: 'a;
         type Extensions = ();
         const ID: &'static str = "";
         const NAME: &'static str = "";
 
-        fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread, Error> {
+        fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread<'_>, Error> {
             Ok(())
         }
     }

@@ -45,7 +45,10 @@ impl Drop for TestPlugin {
 }
 
 impl Plugin for TestPlugin {
-    type AudioThread = TestAudioThread;
+    type AudioThread<'a>
+        = TestAudioThread
+    where
+        Self: 'a;
     type Extensions = Self;
     const ID: &'static str = "clap.plugin.test";
     const NAME: &'static str = "Test Plugin";
@@ -68,7 +71,7 @@ impl Plugin for TestPlugin {
         sample_rate: f64,
         min_frames: u32,
         max_frames: u32,
-    ) -> Result<Self::AudioThread, Error> {
+    ) -> Result<Self::AudioThread<'_>, Error> {
         self.call_activate = Some((sample_rate, min_frames, max_frames));
         Ok(TestAudioThread::new(self.id.unwrap()))
     }

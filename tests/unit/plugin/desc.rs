@@ -6,7 +6,10 @@ use clap_clap::plugin::{Plugin, PluginDescriptor};
 struct Plug;
 
 impl Plugin for Plug {
-    type AudioThread = ();
+    type AudioThread<'a>
+        = ()
+    where
+        Self: 'a;
     type Extensions = ();
 
     const ID: &'static str = "123.456";
@@ -19,7 +22,12 @@ impl Plugin for Plug {
     const DESCRIPTION: &'static str = "none";
     const FEATURES: &'static str = "fx stereo distor..0[";
 
-    fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread, clap_clap::Error> {
+    fn activate(
+        &mut self,
+        _: f64,
+        _: u32,
+        _: u32,
+    ) -> Result<Self::AudioThread<'_>, clap_clap::Error> {
         Ok(())
     }
 }

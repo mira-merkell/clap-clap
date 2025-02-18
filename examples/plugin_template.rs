@@ -39,7 +39,11 @@ impl clap::Extensions<Self> for MyPlug {
 }
 
 impl clap::Plugin for MyPlug {
-    type AudioThread = AudioThread;
+    type AudioThread<'a>
+        = AudioThread
+    where
+        Self: 'a;
+
     type Extensions = Self;
 
     const ID: &'static str = "com.your-company.YourPlugin";
@@ -62,7 +66,12 @@ impl clap::Plugin for MyPlug {
     }
 
     /// Start the audio thread.
-    fn activate(&mut self, sample_rate: f64, _: u32, _: u32) -> Result<AudioThread, clap::Error> {
+    fn activate(
+        &mut self,
+        sample_rate: f64,
+        _: u32,
+        _: u32,
+    ) -> Result<Self::AudioThread<'_>, clap::Error> {
         Ok(AudioThread { sample_rate })
     }
 }

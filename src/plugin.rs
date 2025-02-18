@@ -21,10 +21,14 @@ mod desc;
 #[doc(hidden)]
 pub use desc::PluginDescriptor;
 
+use crate::ext::params::ClapPluginParams;
+
 mod ffi;
 
 pub trait Plugin: Default {
-    type AudioThread: AudioThread<Self>;
+    type AudioThread<'a>: AudioThread<Self>
+    where
+        Self: 'a;
     type Extensions: Extensions<Self>;
 
     const ID: &'static str;
@@ -53,7 +57,7 @@ pub trait Plugin: Default {
         sample_rate: f64,
         min_frames: u32,
         max_frames: u32,
-    ) -> Result<Self::AudioThread, crate::Error>;
+    ) -> Result<Self::AudioThread<'_>, crate::Error>;
 
     fn on_main_thread(&mut self) {}
 }
@@ -81,26 +85,31 @@ impl<P: Plugin> AudioThread<P> for () {
 
 struct ClapPluginExtensions<P> {
     audio_ports: Option<ClapPluginAudioPorts<P>>,
+    params: Option<ClapPluginParams<P>>,
 }
 
 impl<P: Plugin> ClapPluginExtensions<P> {
     fn new() -> Self {
         Self {
             audio_ports: <P as Plugin>::Extensions::audio_ports().map(ClapPluginAudioPorts::new),
+            params: <P as Plugin>::Extensions::params().map(ClapPluginParams::new),
         }
     }
 }
 
-pub(crate) struct Runtime<P: Plugin> {
+pub(crate) struct Runtime<'a, P: Plugin>
+where
+    P: 'a,
+{
     pub(crate) active: AtomicBool,
-    pub(crate) audio_thread: Option<P::AudioThread>,
+    pub(crate) audio_thread: Option<P::AudioThread<'a>>,
     pub(crate) descriptor: PluginDescriptor,
     pub(crate) host: Arc<Host>,
     pub(crate) plugin: P,
     plugin_extensions: Mutex<ClapPluginExtensions<P>>,
 }
 
-impl<P: Plugin> Runtime<P> {
+impl<'a, P: Plugin> Runtime<'a, P> {
     pub(crate) fn initialize(host: Arc<Host>) -> Result<Self, Error> {
         Ok(Self {
             active: AtomicBool::new(false),
@@ -210,7 +219,7 @@ impl<P: Plugin> ClapPlugin<P> {
     ///
     /// The caller must assure they're the only ones who access the
     /// audio_thread.
-    pub const unsafe fn audio_thread(&mut self) -> Option<&mut P::AudioThread> {
+    pub const unsafe fn audio_thread(&mut self) -> Option<&mut P::AudioThread<'_>> {
         let runtime: *mut Runtime<P> = unsafe { *self.clap_plugin }.plugin_data as *mut _;
         unsafe { &mut (*runtime).audio_thread }.as_mut()
     }
