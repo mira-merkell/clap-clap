@@ -311,7 +311,7 @@ pub trait Params<P: Plugin> {
     /// flush().
     fn flush_inactive(plugin: &P, in_events: &InputEvents, out_events: &OutputEvents);
 
-    fn flush(audio_thread: &P::AudioThread<'_>, in_events: &InputEvents, out_events: &OutputEvents);
+    fn flush(audio_thread: &P::AudioThread, in_events: &InputEvents, out_events: &OutputEvents);
 }
 
 impl<P: Plugin> Params<P> for () {
@@ -337,7 +337,7 @@ impl<P: Plugin> Params<P> for () {
 
     fn flush_inactive(_: &P, _: &InputEvents, _: &OutputEvents) {}
 
-    fn flush(_: &P::AudioThread<'_>, _: &InputEvents, _: &OutputEvents) {}
+    fn flush(_: &P::AudioThread, _: &InputEvents, _: &OutputEvents) {}
 }
 
 pub(crate) use ffi::ClapPluginParams;

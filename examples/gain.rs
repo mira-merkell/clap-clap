@@ -13,13 +13,13 @@ use clap_clap::{
 // A plugin must implement `Default` trait.  The plugin instance will be created
 // by the host with the call to `MyPlug::default()`.
 struct Gain {
-    gain: AtomicU64,
+    gain: Arc<AtomicU64>,
 }
 
 impl Default for Gain {
     fn default() -> Self {
         Self {
-            gain: AtomicU64::new(1.0f64.to_bits()),
+            gain: Arc::new(AtomicU64::new(1.0f64.to_bits())),
         }
     }
 }
@@ -91,7 +91,7 @@ impl Params<Gain> for GainParam {
     fn flush_inactive(plugin: &Gain, in_events: &InputEvents, out_events: &OutputEvents) {}
 
     fn flush(
-        audio_thread: &<Gain as clap::Plugin>::AudioThread<'_>,
+        audio_thread: &<Gain as clap::Plugin>::AudioThread,
         in_events: &InputEvents,
         out_events: &OutputEvents,
     ) {
@@ -99,10 +99,7 @@ impl Params<Gain> for GainParam {
 }
 
 impl clap::Plugin for Gain {
-    type AudioThread<'a>
-        = AudioThread<'a>
-    where
-        Self: 'a;
+    type AudioThread = AudioThread;
     type Extensions = Self;
 
     const ID: &'static str = "com.your-company.YourPlugin";
@@ -122,7 +119,7 @@ impl clap::Plugin for Gain {
     /// Start the audio thread.
     fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<AudioThread, clap::Error> {
         Ok(AudioThread {
-            gain: &self.gain,
+            gain: self.gain.clone(),
             smoothed: OnePole {
                 b0: 1.0,
                 a1: -0.999,
@@ -132,12 +129,12 @@ impl clap::Plugin for Gain {
     }
 }
 
-struct AudioThread<'a> {
-    gain: &'a AtomicU64,
+struct AudioThread {
+    gain: Arc<AtomicU64>,
     smoothed: OnePole,
 }
 
-impl<'a> clap::AudioThread<Gain> for AudioThread<'a> {
+impl clap::AudioThread<Gain> for AudioThread {
     fn process(&mut self, process: &mut clap::Process) -> Result<clap::Status, clap::Error> {
         let mut gain = f64::from_bits(self.gain.load(Ordering::Relaxed));
 

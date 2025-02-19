@@ -26,9 +26,7 @@ use crate::ext::params::ClapPluginParams;
 mod ffi;
 
 pub trait Plugin: Default {
-    type AudioThread<'a>: AudioThread<Self>
-    where
-        Self: 'a;
+    type AudioThread: AudioThread<Self>;
     type Extensions: Extensions<Self>;
 
     const ID: &'static str;
@@ -57,7 +55,7 @@ pub trait Plugin: Default {
         sample_rate: f64,
         min_frames: u32,
         max_frames: u32,
-    ) -> Result<Self::AudioThread<'_>, crate::Error>;
+    ) -> Result<Self::AudioThread, crate::Error>;
 
     fn on_main_thread(&mut self) {}
 }
@@ -97,19 +95,16 @@ impl<P: Plugin> ClapPluginExtensions<P> {
     }
 }
 
-pub(crate) struct Runtime<'a, P: Plugin>
-where
-    P: 'a,
-{
+pub(crate) struct Runtime<P: Plugin> {
     pub(crate) active: AtomicBool,
-    pub(crate) audio_thread: Option<P::AudioThread<'a>>,
+    pub(crate) audio_thread: Option<P::AudioThread>,
     pub(crate) descriptor: PluginDescriptor,
     pub(crate) host: Arc<Host>,
     pub(crate) plugin: P,
     plugin_extensions: Mutex<ClapPluginExtensions<P>>,
 }
 
-impl<'a, P: Plugin> Runtime<'a, P> {
+impl<P: Plugin> Runtime<P> {
     pub(crate) fn initialize(host: Arc<Host>) -> Result<Self, Error> {
         Ok(Self {
             active: AtomicBool::new(false),
@@ -219,7 +214,7 @@ impl<P: Plugin> ClapPlugin<P> {
     ///
     /// The caller must assure they're the only ones who access the
     /// audio_thread.
-    pub const unsafe fn audio_thread(&mut self) -> Option<&mut P::AudioThread<'_>> {
+    pub const unsafe fn audio_thread(&mut self) -> Option<&mut P::AudioThread> {
         let runtime: *mut Runtime<P> = unsafe { *self.clap_plugin }.plugin_data as *mut _;
         unsafe { &mut (*runtime).audio_thread }.as_mut()
     }

@@ -39,10 +39,7 @@ impl clap::Extensions<Self> for MyPlug {
 }
 
 impl clap::Plugin for MyPlug {
-    type AudioThread<'a>
-        = AudioThread
-    where
-        Self: 'a;
+    type AudioThread = AudioThread;
 
     type Extensions = Self;
 
@@ -71,7 +68,7 @@ impl clap::Plugin for MyPlug {
         sample_rate: f64,
         _: u32,
         _: u32,
-    ) -> Result<Self::AudioThread<'_>, clap::Error> {
+    ) -> Result<Self::AudioThread, clap::Error> {
         Ok(AudioThread { sample_rate })
     }
 }

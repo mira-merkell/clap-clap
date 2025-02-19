@@ -13,10 +13,7 @@ macro_rules! impl_dummy_plugin {
         impl Plugin for $plug {
             const ID: &'static str = $id;
             const NAME: &'static str = $id;
-            type AudioThread<'a>
-                = ()
-            where
-                Self: 'a;
+            type AudioThread = ();
             type Extensions = ();
 
             fn activate(
@@ -24,7 +21,7 @@ macro_rules! impl_dummy_plugin {
                 _: f64,
                 _: u32,
                 _: u32,
-            ) -> Result<Self::AudioThread<'_>, clap_clap::Error> {
+            ) -> Result<Self::AudioThread, clap_clap::Error> {
                 Ok(())
             }
         }
