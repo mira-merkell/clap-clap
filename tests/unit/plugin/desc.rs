@@ -1,13 +1,15 @@
 use std::ffi::CStr;
 
-use clap_clap::plugin::{Plugin, PluginDescriptor};
+use clap_clap::{
+    ext::Extensions,
+    plugin::{Plugin, PluginDescriptor},
+};
 
 #[derive(Default)]
 struct Plug;
 
 impl Plugin for Plug {
     type AudioThread = ();
-    type Extensions = ();
 
     const ID: &'static str = "123.456";
     const NAME: &'static str = "Test Plug";
@@ -23,6 +25,8 @@ impl Plugin for Plug {
         Ok(())
     }
 }
+
+impl Extensions<Self> for Plug {}
 
 macro_rules! check_desc_field {
     ($name:tt, $field:ident $(,)?) => {

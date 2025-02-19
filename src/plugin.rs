@@ -25,9 +25,8 @@ use crate::ext::params::ClapPluginParams;
 
 mod ffi;
 
-pub trait Plugin: Default {
+pub trait Plugin: Default + Extensions<Self> {
     type AudioThread: AudioThread<Self>;
-    type Extensions: Extensions<Self>;
 
     const ID: &'static str;
     const NAME: &'static str;
@@ -89,8 +88,8 @@ struct ClapPluginExtensions<P> {
 impl<P: Plugin> ClapPluginExtensions<P> {
     fn new() -> Self {
         Self {
-            audio_ports: <P as Plugin>::Extensions::audio_ports().map(ClapPluginAudioPorts::new),
-            params: <P as Plugin>::Extensions::params().map(ClapPluginParams::new),
+            audio_ports: <P as Extensions<P>>::audio_ports().map(ClapPluginAudioPorts::new),
+            params: <P as Extensions<P>>::params().map(ClapPluginParams::new),
         }
     }
 }

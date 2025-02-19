@@ -144,7 +144,7 @@ mod plugin_audio_ports {
 
     impl<P: Plugin + 'static> Test<P> for CheckNoPorts<P> {
         fn test(self, bed: &mut TestBed<P>) {
-            if P::Extensions::audio_ports().is_some() {
+            if P::audio_ports().is_some() {
                 assert!(bed.ext_audio_ports.is_some());
             } else {
                 assert!(bed.ext_audio_ports.is_none());
@@ -162,7 +162,6 @@ mod plugin_audio_ports {
 
     impl Plugin for Ports {
         type AudioThread = ();
-        type Extensions = Self;
         const ID: &'static str = "";
         const NAME: &'static str = "";
 

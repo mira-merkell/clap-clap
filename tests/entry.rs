@@ -14,7 +14,6 @@ macro_rules! impl_dummy_plugin {
             const ID: &'static str = $id;
             const NAME: &'static str = $id;
             type AudioThread = ();
-            type Extensions = ();
 
             fn activate(
                 &mut self,
@@ -25,6 +24,8 @@ macro_rules! impl_dummy_plugin {
                 Ok(())
             }
         }
+
+        impl Extensions<Self> for $plug {}
     };
 }
 impl_dummy_plugin!(Dummy, "dummy");
@@ -32,7 +33,10 @@ impl_dummy_plugin!(Dummier, "dummier");
 
 clap_clap::entry!(Dummy, Dummier);
 use _clap_entry::clap_entry;
-use clap_clap::ffi::{CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, clap_host, clap_plugin_factory};
+use clap_clap::{
+    ext::Extensions,
+    ffi::{CLAP_PLUGIN_FACTORY_ID, CLAP_VERSION, clap_host, clap_plugin_factory},
+};
 
 struct DummyHost(clap_host);
 

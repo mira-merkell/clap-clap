@@ -41,8 +41,6 @@ impl clap::Extensions<Self> for MyPlug {
 impl clap::Plugin for MyPlug {
     type AudioThread = AudioThread;
 
-    type Extensions = Self;
-
     const ID: &'static str = "com.your-company.YourPlugin";
     const NAME: &'static str = "Plugin Name";
     const VENDOR: &'static str = "Vendor";

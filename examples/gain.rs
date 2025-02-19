@@ -5,7 +5,10 @@ use std::sync::{
 
 use clap_clap::{
     events::{InputEvents, OutputEvents},
-    ext::params::{Error, ParamInfo, ParamInfoFlags, Params},
+    ext::{
+        Extensions,
+        params::{Error, ParamInfo, ParamInfoFlags, Params},
+    },
     id::ClapId,
     prelude as clap,
 };
@@ -100,7 +103,6 @@ impl Params<Gain> for GainParam {
 
 impl clap::Plugin for Gain {
     type AudioThread = AudioThread;
-    type Extensions = Self;
 
     const ID: &'static str = "com.your-company.YourPlugin";
     const NAME: &'static str = "Plugin Name";

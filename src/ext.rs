@@ -36,8 +36,6 @@ pub trait Extensions<P: Plugin> {
     }
 }
 
-impl<P: Plugin> Extensions<P> for () {}
-
 #[derive(Debug)]
 pub enum Error {
     Log(log::Error),

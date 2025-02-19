@@ -46,7 +46,6 @@ impl Drop for TestPlugin {
 
 impl Plugin for TestPlugin {
     type AudioThread = TestAudioThread;
-    type Extensions = Self;
     const ID: &'static str = "clap.plugin.test";
     const NAME: &'static str = "Test Plugin";
     const VENDOR: &'static str = "⧉⧉⧉";
