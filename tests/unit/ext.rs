@@ -5,7 +5,7 @@ mod params;
 use std::{ffi::CStr, marker::PhantomData, mem::MaybeUninit, ptr::null};
 
 use clap_clap::{
-    ext::{Extensions, audio_ports::AudioPortInfo},
+    ext::{Extensions, audio_ports::AudioPortInfo, params::ParamInfo},
     factory::{Factory, FactoryHost, FactoryPluginPrototype},
     ffi::{
         CLAP_EXT_AUDIO_PORTS, CLAP_EXT_PARAMS, clap_audio_port_info, clap_plugin,
@@ -164,5 +164,15 @@ impl ExtParams {
     pub fn count(&self) -> u32 {
         let params = unsafe { self.clap_plugin_params.as_ref() }.unwrap();
         unsafe { params.count.unwrap()(self.clap_plugin) }
+    }
+
+    pub fn get_info(&self, param_index: u32) -> Option<ParamInfo> {
+        let params = unsafe { self.clap_plugin_params.as_ref() }.unwrap();
+        let mut info = MaybeUninit::uninit();
+        if unsafe { params.get_info.unwrap()(self.clap_plugin, param_index, info.as_mut_ptr()) } {
+            Some(unsafe { ParamInfo::try_from_unchecked(info.assume_init()) }.unwrap())
+        } else {
+            None
+        }
     }
 }

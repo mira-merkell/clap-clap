@@ -130,7 +130,10 @@
 //! - if you plan to use adapters for other plugin formats, then you need to pay
 //!   extra attention to the adapter requirements
 
-use std::fmt::{Display, Formatter};
+use std::{
+    ffi::CStr,
+    fmt::{Display, Formatter},
+};
 
 use crate::{
     events::{InputEvents, OutputEvents},
@@ -219,7 +222,7 @@ pub enum ParamInfoFlags {
 impl_flags_u32!(ParamInfoFlags);
 
 /// Describes a parameter.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParamInfo {
     /// Stable parameter identifier, it must never change.
     pub id: ClapId,
@@ -272,6 +275,30 @@ pub struct ParamInfo {
     pub max_value: f64,
     /// Default plain value. Must be in [min, max] range.
     pub default_value: f64,
+}
+
+impl ParamInfo {
+    /// # Safety
+    ///
+    /// The `values` fields: 'name' and 'module' must be valid, null-terminated
+    /// C strings.
+    pub unsafe fn try_from_unchecked(value: clap_param_info) -> Result<Self, Error> {
+        Ok(Self {
+            id: value.id.try_into().unwrap_or(ClapId::invalid_id()),
+            flags: value.flags,
+            // SAFETY: The safety condition is upheld by the caller.
+            name: unsafe { CStr::from_ptr(value.name.as_ptr()) }
+                .to_str()?
+                .to_owned(),
+            // SAFETY: The safety condition is upheld by the caller.
+            module: unsafe { CStr::from_ptr(value.module.as_ptr()) }
+                .to_str()?
+                .to_owned(),
+            min_value: value.min_value,
+            max_value: value.max_value,
+            default_value: value.default_value,
+        })
+    }
 }
 
 pub trait Params<P: Plugin> {
@@ -337,6 +364,8 @@ impl<P: Plugin> Params<P> for () {
 }
 
 pub(crate) use ffi::ClapPluginParams;
+
+use crate::ffi::clap_param_info;
 
 mod ffi {
     use std::{

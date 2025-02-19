@@ -9,10 +9,47 @@ use clap_clap::{
     plugin::Plugin,
 };
 
-use crate::ext::{TestBed, TestConfig};
+use crate::{
+    ext::{TestBed, TestConfig},
+    shims::plugin::ShimPlugin,
+};
 
-#[derive(Default)]
-struct TestPlugin;
+#[test]
+fn no_impl_params() {
+    let bed = TestBed::<ShimPlugin>::new(TestConfig::default());
+    assert!(bed.ext_params.is_none())
+}
+
+struct TestPlugin {
+    info: Vec<ParamInfo>,
+}
+
+impl Default for TestPlugin {
+    fn default() -> Self {
+        Self {
+            info: vec![
+                ParamInfo {
+                    id: ClapId::from(1),
+                    flags: 1,
+                    name: "u93".to_string(),
+                    module: "eu/o33".to_string(),
+                    min_value: 0.0,
+                    max_value: 1.0,
+                    default_value: 1.0,
+                },
+                ParamInfo {
+                    id: ClapId::from(2),
+                    flags: 2,
+                    name: "ee3".to_string(),
+                    module: "euo0".to_string(),
+                    min_value: -10.0,
+                    max_value: 10.0,
+                    default_value: 0.10,
+                },
+            ],
+        }
+    }
+}
 
 impl Plugin for TestPlugin {
     type AudioThread = ();
@@ -34,11 +71,11 @@ struct TestParams;
 
 impl Params<TestPlugin> for TestParams {
     fn count(plugin: &TestPlugin) -> u32 {
-        3
+        plugin.info.len() as u32
     }
 
     fn get_info(plugin: &TestPlugin, param_index: u32) -> Option<ParamInfo> {
-        None
+        (param_index < plugin.info.len() as u32).then(|| plugin.info[param_index as usize].clone())
     }
 
     fn get_value(plugin: &TestPlugin, param_id: ClapId) -> Option<f64> {
@@ -78,5 +115,16 @@ fn check_params_count() {
 
     let params = bed.ext_params.as_ref().unwrap();
 
-    assert_eq!(params.count(), 3);
+    assert_eq!(params.count(), TestPlugin::default().info.len() as u32);
+}
+
+#[test]
+fn check_params_get_info() {
+    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+
+    let params = bed.ext_params.as_ref().unwrap();
+
+    assert_eq!(params.count(), 2);
+    assert_eq!(params.get_info(0).unwrap(), TestPlugin::default().info[0]);
+    assert_eq!(params.get_info(1).unwrap(), TestPlugin::default().info[1]);
 }
