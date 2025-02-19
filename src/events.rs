@@ -239,7 +239,7 @@ impl<'a> ParamValue<'a> {
     impl_event_const_getter!(key, as_clap_event_param_value, i16);
     impl_event_const_getter!(note_id, as_clap_event_param_value, i32);
 
-    pub fn cookie(&self) -> Option<NonNull<c_void>> {
+    fn cookie(&self) -> Option<NonNull<c_void>> {
         NonNull::new(self.as_clap_event_param_value().cookie)
     }
 
@@ -302,7 +302,7 @@ impl ParamValueBuilder {
     impl_event_builder_setter!(key, i16);
     impl_event_builder_setter!(note_id, i32);
 
-    pub fn cookie(self, value: NonNull<c_void>) -> Self {
+    fn cookie(self, value: NonNull<c_void>) -> Self {
         let mut builder = self;
         builder.0.cookie = value.as_ptr();
         builder
@@ -353,7 +353,7 @@ impl<'a> ParamMod<'a> {
     impl_event_const_getter!(key, as_clap_event_param_mod, i16);
     impl_event_const_getter!(note_id, as_clap_event_param_mod, i32);
 
-    pub fn cookie(&self) -> Option<NonNull<c_void>> {
+    fn cookie(&self) -> Option<NonNull<c_void>> {
         NonNull::new(self.as_clap_event_param_mod().cookie)
     }
 
@@ -416,7 +416,7 @@ impl ParamModBuilder {
     impl_event_builder_setter!(key, i16);
     impl_event_builder_setter!(note_id, i32);
 
-    pub fn cookie(self, value: NonNull<c_void>) -> Self {
+    fn cookie(self, value: NonNull<c_void>) -> Self {
         let mut builder = self;
         builder.0.cookie = value.as_ptr();
         builder

@@ -130,11 +130,7 @@
 //! - if you plan to use adapters for other plugin formats, then you need to pay
 //!   extra attention to the adapter requirements
 
-use std::{
-    ffi::c_void,
-    fmt::{Display, Formatter},
-    ptr::NonNull,
-};
+use std::fmt::{Display, Formatter};
 
 use crate::{
     events::{InputEvents, OutputEvents},
@@ -258,7 +254,7 @@ pub struct ParamInfo {
     ///  - Many plugins will process the parameter events more quickly if the
     ///    host can provide the cookie in a faster time than a hashmap lookup
     ///    per param per event.
-    pub cookie: Option<NonNull<c_void>>,
+    // pub cookie: Option<NonNull<c_void>>,
 
     /// The display name. eg: "Volume". This does not need to be unique. Do not
     /// include the module text in this. The host should concatenate/format
@@ -346,7 +342,7 @@ mod ffi {
     use std::{
         ffi::{CStr, c_char},
         marker::PhantomData,
-        ptr::{null_mut, slice_from_raw_parts_mut},
+        ptr::slice_from_raw_parts_mut,
     };
 
     use crate::{
@@ -412,11 +408,11 @@ mod ffi {
 
         param_info.id = info.id.into();
         param_info.flags = info.flags;
-        param_info.cookie = if let Some(cookie) = info.cookie {
-            cookie.as_ptr()
-        } else {
-            null_mut()
-        };
+        // param_info.cookie = if let Some(cookie) = info.cookie {
+        //     cookie.as_ptr()
+        // } else {
+        //     null_mut()
+        // };
 
         let n = info.name.len().min(param_info.name.len());
         unsafe {
