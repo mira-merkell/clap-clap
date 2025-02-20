@@ -181,13 +181,40 @@ fn check_text_to_value() {
 }
 
 #[test]
-fn check_value_to_text() {
+fn check_value_to_text_01() {
     let bed = TestBed::<TestPlugin>::new(TestConfig::default());
 
     let params = bed.ext_params.as_ref().unwrap();
 
     let mut buf = vec![0; 3];
-    params.value_to_text(ClapId::from(0), 1.0, &mut buf);
-    let text = String::from_utf8(buf).unwrap();
-    assert_eq!(text, "1.0");
+    params
+        .value_to_text(ClapId::from(0), 1.0195, &mut buf)
+        .unwrap();
+    assert_eq!(String::from_utf8(buf).unwrap(), "1.0");
+}
+
+#[test]
+fn check_value_to_text_02() {
+    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+
+    let params = bed.ext_params.as_ref().unwrap();
+
+    let mut buf = vec![0; 0];
+    params
+        .value_to_text(ClapId::from(0), 1.0195, &mut buf)
+        .unwrap();
+    assert_eq!(String::from_utf8(buf).unwrap(), "");
+}
+
+#[test]
+fn check_value_to_text_03() {
+    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+
+    let params = bed.ext_params.as_ref().unwrap();
+
+    let mut buf = vec![0; 6];
+    params
+        .value_to_text(ClapId::from(0), 1.0195, &mut buf)
+        .unwrap();
+    assert_eq!(String::from_utf8(buf).unwrap(), "1.020\0");
 }
