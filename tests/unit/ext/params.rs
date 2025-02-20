@@ -89,11 +89,14 @@ impl Params<TestPlugin> for TestParams {
     }
 
     fn value_to_text(
-        plugin: &TestPlugin,
-        param_id: ClapId,
+        _: &TestPlugin,
+        _: ClapId,
         value: f64,
         out_buf: &mut [u8],
     ) -> Result<(), clap_clap::ext::params::Error> {
+        for (d, &s) in out_buf.iter_mut().zip(format!("{value:.3}").as_bytes()) {
+            *d = s;
+        }
         Ok(())
     }
 
@@ -175,4 +178,16 @@ fn check_text_to_value() {
         params.text_to_value(ClapId::from(2), "").unwrap_err(),
         ConvertToValue
     );
+}
+
+#[test]
+fn check_value_to_text() {
+    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+
+    let params = bed.ext_params.as_ref().unwrap();
+
+    let mut buf = vec![0; 3];
+    params.value_to_text(ClapId::from(0), 1.0, &mut buf);
+    let text = String::from_utf8(buf).unwrap();
+    assert_eq!(text, "1.0");
 }

@@ -536,6 +536,10 @@ mod ffi {
         } else {
             return false;
         };
+        // We need to fill `buf` with zeroes, so that the user supplied string will be
+        // null-terminated no matter what length.
+        buf.iter_mut().for_each(|b| *b = b'\0');
+
         let Ok(param_id) = param_id.try_into() else {
             return false;
         };
@@ -545,9 +549,6 @@ mod ffi {
             value,
             &mut buf[0..out_buffer_capacity - 1],
         )
-        .map(|_| {
-            buf[out_buffer_capacity - 1] = b'\0';
-        })
         .is_ok()
     }
 

@@ -208,4 +208,27 @@ impl ExtParams {
         .then_some(out_value)
         .ok_or(Error::ConvertToValue)
     }
+
+    pub fn value_to_text(&self, param_id: ClapId, value: f64, buf: &mut [u8]) -> Result<(), Error> {
+        let params = unsafe { self.clap_plugin_params.as_ref() }.unwrap();
+
+        let mut out_buf = vec![1; buf.len() + 1];
+        unsafe {
+            params.value_to_text.unwrap()(
+                self.clap_plugin,
+                param_id.into(),
+                value,
+                out_buf.as_mut_ptr(),
+                out_buf.len() as u32,
+            )
+        }
+        .then_some(())
+        .ok_or(Error::ConvertToText(value))?;
+
+        for (d, s) in buf.iter_mut().zip(out_buf) {
+            *d = s as u8;
+        }
+
+        Ok(())
+    }
 }
