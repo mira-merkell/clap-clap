@@ -759,7 +759,7 @@ impl<'a> HostParams<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
     ConvertToText(f64),
     ConvertToValue,

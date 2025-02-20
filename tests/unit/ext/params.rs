@@ -3,7 +3,7 @@ use clap_clap::{
     events::{InputEvents, OutputEvents},
     ext::{
         Extensions,
-        params::{ParamInfo, Params},
+        params::{Error::ConvertToValue, ParamInfo, Params},
     },
     id::ClapId,
     plugin::Plugin,
@@ -78,8 +78,14 @@ impl Params<TestPlugin> for TestParams {
         (param_index < plugin.info.len() as u32).then(|| plugin.info[param_index as usize].clone())
     }
 
-    fn get_value(plugin: &TestPlugin, param_id: ClapId) -> Option<f64> {
-        None
+    fn get_value(_: &TestPlugin, param_id: ClapId) -> Option<f64> {
+        if param_id == ClapId::from(0) {
+            Some(0.0)
+        } else if param_id == ClapId::from(1) {
+            Some(1.0)
+        } else {
+            None
+        }
     }
 
     fn value_to_text(
@@ -92,11 +98,17 @@ impl Params<TestPlugin> for TestParams {
     }
 
     fn text_to_value(
-        plugin: &TestPlugin,
+        _: &TestPlugin,
         param_id: ClapId,
         param_value_text: &str,
     ) -> Result<f64, clap_clap::ext::params::Error> {
-        Ok(0.0)
+        if param_id != ClapId::from(0) {
+            return Err(clap_clap::ext::params::Error::ConvertToValue);
+        }
+
+        param_value_text
+            .parse()
+            .map_err(|_| clap_clap::ext::params::Error::ConvertToValue)
     }
 
     fn flush_inactive(plugin: &TestPlugin, in_events: &InputEvents, out_events: &OutputEvents) {}
@@ -127,4 +139,40 @@ fn check_params_get_info() {
     assert_eq!(params.count(), 2);
     assert_eq!(params.get_info(0).unwrap(), TestPlugin::default().info[0]);
     assert_eq!(params.get_info(1).unwrap(), TestPlugin::default().info[1]);
+}
+
+#[test]
+fn check_get_value() {
+    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+
+    let params = bed.ext_params.as_ref().unwrap();
+
+    assert_eq!(params.get_value(ClapId::from(0)), Some(0.0));
+    assert_eq!(params.get_value(ClapId::from(1)), Some(1.0));
+    assert_eq!(params.get_value(ClapId::from(2)), None);
+}
+
+#[test]
+fn check_text_to_value() {
+    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+
+    let params = bed.ext_params.as_ref().unwrap();
+
+    assert_eq!(params.text_to_value(ClapId::from(0), "0").unwrap(), 0.0);
+    assert_eq!(params.text_to_value(ClapId::from(0), "0.0").unwrap(), 0.0);
+    assert_eq!(params.text_to_value(ClapId::from(0), "0.1").unwrap(), 0.1);
+    assert_eq!(params.text_to_value(ClapId::from(0), "-0.1").unwrap(), -0.1);
+    assert_eq!(params.text_to_value(ClapId::from(0), ".1").unwrap(), 0.1);
+    assert_eq!(
+        params.text_to_value(ClapId::from(0), ".l/o.1").unwrap_err(),
+        ConvertToValue
+    );
+    assert_eq!(
+        params.text_to_value(ClapId::from(1), "").unwrap_err(),
+        ConvertToValue
+    );
+    assert_eq!(
+        params.text_to_value(ClapId::from(2), "").unwrap_err(),
+        ConvertToValue
+    );
 }

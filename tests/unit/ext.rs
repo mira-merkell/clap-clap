@@ -2,10 +2,19 @@ mod audio_ports;
 mod log;
 mod params;
 
-use std::{ffi::CStr, marker::PhantomData, mem::MaybeUninit, ptr::null};
+use std::{
+    ffi::{CStr, CString},
+    marker::PhantomData,
+    mem::MaybeUninit,
+    ptr::null,
+};
 
 use clap_clap::{
-    ext::{Extensions, audio_ports::AudioPortInfo, params::ParamInfo},
+    ext::{
+        Extensions,
+        audio_ports::AudioPortInfo,
+        params::{Error, ParamInfo},
+    },
     factory::{Factory, FactoryHost, FactoryPluginPrototype},
     ffi::{
         CLAP_EXT_AUDIO_PORTS, CLAP_EXT_PARAMS, clap_audio_port_info, clap_plugin,
@@ -174,5 +183,29 @@ impl ExtParams {
         } else {
             None
         }
+    }
+
+    pub fn get_value(&self, param_id: ClapId) -> Option<f64> {
+        let params = unsafe { self.clap_plugin_params.as_ref() }.unwrap();
+
+        let mut value = 0.0;
+        unsafe { params.get_value.unwrap()(self.clap_plugin, param_id.into(), &raw mut value) }
+            .then_some(value)
+    }
+
+    pub fn text_to_value(&self, param_id: ClapId, param_value_text: &str) -> Result<f64, Error> {
+        let params = unsafe { self.clap_plugin_params.as_ref() }.unwrap();
+        let text = CString::new(param_value_text).map_err(|_| Error::ConvertToValue)?;
+        let mut out_value = 0.0;
+        unsafe {
+            params.text_to_value.unwrap()(
+                self.clap_plugin,
+                param_id.into(),
+                text.as_ptr(),
+                &raw mut out_value,
+            )
+        }
+        .then_some(out_value)
+        .ok_or(Error::ConvertToValue)
     }
 }
