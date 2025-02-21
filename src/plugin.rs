@@ -121,7 +121,7 @@ impl<P: Plugin> Runtime<P> {
         // for a safe call to ClapPlugin::new():
         // 1. it is non-null
         // 2. it represents a valid clap_plugin tied to type P.
-        unsafe { ClapPlugin::new(Box::into_raw(ffi::box_clap_plugin(self))) }
+        unsafe { ClapPlugin::new_unchecked(Box::into_raw(ffi::box_clap_plugin(self))) }
     }
 
     /// Retake ownership of the runtime from the pointer to  clap_plugin.
@@ -161,7 +161,7 @@ impl<P: Plugin> ClapPlugin<P> {
     ///
     /// Typically, a valid pointer comes from the host calling the plugin's
     /// methods, or from Runtime::into_clap_plugin()
-    pub const unsafe fn new(clap_plugin: *const clap_plugin) -> Self {
+    pub const unsafe fn new_unchecked(clap_plugin: *const clap_plugin) -> Self {
         Self {
             clap_plugin,
             _marker: PhantomData,

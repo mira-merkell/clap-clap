@@ -1,3 +1,8 @@
+use std::{
+    cell::UnsafeCell,
+    sync::{Arc, Mutex},
+};
+
 use clap_clap::{
     Error,
     events::{InputEvents, OutputEvents},
@@ -6,7 +11,8 @@ use clap_clap::{
         params::{Error::ConvertToValue, ParamInfo, Params},
     },
     id::ClapId,
-    plugin::Plugin,
+    plugin::{AudioThread, Plugin},
+    prelude::{Process, Status, Status::Continue},
 };
 
 use crate::{
@@ -22,6 +28,7 @@ fn no_impl_params() {
 
 struct TestPlugin {
     info: Vec<ParamInfo>,
+    call_flush: UnsafeCell<bool>,
 }
 
 impl Default for TestPlugin {
@@ -47,17 +54,30 @@ impl Default for TestPlugin {
                     default_value: 0.10,
                 },
             ],
+            call_flush: UnsafeCell::new(false),
         }
     }
 }
 
 impl Plugin for TestPlugin {
-    type AudioThread = ();
+    type AudioThread = TestAudioThread;
     const ID: &'static str = "";
     const NAME: &'static str = "";
 
     fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread, Error> {
-        Ok(())
+        Ok(TestAudioThread {
+            call_flush: Arc::new(Mutex::new(false)),
+        })
+    }
+}
+
+struct TestAudioThread {
+    call_flush: Arc<Mutex<bool>>,
+}
+
+impl AudioThread<TestPlugin> for TestAudioThread {
+    fn process(&mut self, _: &mut Process) -> Result<Status, Error> {
+        Ok(Continue)
     }
 }
 
@@ -106,21 +126,25 @@ impl Params<TestPlugin> for TestParams {
         param_value_text: &str,
     ) -> Result<f64, clap_clap::ext::params::Error> {
         if param_id != ClapId::from(0) {
-            return Err(clap_clap::ext::params::Error::ConvertToValue);
+            return Err(ConvertToValue);
         }
 
-        param_value_text
-            .parse()
-            .map_err(|_| clap_clap::ext::params::Error::ConvertToValue)
+        param_value_text.parse().map_err(|_| ConvertToValue)
     }
 
-    fn flush_inactive(plugin: &TestPlugin, in_events: &InputEvents, out_events: &OutputEvents) {}
+    fn flush_inactive(plugin: &TestPlugin, _: &InputEvents, _: &OutputEvents) {
+        unsafe {
+            *plugin.call_flush.get() = true;
+        }
+    }
 
     fn flush(
         audio_thread: &<TestPlugin as Plugin>::AudioThread,
-        in_events: &InputEvents,
-        out_events: &OutputEvents,
+        _: &InputEvents,
+        _: &OutputEvents,
     ) {
+        let mut call = audio_thread.call_flush.lock().unwrap();
+        *call = true;
     }
 }
 
@@ -153,31 +177,6 @@ fn check_get_value() {
     assert_eq!(params.get_value(ClapId::from(0)), Some(0.0));
     assert_eq!(params.get_value(ClapId::from(1)), Some(1.0));
     assert_eq!(params.get_value(ClapId::from(2)), None);
-}
-
-#[test]
-fn check_text_to_value() {
-    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
-
-    let params = bed.ext_params.as_ref().unwrap();
-
-    assert_eq!(params.text_to_value(ClapId::from(0), "0").unwrap(), 0.0);
-    assert_eq!(params.text_to_value(ClapId::from(0), "0.0").unwrap(), 0.0);
-    assert_eq!(params.text_to_value(ClapId::from(0), "0.1").unwrap(), 0.1);
-    assert_eq!(params.text_to_value(ClapId::from(0), "-0.1").unwrap(), -0.1);
-    assert_eq!(params.text_to_value(ClapId::from(0), ".1").unwrap(), 0.1);
-    assert_eq!(
-        params.text_to_value(ClapId::from(0), ".l/o.1").unwrap_err(),
-        ConvertToValue
-    );
-    assert_eq!(
-        params.text_to_value(ClapId::from(1), "").unwrap_err(),
-        ConvertToValue
-    );
-    assert_eq!(
-        params.text_to_value(ClapId::from(2), "").unwrap_err(),
-        ConvertToValue
-    );
 }
 
 #[test]
@@ -217,4 +216,66 @@ fn check_value_to_text_03() {
         .value_to_text(ClapId::from(0), 1.0195, &mut buf)
         .unwrap();
     assert_eq!(String::from_utf8(buf).unwrap(), "1.020\0");
+}
+
+#[test]
+fn check_text_to_value() {
+    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+
+    let params = bed.ext_params.as_ref().unwrap();
+
+    assert_eq!(params.text_to_value(ClapId::from(0), "0").unwrap(), 0.0);
+    assert_eq!(params.text_to_value(ClapId::from(0), "0.0").unwrap(), 0.0);
+    assert_eq!(params.text_to_value(ClapId::from(0), "0.1").unwrap(), 0.1);
+    assert_eq!(params.text_to_value(ClapId::from(0), "-0.1").unwrap(), -0.1);
+    assert_eq!(params.text_to_value(ClapId::from(0), ".1").unwrap(), 0.1);
+    assert_eq!(
+        params.text_to_value(ClapId::from(0), ".l/o.1").unwrap_err(),
+        ConvertToValue
+    );
+    assert_eq!(
+        params.text_to_value(ClapId::from(1), "").unwrap_err(),
+        ConvertToValue
+    );
+    assert_eq!(
+        params.text_to_value(ClapId::from(2), "").unwrap_err(),
+        ConvertToValue
+    );
+}
+
+#[test]
+fn check_flush_inactive() {
+    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+    let params = bed.ext_params.as_ref().unwrap();
+
+    assert!(!bed.plugin().is_active());
+    {
+        let mut plugin = bed.plugin();
+        assert!(!*unsafe { plugin.plugin().call_flush.get_mut() });
+    }
+    params.flush();
+    {
+        let mut plugin = bed.plugin();
+        assert!(*unsafe { plugin.plugin().call_flush.get_mut() });
+    }
+}
+
+#[test]
+fn check_flush_active() {
+    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+    let params = bed.ext_params.as_ref().unwrap();
+
+    bed.activate();
+    assert!(bed.plugin().is_active());
+    {
+        let mut plugin = bed.plugin();
+        let call = unsafe { plugin.audio_thread().unwrap().call_flush.lock().unwrap() };
+        assert!(!*call);
+    }
+    params.flush();
+    {
+        let mut plugin = bed.plugin();
+        let call = unsafe { plugin.audio_thread().unwrap().call_flush.lock().unwrap() };
+        assert!(*call);
+    }
 }

@@ -152,7 +152,7 @@ unsafe fn build_plugin<P: Plugin>() -> ClapPlugin<P> {
         })
         .unwrap();
 
-    unsafe { ClapPlugin::new(plugin) }
+    unsafe { ClapPlugin::new_unchecked(plugin) }
 }
 
 unsafe fn destroy_plugin<P: Plugin>(plugin: ClapPlugin<P>) {

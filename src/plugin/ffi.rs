@@ -21,7 +21,7 @@ extern "C-unwind" fn init<P: Plugin>(plugin: *const clap_plugin) -> bool {
     }
     // SAFETY: We just checked that the pointer is non-null and the plugin
     // has been obtained from host, and is tied to type P.
-    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
     // SAFETY: This function is called on the main thread during the initialization.
     // It is guaranteed that we are the only function accessing the entire runtime.
@@ -37,7 +37,7 @@ extern "C-unwind" fn destroy<P: Plugin>(plugin: *const clap_plugin) {
     }
     // SAFETY: We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+    let clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
     // SAFETY: This function is called on the main thread to destroy the plugin.
     // It is guaranteed that we are the only function accessing the runtime now.
@@ -58,7 +58,7 @@ extern "C-unwind" fn activate<P: Plugin>(
     }
     // SAFETY: We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
     // SAFETY: This function is called on the main thread. It is guaranteed that we
     // are the only function accessing runtime now, because the audio thread
@@ -84,7 +84,7 @@ extern "C-unwind" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
     }
     // SAFETY: We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
     // SAFETY: This function is called on the main thread.
     // It is guaranteed that we are the only function accessing runtime.audio_thread
@@ -107,7 +107,7 @@ extern "C-unwind" fn start_processing<P: Plugin>(plugin: *const clap_plugin) -> 
     }
     // SAFETY: We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
     // SAFETY: This function is called on the audio thread.  It is guaranteed that
     // we are the only function accessing audio_thread now. So a mutable reference
@@ -125,7 +125,7 @@ extern "C-unwind" fn stop_processing<P: Plugin>(plugin: *const clap_plugin) {
     }
     // SAFETY: We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
     // SAFETY: This function is called on the audio thread.  It is guaranteed that
     // we are the only function accessing audio_thread now. So a mutable reference
@@ -143,7 +143,7 @@ extern "C-unwind" fn reset<P: Plugin>(plugin: *const clap_plugin) {
     }
     // SAFETY: We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
     // SAFETY: This function is called on the audio thread.  It is guaranteed that
     // we are the only function accessing audio_thread now. So a mutable reference
@@ -165,7 +165,7 @@ extern "C-unwind" fn process<P: Plugin>(
     }
     // SAFETY: We just checked that the pointer is non-null and the plugin
     // has been obtained from host, and is tied to type P.
-    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
     // SAFETY: This function is called on the audio thread.  It is guaranteed that
     // we are the only function accessing audio_thread now. So a mutable reference
@@ -198,7 +198,7 @@ extern "C-unwind" fn get_extension<P: Plugin>(
     }
     // SAFETY: We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
     // SAFETY: The plugin id is a valid C string obtained from the host.  The C
     // string lifetime extends for the duration of this function call.
@@ -230,7 +230,7 @@ extern "C-unwind" fn on_main_thread<P: Plugin>(plugin: *const clap_plugin) {
     }
     // SAFETY: We just checked that the pointer is non-null and the plugin
     // has been obtained from host and is tied to type P.
-    let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+    let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
     // SAFETY: This function is called on the main thread.
     // It is guaranteed that we are the only function accessing the plugin now.

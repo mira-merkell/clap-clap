@@ -6,7 +6,7 @@ use std::{
     ffi::{CStr, CString},
     marker::PhantomData,
     mem::MaybeUninit,
-    ptr::null,
+    ptr::{null, null_mut},
 };
 
 use clap_clap::{
@@ -17,11 +17,12 @@ use clap_clap::{
     },
     factory::{Factory, FactoryHost, FactoryPluginPrototype},
     ffi::{
-        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_PARAMS, clap_audio_port_info, clap_plugin,
-        clap_plugin_audio_ports, clap_plugin_params,
+        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_PARAMS, clap_audio_port_info, clap_event_header,
+        clap_input_events, clap_output_events, clap_plugin, clap_plugin_audio_ports,
+        clap_plugin_params,
     },
     id::ClapId,
-    plugin::Plugin,
+    plugin::{ClapPlugin, Plugin},
     prelude::AudioPorts,
 };
 
@@ -77,6 +78,20 @@ impl<P: Plugin + 'static> TestBed<P> {
                 _config: config,
             }
         }
+    }
+
+    pub const fn plugin(&self) -> ClapPlugin<P> {
+        unsafe { ClapPlugin::new_unchecked(self.clap_plugin) }
+    }
+
+    pub fn activate(&self) -> bool {
+        unsafe {
+            self.clap_plugin.as_ref().unwrap().activate.unwrap()(self.clap_plugin, 48000.0, 1, 512)
+        }
+    }
+
+    pub fn deactivate(&self) {
+        unsafe { self.clap_plugin.as_ref().unwrap().deactivate.unwrap()(self.clap_plugin) }
     }
 
     fn test(&mut self, case: impl Test<P>) -> &mut Self {
@@ -230,5 +245,36 @@ impl ExtParams {
         }
 
         Ok(())
+    }
+
+    pub fn flush(&self) {
+        extern "C-unwind" fn size(_: *const clap_input_events) -> u32 {
+            0
+        }
+
+        extern "C-unwind" fn get(_: *const clap_input_events, _: u32) -> *const clap_event_header {
+            null()
+        }
+
+        extern "C-unwind" fn try_push(
+            _: *const clap_output_events,
+            _: *const clap_event_header,
+        ) -> bool {
+            false
+        }
+
+        let in_events = clap_input_events {
+            ctx: null_mut(),
+            size: Some(size),
+            get: Some(get),
+        };
+
+        let out_events = clap_output_events {
+            ctx: null_mut(),
+            try_push: Some(try_push),
+        };
+
+        let params = unsafe { self.clap_plugin_params.as_ref() }.unwrap();
+        unsafe { params.flush.unwrap()(self.clap_plugin, &in_events, &out_events) };
     }
 }

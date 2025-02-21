@@ -394,7 +394,7 @@ mod ffi {
         }
         // SAFETY: We just checked that the pointer is non-null and the plugin
         // has been obtained from host and is tied to type P.
-        let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+        let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
         // SAFETY: This function is called on the main thread.
         // It is guaranteed that we are the only function accessing the plugin now.
@@ -419,7 +419,7 @@ mod ffi {
         }
         // SAFETY: We just checked that the pointer is non-null and the plugin
         // has been obtained from host and is tied to type P.
-        let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+        let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
         // SAFETY: This function is called on the main thread.
         // It is guaranteed that we are the only function accessing the plugin now.
@@ -483,7 +483,7 @@ mod ffi {
         }
         // SAFETY: We just checked that the pointer is non-null and the plugin
         // has been obtained from host and is tied to type P.
-        let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+        let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
         // SAFETY: This function is called on the main thread.
         // It is guaranteed that we are the only function accessing the plugin now.
@@ -517,7 +517,7 @@ mod ffi {
         }
         // SAFETY: We just checked that the pointer is non-null and the plugin
         // has been obtained from host and is tied to type P.
-        let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+        let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
         // SAFETY: This function is called on the main thread.
         // It is guaranteed that we are the only function accessing the plugin now.
@@ -567,7 +567,7 @@ mod ffi {
         }
         // SAFETY: We just checked that the pointer is non-null and the plugin
         // has been obtained from host and is tied to type P.
-        let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+        let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
         // SAFETY: This function is called on the main thread.
         // It is guaranteed that we are the only function accessing the plugin now.
@@ -619,7 +619,7 @@ mod ffi {
         }
         // SAFETY: We just checked that the pointer is non-null and the plugin
         // has been obtained from host and is tied to type P.
-        let mut clap_plugin = unsafe { ClapPlugin::<P>::new(plugin) };
+        let mut clap_plugin = unsafe { ClapPlugin::<P>::new_unchecked(plugin) };
 
         if clap_plugin.is_active() {
             // SAFETY: This function is called on the audio thread.  It is guaranteed that
