@@ -8,8 +8,8 @@ use std::{
 
 use clap_clap::{
     ffi::{
-        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, clap_host, clap_host_audio_ports, clap_host_log,
-        clap_log_severity,
+        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, CLAP_EXT_PARAMS, clap_host, clap_host_audio_ports,
+        clap_host_log, clap_host_params, clap_id, clap_log_severity,
     },
     host::Host,
     version::CLAP_VERSION,
@@ -26,8 +26,9 @@ pub struct TestConfig<'a> {
     pub url: &'a CStr,
     pub version: &'a CStr,
 
-    pub ext_log: Option<ExtLogConfig>,
     pub ext_audio_ports: Option<ExtAudioPortsConfig>,
+    pub ext_log: Option<ExtLogConfig>,
+    pub ext_params: Option<ExtParamsConfig>,
 }
 
 impl TestConfig<'_> {
@@ -54,6 +55,7 @@ pub struct TestBed<'a> {
 
     pub ext_audio_ports: Option<ExtAudioPorts>,
     pub ext_log: Option<ExtLog>,
+    pub ext_params: Option<ExtParams>,
 
     _marker: PhantomPinned,
 }
@@ -78,6 +80,7 @@ impl<'a> TestBed<'a> {
 
             ext_audio_ports: config.ext_audio_ports.map(ExtAudioPorts::new),
             ext_log: config.ext_log.map(ExtLog::new),
+            ext_params: config.ext_params.map(ExtParams::new),
 
             config,
             _marker: PhantomPinned,
@@ -120,6 +123,11 @@ extern "C-unwind" fn get_extension(
     if extension_id == CLAP_EXT_LOG {
         if let Some(ext) = &bed.ext_log {
             return (&raw const ext.clap_host_log).cast();
+        }
+    }
+    if extension_id == CLAP_EXT_PARAMS {
+        if let Some(ext) = &bed.ext_params {
+            return (&raw const ext.clap_host_params).cast();
         }
     }
 
@@ -229,6 +237,58 @@ extern "C-unwind" fn ext_log_log(
     if let Some(ext) = &bed.ext_log {
         let mut buf = ext.log_msg.lock().unwrap();
         buf.push((severity, msg))
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct ExtParamsConfig {
+    pub null_callback: (bool, bool, bool),
+}
+
+#[derive(Debug)]
+pub struct ExtParams {
+    clap_host_params: clap_host_params,
+    pub call_rescan_flags: u32,
+    pub call_clear: u32,
+    pub call_request_flush: bool,
+}
+
+impl ExtParams {
+    fn new(config: ExtParamsConfig) -> Self {
+        Self {
+            clap_host_params: clap_host_params {
+                rescan: (!config.null_callback.0).then_some(ext_params_rescan),
+                clear: (!config.null_callback.1).then_some(ext_params_clear),
+                request_flush: (!config.null_callback.2).then_some(ext_params_request_flush),
+            },
+            call_rescan_flags: 0,
+            call_clear: 0,
+            call_request_flush: false,
+        }
+    }
+}
+
+extern "C-unwind" fn ext_params_rescan(host: *const clap_host, flags: u32) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    if let Some(ext) = &mut bed.ext_params {
+        ext.call_rescan_flags = flags;
+    }
+}
+
+extern "C-unwind" fn ext_params_clear(host: *const clap_host, _: clap_id, flags: u32) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    if let Some(ext) = &mut bed.ext_params {
+        ext.call_clear = flags;
+    }
+}
+
+extern "C-unwind" fn ext_params_request_flush(host: *const clap_host) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    if let Some(ext) = &mut bed.ext_params {
+        ext.call_request_flush = true;
     }
 }
 

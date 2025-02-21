@@ -279,3 +279,125 @@ fn check_flush_active() {
         assert!(*call);
     }
 }
+
+mod host {
+    use std::pin::Pin;
+
+    use clap_clap::{
+        host,
+        host::Error::{Callback, ExtensionNotFound},
+        id::ClapId,
+    };
+
+    use crate::host::{ExtParamsConfig, Test, TestBed, TestConfig};
+
+    struct CheckImplParams {
+        error: Result<(), host::Error>,
+    }
+
+    impl Test for CheckImplParams {
+        fn test(self, bed: Pin<&mut TestBed>) {
+            let host = unsafe { bed.host_mut() };
+
+            assert_eq!(host.get_extension().params().map(|_| ()), self.error);
+        }
+    }
+
+    #[test]
+    fn host_doesnt_implement_params() {
+        TestConfig::default().test(CheckImplParams {
+            error: Err(ExtensionNotFound("params")),
+        });
+    }
+
+    #[test]
+    fn host_implements_params_null_callback_rescan() {
+        TestConfig {
+            ext_params: Some(ExtParamsConfig {
+                null_callback: (true, false, false),
+            }),
+            ..Default::default()
+        }
+        .test(CheckImplParams {
+            error: Err(Callback("rescan")),
+        });
+    }
+
+    #[test]
+    fn host_implements_params_null_callback_clear() {
+        TestConfig {
+            ext_params: Some(ExtParamsConfig {
+                null_callback: (false, true, false),
+            }),
+            ..Default::default()
+        }
+        .test(CheckImplParams {
+            error: Err(Callback("clear")),
+        });
+    }
+    #[test]
+    fn host_implements_params_null_callback_resquest_flush() {
+        TestConfig {
+            ext_params: Some(ExtParamsConfig {
+                null_callback: (false, false, true),
+            }),
+            ..Default::default()
+        }
+        .test(CheckImplParams {
+            error: Err(Callback("request_flush")),
+        });
+    }
+
+    #[test]
+    fn host_implements_params() {
+        TestConfig {
+            ext_params: Some(ExtParamsConfig::default()),
+            ..Default::default()
+        }
+        .test(CheckImplParams { error: Ok(()) });
+    }
+
+    #[test]
+    fn check_call_rescan() {
+        let mut bed = TestBed::new(TestConfig {
+            ext_params: Some(ExtParamsConfig::default()),
+            ..Default::default()
+        });
+
+        assert_eq!(bed.ext_params.as_ref().unwrap().call_rescan_flags, 0);
+        let host = unsafe { bed.as_mut().host_mut() };
+        let params = host.get_extension().params().unwrap();
+        params.rescan(123);
+
+        assert_eq!(bed.ext_params.as_ref().unwrap().call_rescan_flags, 123);
+    }
+
+    #[test]
+    fn check_call_clear() {
+        let mut bed = TestBed::new(TestConfig {
+            ext_params: Some(ExtParamsConfig::default()),
+            ..Default::default()
+        });
+
+        assert_eq!(bed.ext_params.as_ref().unwrap().call_clear, 0);
+        let host = unsafe { bed.as_mut().host_mut() };
+        let params = host.get_extension().params().unwrap();
+        params.clear(ClapId::from(0), 123);
+
+        assert_eq!(bed.ext_params.as_ref().unwrap().call_clear, 123);
+    }
+    #[test]
+    fn check_call_request_flush() {
+        let mut bed = TestBed::new(TestConfig {
+            ext_params: Some(ExtParamsConfig::default()),
+            ..Default::default()
+        });
+
+        assert!(!bed.ext_params.as_ref().unwrap().call_request_flush);
+        let host = unsafe { bed.as_mut().host_mut() };
+        let params = host.get_extension().params().unwrap();
+        params.request_flush();
+
+        assert!(bed.ext_params.as_ref().unwrap().call_request_flush);
+    }
+}

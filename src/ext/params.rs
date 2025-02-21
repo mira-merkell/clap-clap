@@ -1,135 +1,3 @@
-//! Main idea:
-//!
-//! The host sees the plugin as an atomic entity; and acts as a controller on
-//! top of its parameters. The plugin is responsible for keeping its audio
-//! processor and its GUI in sync.
-//!
-//! The host can at any time read parameters' value on the [main-thread] using
-//! @ref clap_plugin_params.get_value().
-//!
-//! There are two options to communicate parameter value changes, and they are
-//! not concurrent.
-//! - send automation points during clap_plugin.process()
-//! - send automation points during clap_plugin_params.flush(), for parameter
-//!   changes without processing audio
-//!
-//! When the plugin changes a parameter value, it must inform the host.
-//! It will send @ref CLAP_EVENT_PARAM_VALUE event during process() or flush().
-//! If the user is adjusting the value, don't forget to mark the beginning and
-//! end of the gesture by sending CLAP_EVENT_PARAM_GESTURE_BEGIN and
-//! CLAP_EVENT_PARAM_GESTURE_END events.
-//!
-//! @note MIDI CCs are tricky because you may not know when the parameter
-//! adjustment ends. Also, if the host records incoming MIDI CC and parameter
-//! change automation at the same time, there will be a conflict at playback:
-//! MIDI CC vs Automation. The parameter automation will always target the same
-//! parameter because the param_id is stable. The MIDI CC may have a different
-//! mapping in the future and may result in a different playback.
-//!
-//! When a MIDI CC changes a parameter's value, set the flag
-//! CLAP_EVENT_DONT_RECORD in clap_event_param.header.flags. That way the host
-//! may record the MIDI CC automation, but not the parameter change and there
-//! won't be conflict at playback.
-//!
-//! Scenarios:
-//!
-//! I. Loading a preset
-//! - load the preset in a temporary state
-//! - call @ref clap_host_params.rescan() if anything changed
-//! - call @ref clap_host_latency.changed() if latency changed
-//! - invalidate any other info that may be cached by the host
-//! - if the plugin is activated and the preset will introduce breaking changes
-//!   (latency, audio ports, new parameters, ...) be sure to wait for the host
-//!   to deactivate the plugin to apply those changes. If there are no breaking
-//!   changes, the plugin can apply them right away. The plugin is responsible
-//!   for updating both its audio processor and its gui.
-//!
-//! II. Turning a knob on the DAW interface
-//! - the host will send an automation event to the plugin via a process() or
-//!   flush()
-//!
-//! III. Turning a knob on the Plugin interface
-//! - the plugin is responsible for sending the parameter value to its audio
-//!   processor
-//! - call clap_host_params->request_flush() or clap_host->request_process().
-//! - when the host calls either clap_plugin->process() or
-//!   clap_plugin_params->flush(), send an automation event and don't forget to
-//!   wrap the parameter change(s) with CLAP_EVENT_PARAM_GESTURE_BEGIN and
-//!   CLAP_EVENT_PARAM_GESTURE_END to define the beginning and end of the
-//!   gesture.
-//!
-//! IV. Turning a knob via automation
-//! - host sends an automation point during clap_plugin->process() or
-//!   clap_plugin_params->flush().
-//! - the plugin is responsible for updating its GUI
-//!
-//! V. Turning a knob via plugin's internal MIDI mapping
-//! - the plugin sends a CLAP_EVENT_PARAM_VALUE output event, set should_record
-//!   to false
-//! - the plugin is responsible for updating its GUI
-//!
-//! VI. Adding or removing parameters
-//! - if the plugin is activated call clap_host->restart()
-//! - once the plugin isn't active:
-//!   - apply the new state
-//!   - if a parameter is gone or is created with an id that may have been used
-//!     before, call clap_host_params.clear(host, param_id,
-//!     CLAP_PARAM_CLEAR_ALL)
-//!   - call clap_host_params->rescan(CLAP_PARAM_RESCAN_ALL)
-//!
-//! CLAP allows the plugin to change the parameter range, yet the plugin
-//! developer should be aware that doing so isn't without risk, especially if
-//! you made the promise to never change the sound. If you want to be 100%
-//! certain that the sound will not change with all host, then simply never
-//! change the range.
-//!
-//! There are two approaches to automations, either you automate the plain
-//! value, or you automate the knob position. The first option will be robust to
-//! a range increase, while the second won't be.
-//!
-//! If the host goes with the second approach (automating the knob position), it
-//! means that the plugin is hosted in a relaxed environment regarding sound
-//! changes (they are accepted, and not a concern as long as they are
-//! reasonable). Though, stepped parameters should be stored as plain value in
-//! the document.
-//!
-//! If the host goes with the first approach, there will still be situation
-//! where the sound may inevitably change. For example, if the plugin increase
-//! the range, there is an automation playing at the max value and on top of
-//! that an LFO is applied. See the following curve:
-//!                                   .
-//!                                  . .
-//!          .....                  .   .
-//! before: .     .     and after: .     .
-//!
-//! Persisting parameter values:
-//!
-//! Plugins are responsible for persisting their parameter's values between
-//! sessions by implementing the state extension. Otherwise, parameter value
-//! will not be recalled when reloading a project. Hosts should _not_ try to
-//! save and restore parameter values for plugins that don't implement the state
-//! extension.
-//!
-//! Advice for the host:
-//!
-//! - store plain values in the document (automation)
-//! - store modulation amount in plain value delta, not in percentage
-//! - when you apply a CC mapping, remember the min/max plain values so you can
-//!   adjust
-//! - do not implement a parameter saving fall back for plugins that don't
-//!   implement the state extension
-//!
-//! Advice for the plugin:
-//!
-//! - think carefully about your parameter range when designing your DSP
-//! - avoid shrinking parameter ranges, they are very likely to change the sound
-//! - consider changing the parameter range as a tradeoff: what you improve vs
-//!   what you break
-//! - make sure to implement saving and loading the parameter values using the
-//!   state extension
-//! - if you plan to use adapters for other plugin formats, then you need to pay
-//!   extra attention to the adapter requirements
-
 use std::{
     ffi::CStr,
     fmt::{Display, Formatter},
@@ -716,6 +584,7 @@ pub enum ParamClearFlags {
 
 impl_flags_u32!(ParamClearFlags);
 
+#[derive(Debug)]
 pub struct HostParams<'a> {
     host: &'a Host,
     clap_host_params: &'a clap_host_params,
@@ -738,12 +607,18 @@ impl<'a> HostParams<'a> {
 
     /// Rescan the full list of parameters according to the flags.
     pub fn rescan(&self, flags: u32) {
-        todo!()
+        // SAFETY: By construction the function pointer: `clap_host_param.rescan` is
+        // non-null (Some).
+        unsafe { self.clap_host_params.rescan.unwrap()(self.host.clap_host(), flags) }
     }
 
     /// Clears references to a parameter.
     pub fn clear(&self, param_id: ClapId, flags: u32) {
-        todo!()
+        // SAFETY: By construction the function pointer: `clap_host_param.clear` is
+        // non-null (Some).
+        unsafe {
+            self.clap_host_params.clear.unwrap()(self.host.clap_host(), param_id.into(), flags)
+        }
     }
 
     /// Request a parameter flush.
@@ -756,7 +631,9 @@ impl<'a> HostParams<'a> {
     /// audio-thread as the plugin would already be within process() or
     /// flush().
     pub fn request_flush(&self) {
-        todo!()
+        // SAFETY: By construction the function pointer: `clap_host_param.request_flush`
+        // is non-null (Some).
+        unsafe { self.clap_host_params.request_flush.unwrap()(self.host.clap_host()) }
     }
 }
 

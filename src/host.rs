@@ -4,8 +4,11 @@ use std::{
 };
 
 use crate::{
-    ext::{audio_ports::HostAudioPorts, log::HostLog},
-    ffi::{CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, clap_host, clap_host_audio_ports, clap_host_log},
+    ext::{audio_ports::HostAudioPorts, log::HostLog, params::HostParams},
+    ffi::{
+        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, CLAP_EXT_PARAMS, clap_host, clap_host_audio_ports,
+        clap_host_log, clap_host_params,
+    },
     version::ClapVersion,
 };
 
@@ -108,22 +111,6 @@ impl<'a> HostExtensions<'a> {
         (!ext_ptr.is_null()).then_some(ext_ptr)
     }
 
-    pub fn log(&self) -> Result<HostLog<'a>, Error> {
-        let clap_host_log = self
-            .get_extension_ptr(CLAP_EXT_LOG)
-            .ok_or(Error::ExtensionNotFound("log"))?;
-
-        // SAFETY: We just checked if the pointer to clap_log is non-null. We return a
-        // reference to it for the lifetime of Host.
-        let clap_host_log: &clap_host_log = unsafe { &*clap_host_log.cast() };
-
-        let _ = clap_host_log.log.ok_or(Error::Callback("log"))?;
-
-        // SAFETY: We just checked if the pointer to clap_host_log is non-null.
-        // We return a reference to it for the lifetime of Host.
-        Ok(unsafe { HostLog::new_unchecked(self.host, clap_host_log) })
-    }
-
     pub fn audio_ports(&self) -> Result<HostAudioPorts<'a>, Error> {
         let clap_host_audio_ports = self
             .get_extension_ptr(CLAP_EXT_AUDIO_PORTS)
@@ -143,6 +130,42 @@ impl<'a> HostExtensions<'a> {
 
         // SAFETY: We just checked if the methods are non-null (Some).
         Ok(unsafe { HostAudioPorts::new_unchecked(self.host, clap_host_audio_ports) })
+    }
+
+    pub fn log(&self) -> Result<HostLog<'a>, Error> {
+        let clap_host_log = self
+            .get_extension_ptr(CLAP_EXT_LOG)
+            .ok_or(Error::ExtensionNotFound("log"))?;
+
+        // SAFETY: We just checked if the pointer to clap_log is non-null. We return a
+        // reference to it for the lifetime of Host.
+        let clap_host_log: &clap_host_log = unsafe { &*clap_host_log.cast() };
+
+        let _ = clap_host_log.log.ok_or(Error::Callback("log"))?;
+
+        // SAFETY: We just checked if the pointer to clap_host_log, and all its methods,
+        // are non-null.
+        Ok(unsafe { HostLog::new_unchecked(self.host, clap_host_log) })
+    }
+
+    pub fn params(&self) -> Result<HostParams<'a>, Error> {
+        let clap_host_params = self
+            .get_extension_ptr(CLAP_EXT_PARAMS)
+            .ok_or(Error::ExtensionNotFound("params"))?;
+
+        // SAFETY: We just checked if the pointer to clap_host_params is non-null. We
+        // return a reference to it for the lifetime of Host.
+        let clap_host_params: &clap_host_params = unsafe { &*clap_host_params.cast() };
+
+        let _ = clap_host_params.rescan.ok_or(Error::Callback("rescan"))?;
+        let _ = clap_host_params.clear.ok_or(Error::Callback("clear"))?;
+        let _ = clap_host_params
+            .request_flush
+            .ok_or(Error::Callback("request_flush"))?;
+
+        // SAFETY: We just checked if the pointer to clap_host_params, and all its
+        // methods are non-null.
+        Ok(unsafe { HostParams::new_unchecked(self.host, clap_host_params) })
     }
 }
 
