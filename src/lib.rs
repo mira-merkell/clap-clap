@@ -15,6 +15,7 @@ pub mod plugin;
 pub mod plugin_features;
 pub mod process;
 pub mod string_sizes;
+pub mod timestamp;
 pub mod version;
 
 pub mod prelude {
