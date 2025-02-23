@@ -46,7 +46,6 @@ impl Drop for TestPlugin {
 
 impl Plugin for TestPlugin {
     type AudioThread = TestAudioThread;
-    type Extensions = Self;
     const ID: &'static str = "clap.plugin.test";
     const NAME: &'static str = "Test Plugin";
     const VENDOR: &'static str = "⧉⧉⧉";
@@ -153,7 +152,7 @@ unsafe fn build_plugin<P: Plugin>() -> ClapPlugin<P> {
         })
         .unwrap();
 
-    unsafe { ClapPlugin::new(plugin) }
+    unsafe { ClapPlugin::new_unchecked(plugin) }
 }
 
 unsafe fn destroy_plugin<P: Plugin>(plugin: ClapPlugin<P>) {
@@ -419,4 +418,29 @@ fn call_get_extension_audio_ports() {
     // TestAudioPorts sets the first bit of plugin.call_get_extensions.
     let plugin = unsafe { wrap.plugin() };
     assert_eq!(plugin.call_get_extension.load(Ordering::Acquire) & 1, 1);
+}
+
+#[test]
+fn is_active() {
+    let mut wrap = TestWrapper::build();
+
+    let clap_plugin = unsafe { wrap.as_ref() };
+    unsafe { clap_plugin.init.unwrap()(clap_plugin) };
+
+    assert!(!wrap.is_active());
+    unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.1, 1, 7) };
+    assert!(wrap.is_active());
+}
+
+#[test]
+fn is_inactive() {
+    let mut wrap = TestWrapper::build();
+
+    let clap_plugin = unsafe { wrap.as_ref() };
+    unsafe { clap_plugin.init.unwrap()(clap_plugin) };
+    assert!(!wrap.is_active());
+    unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.1, 1, 7) };
+    assert!(wrap.is_active());
+    unsafe { clap_plugin.deactivate.unwrap()(clap_plugin) }
+    assert!(!wrap.is_active());
 }

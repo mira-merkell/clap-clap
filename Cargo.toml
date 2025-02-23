@@ -14,5 +14,9 @@ authors = ["⧉⧉⧉"]
 crate-type = ["rlib"]
 
 [[example]]
+name = "gain"
+crate-type = ["cdylib"]
+
+[[example]]
 name = "plugin_template"
 crate-type = ["cdylib"]

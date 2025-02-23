@@ -137,14 +137,13 @@ pub mod process {
 }
 
 pub mod plugin {
-    use clap_clap::{Error, plugin::Plugin};
+    use clap_clap::{Error, plugin::Plugin, prelude::Extensions};
 
     #[derive(Default, Copy, Clone)]
     pub struct ShimPlugin;
 
     impl Plugin for ShimPlugin {
         type AudioThread = ();
-        type Extensions = ();
         const ID: &'static str = "";
         const NAME: &'static str = "";
 
@@ -152,4 +151,6 @@ pub mod plugin {
             Ok(())
         }
     }
+
+    impl Extensions<Self> for ShimPlugin {}
 }

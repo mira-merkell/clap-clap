@@ -2,7 +2,10 @@ use std::{
     ffi::NulError,
     fmt::Display,
     marker::PhantomData,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use crate::{
@@ -18,11 +21,12 @@ mod desc;
 #[doc(hidden)]
 pub use desc::PluginDescriptor;
 
+use crate::ext::params::ClapPluginParams;
+
 mod ffi;
 
-pub trait Plugin: Default {
+pub trait Plugin: Default + Extensions<Self> {
     type AudioThread: AudioThread<Self>;
-    type Extensions: Extensions<Self>;
 
     const ID: &'static str;
     const NAME: &'static str;
@@ -78,17 +82,20 @@ impl<P: Plugin> AudioThread<P> for () {
 
 struct ClapPluginExtensions<P> {
     audio_ports: Option<ClapPluginAudioPorts<P>>,
+    params: Option<ClapPluginParams<P>>,
 }
 
 impl<P: Plugin> ClapPluginExtensions<P> {
     fn new() -> Self {
         Self {
-            audio_ports: <P as Plugin>::Extensions::audio_ports().map(ClapPluginAudioPorts::new),
+            audio_ports: <P as Extensions<P>>::audio_ports().map(ClapPluginAudioPorts::new),
+            params: <P as Extensions<P>>::params().map(ClapPluginParams::new),
         }
     }
 }
 
 pub(crate) struct Runtime<P: Plugin> {
+    pub(crate) active: AtomicBool,
     pub(crate) audio_thread: Option<P::AudioThread>,
     pub(crate) descriptor: PluginDescriptor,
     pub(crate) host: Arc<Host>,
@@ -99,6 +106,7 @@ pub(crate) struct Runtime<P: Plugin> {
 impl<P: Plugin> Runtime<P> {
     pub(crate) fn initialize(host: Arc<Host>) -> Result<Self, Error> {
         Ok(Self {
+            active: AtomicBool::new(false),
             descriptor: PluginDescriptor::new::<P>()?,
             plugin: P::default(),
             audio_thread: None,
@@ -113,7 +121,7 @@ impl<P: Plugin> Runtime<P> {
         // for a safe call to ClapPlugin::new():
         // 1. it is non-null
         // 2. it represents a valid clap_plugin tied to type P.
-        unsafe { ClapPlugin::new(Box::into_raw(ffi::box_clap_plugin(self))) }
+        unsafe { ClapPlugin::new_unchecked(Box::into_raw(ffi::box_clap_plugin(self))) }
     }
 
     /// Retake ownership of the runtime from the pointer to  clap_plugin.
@@ -153,7 +161,7 @@ impl<P: Plugin> ClapPlugin<P> {
     ///
     /// Typically, a valid pointer comes from the host calling the plugin's
     /// methods, or from Runtime::into_clap_plugin()
-    pub const unsafe fn new(clap_plugin: *const clap_plugin) -> Self {
+    pub const unsafe fn new_unchecked(clap_plugin: *const clap_plugin) -> Self {
         Self {
             clap_plugin,
             _marker: PhantomData,
@@ -182,6 +190,11 @@ impl<P: Plugin> ClapPlugin<P> {
     pub(crate) const unsafe fn runtime(&mut self) -> &mut Runtime<P> {
         let runtime: *mut Runtime<P> = unsafe { *self.clap_plugin }.plugin_data as *mut _;
         unsafe { &mut *runtime }
+    }
+
+    pub fn is_active(&mut self) -> bool {
+        let runtime: *mut Runtime<P> = unsafe { *self.clap_plugin }.plugin_data as *mut _;
+        unsafe { (*runtime).active.load(Ordering::Acquire) }
     }
 
     /// Obtain a mutable reference to plugin.
