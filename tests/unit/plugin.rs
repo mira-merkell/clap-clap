@@ -422,7 +422,7 @@ fn call_get_extension_audio_ports() {
 
 #[test]
 fn is_active() {
-    let mut wrap = TestWrapper::build();
+    let wrap = TestWrapper::build();
 
     let clap_plugin = unsafe { wrap.as_ref() };
     unsafe { clap_plugin.init.unwrap()(clap_plugin) };
@@ -434,7 +434,7 @@ fn is_active() {
 
 #[test]
 fn is_inactive() {
-    let mut wrap = TestWrapper::build();
+    let wrap = TestWrapper::build();
 
     let clap_plugin = unsafe { wrap.as_ref() };
     unsafe { clap_plugin.init.unwrap()(clap_plugin) };
