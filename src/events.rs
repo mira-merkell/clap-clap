@@ -1,9 +1,8 @@
 //! Events and event lists.
 
 use std::{
-    ffi::c_void,
     fmt::{Display, Formatter},
-    ptr::{NonNull, null_mut, slice_from_raw_parts},
+    ptr::{null_mut, slice_from_raw_parts},
 };
 
 use crate::{
@@ -239,9 +238,9 @@ impl<'a> ParamValue<'a> {
     impl_event_const_getter!(key, as_clap_event_param_value, i16);
     impl_event_const_getter!(note_id, as_clap_event_param_value, i32);
 
-    fn cookie(&self) -> Option<NonNull<c_void>> {
-        NonNull::new(self.as_clap_event_param_value().cookie)
-    }
+    // fn cookie(&self) -> Option<NonNull<c_void>> {
+    //     NonNull::new(self.as_clap_event_param_value().cookie)
+    // }
 
     pub fn param_id(&self) -> ClapId {
         self.as_clap_event_param_value()
@@ -302,11 +301,11 @@ impl ParamValueBuilder {
     impl_event_builder_setter!(key, i16);
     impl_event_builder_setter!(note_id, i32);
 
-    fn cookie(self, value: NonNull<c_void>) -> Self {
-        let mut builder = self;
-        builder.0.cookie = value.as_ptr();
-        builder
-    }
+    // fn cookie(self, value: NonNull<c_void>) -> Self {
+    //     let mut builder = self;
+    //     builder.0.cookie = value.as_ptr();
+    //     builder
+    // }
 
     pub fn param_id(self, value: ClapId) -> Self {
         let mut builder = self;
@@ -353,9 +352,9 @@ impl<'a> ParamMod<'a> {
     impl_event_const_getter!(key, as_clap_event_param_mod, i16);
     impl_event_const_getter!(note_id, as_clap_event_param_mod, i32);
 
-    fn cookie(&self) -> Option<NonNull<c_void>> {
-        NonNull::new(self.as_clap_event_param_mod().cookie)
-    }
+    // fn cookie(&self) -> Option<NonNull<c_void>> {
+    //     NonNull::new(self.as_clap_event_param_mod().cookie)
+    // }
 
     pub fn param_id(&self) -> ClapId {
         self.as_clap_event_param_mod()
@@ -416,11 +415,11 @@ impl ParamModBuilder {
     impl_event_builder_setter!(key, i16);
     impl_event_builder_setter!(note_id, i32);
 
-    fn cookie(self, value: NonNull<c_void>) -> Self {
-        let mut builder = self;
-        builder.0.cookie = value.as_ptr();
-        builder
-    }
+    // fn cookie(self, value: NonNull<c_void>) -> Self {
+    //     let mut builder = self;
+    //     builder.0.cookie = value.as_ptr();
+    //     builder
+    // }
 
     pub fn param_id(self, value: ClapId) -> Self {
         let mut builder = self;

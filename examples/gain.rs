@@ -13,7 +13,7 @@ use clap_clap::{
 // A plugin must implement `Default` trait.  The plugin instance will be created
 // by the host with the call to `MyPlug::default()`.
 struct Gain {
-    gain: Arc<(AtomicU64, AtomicU64)>,
+    gain: Arc<(AtomicU64, AtomicU64)>, // (value, mod amount)
 }
 
 impl Default for Gain {
@@ -28,10 +28,6 @@ impl Default for Gain {
 }
 
 impl clap::Extensions<Self> for Gain {
-    // Provide CLAP "plugin_audio_ports" extension: for example,
-    // a static layout of stereo ports, one in and one out.
-    // If the plugin needs to dynamically control the port layout,
-    // you might want to implement the AudioPorts trait yourself.
     fn audio_ports() -> Option<impl clap::AudioPorts<Self>> {
         Some(clap::StereoPorts::<1, 1>)
     }
@@ -112,25 +108,14 @@ impl clap::Plugin for Gain {
     fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<AudioThread, clap::Error> {
         Ok(AudioThread {
             gain: self.gain.clone(),
-            smoothed: (
-                OnePole {
-                    b0: 1.0,
-                    a1: -0.999,
-                    y1: 0.0,
-                },
-                OnePole {
-                    b0: 1.0,
-                    a1: -0.999,
-                    y1: 0.0,
-                },
-            ),
+            smoothed: (Smooth::default(), Smooth::default()),
         })
     }
 }
 
 struct AudioThread {
     gain: Arc<(AtomicU64, AtomicU64)>,
-    smoothed: (OnePole, OnePole),
+    smoothed: (Smooth, Smooth),
 }
 
 impl clap::AudioThread<Gain> for AudioThread {
@@ -200,17 +185,28 @@ impl clap::AudioThread<Gain> for AudioThread {
 // Export clap_entry symbols and build a plugin factory.
 clap::entry!(Gain);
 
+// A one-pole low pass filter to smooth out parameter changes.
 #[derive(Debug, Clone)]
-pub struct OnePole {
+pub struct Smooth {
     b0: f32,
     a1: f32,
     y1: f32,
 }
 
-impl OnePole {
+impl Smooth {
     fn tick(&mut self, sample: f32) -> f32 {
         let y0 = sample * self.b0 - self.y1 * self.a1;
         self.y1 = y0;
         y0 * (1.0 + self.a1)
+    }
+}
+
+impl Default for Smooth {
+    fn default() -> Self {
+        Smooth {
+            b0: 1.0,
+            a1: -0.999,
+            y1: 0.0,
+        }
     }
 }

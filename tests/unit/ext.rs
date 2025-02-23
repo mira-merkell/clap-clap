@@ -11,7 +11,6 @@ use std::{
 
 use clap_clap::{
     ext::{
-        Extensions,
         audio_ports::AudioPortInfo,
         params::{Error, ParamInfo},
     },
@@ -23,7 +22,6 @@ use clap_clap::{
     },
     id::ClapId,
     plugin::{ClapPlugin, Plugin},
-    prelude::AudioPorts,
 };
 
 use crate::shims::host::SHIM_CLAP_HOST;
@@ -88,10 +86,6 @@ impl<P: Plugin + 'static> TestBed<P> {
         unsafe {
             self.clap_plugin.as_ref().unwrap().activate.unwrap()(self.clap_plugin, 48000.0, 1, 512)
         }
-    }
-
-    pub fn deactivate(&self) {
-        unsafe { self.clap_plugin.as_ref().unwrap().deactivate.unwrap()(self.clap_plugin) }
     }
 
     fn test(&mut self, case: impl Test<P>) -> &mut Self {

@@ -97,36 +97,32 @@ pub struct ParamInfo {
 
     pub flags: u32,
 
-    /// This value is optional and set by the plugin.
-    /// Its purpose is to provide fast access to the plugin parameter object by
-    /// caching its pointer. For instance:
-    ///
-    /// in clap_plugin_params.get_info():
-    ///    Parameter *p = findParameter(param_id);
-    ///    param_info->cookie = p;
-    ///
-    /// later, in clap_plugin.process():
-    ///
-    ///    Parameter *p = (Parameter *)event->cookie;
-    ///    if (!p) [[unlikely]]
-    ///       p = findParameter(event->param_id);
-    ///
-    /// where findParameter() is a function the plugin implements to map
-    /// parameter ids to internal objects.
-    ///
-    /// Important:
-    ///  - The cookie is invalidated by a call to
-    ///    clap_host_params->rescan(CLAP_PARAM_RESCAN_ALL) or when the plugin is
-    ///    destroyed.
-    ///  - The host will either provide the cookie as issued or nullptr in
-    ///    events addressing parameters.
-    ///  - The plugin must gracefully handle the case of a cookie which is
-    ///    nullptr.
-    ///  - Many plugins will process the parameter events more quickly if the
-    ///    host can provide the cookie in a faster time than a hashmap lookup
-    ///    per param per event.
+    // This value is optional and set by the plugin.
+    // Its purpose is to provide fast access to the plugin parameter object by
+    // caching its pointer. For instance:
+    //
+    // in clap_plugin_params.get_info():
+    //    Parameter *p = findParameter(param_id);
+    //    param_info->cookie = p;
+    //
+    // later, in clap_plugin.process():
+    //
+    //    Parameter *p = (Parameter *)event->cookie;
+    //    if (!p) [[unlikely]]
+    //       p = findParameter(event->param_id);
+    //
+    // where findParameter() is a function the plugin implements to map
+    // parameter ids to internal objects.
+    //
+    // Important:
+    //  - The cookie is invalidated by a call to clap_host_params->rescan(CLAP_PARAM_RESCAN_ALL) or
+    //    when the plugin is destroyed.
+    //  - The host will either provide the cookie as issued or nullptr in events addressing
+    //    parameters.
+    //  - The plugin must gracefully handle the case of a cookie which is nullptr.
+    //  - Many plugins will process the parameter events more quickly if the host can provide the
+    //    cookie in a faster time than a hashmap lookup per param per event.
     // pub cookie: Option<NonNull<c_void>>,
-
     /// The display name. eg: "Volume". This does not need to be unique. Do not
     /// include the module text in this. The host should concatenate/format
     /// the module + name in the case where showing the name alone would be
@@ -305,13 +301,9 @@ mod ffi {
 
         param_info.id = info.id.into();
         param_info.flags = info.flags;
-        // param_info.cookie = if let Some(cookie) = info.cookie {
-        //     cookie.as_ptr()
-        // } else {
-        //     null_mut()
-        // };
 
-        let n = info.name.len().min(param_info.name.len());
+        // param_info.name.len() > 0, so subtracting 1 won't underflow.
+        let n = info.name.len().min(param_info.name.len() - 1);
         unsafe {
             std::ptr::copy_nonoverlapping(
                 info.name.as_ptr(),
@@ -319,9 +311,11 @@ mod ffi {
                 n,
             )
         }
+        // n is within bounds:
         param_info.name[n] = b'\0' as _;
 
-        let n = info.module.len().min(param_info.module.len());
+        // param_info.name.len() > 0, so subtracting 1 won't underflow.
+        let n = info.module.len().min(param_info.module.len() - 1);
         unsafe {
             std::ptr::copy_nonoverlapping(
                 info.module.as_ptr(),
@@ -329,6 +323,7 @@ mod ffi {
                 n,
             )
         }
+        // n is within bounds:
         param_info.module[n] = b'\0' as _;
 
         param_info.default_value = info.default_value;
