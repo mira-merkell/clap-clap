@@ -146,7 +146,7 @@ impl ExtAudioPorts {
 
             Some(AudioPortInfo {
                 id: ClapId::try_from(info.id).unwrap_or(ClapId::invalid_id()),
-                name: name.to_str().ok().map(|s| s.to_owned()),
+                name: name.to_str().map(|s| s.to_owned()).unwrap(),
                 flags: info.flags,
                 channel_count: info.channel_count,
                 port_type: port_type.try_into().ok(),

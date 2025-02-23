@@ -5,7 +5,7 @@ mod plugin_audio_ports {
         Error,
         ext::{
             Extensions,
-            audio_ports::{AudioPortInfo, AudioPortType},
+            audio_ports::{AudioPortFlags, AudioPortInfo, AudioPortType},
         },
         id::ClapId,
         plugin::Plugin,
@@ -63,24 +63,23 @@ mod plugin_audio_ports {
 
         fn get(_: &Self, index: u32, is_input: bool) -> Option<AudioPortInfo> {
             if is_input && index == 0 {
-                Some(
-                    AudioPortInfo::builder()
-                        .port_type(AudioPortType::Surround)
-                        .name("input 1")
-                        .port_is_main()
-                        .id(ClapId::from(0))
-                        .build(),
-                )
+                Some(AudioPortInfo {
+                    port_type: Some(AudioPortType::Surround),
+                    name: "input 1".to_owned(),
+                    flags: AudioPortFlags::IsMain as u32,
+                    id: ClapId::from(0),
+                    channel_count: 0,
+                    in_place_pair: None,
+                })
             } else if !is_input && index == 0 {
-                Some(
-                    AudioPortInfo::builder()
-                        .port_type(AudioPortType::Mono)
-                        .name("output 0")
-                        .id(ClapId::from(11))
-                        .channel_count(7)
-                        .in_place_pair(ClapId::from(2))
-                        .build(),
-                )
+                Some(AudioPortInfo {
+                    port_type: Some(AudioPortType::Mono),
+                    name: "output 0".to_owned(),
+                    id: ClapId::from(11),
+                    channel_count: 7,
+                    in_place_pair: Some(ClapId::from(2)),
+                    flags: 0,
+                })
             } else {
                 None
             }

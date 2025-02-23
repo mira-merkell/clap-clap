@@ -168,7 +168,7 @@ mod ffi {
     }
 }
 
-pub use port_info::{AudioPortFlags, AudioPortInfo, AudioPortInfoBuilder, AudioPortType};
+pub use port_info::{AudioPortFlags, AudioPortInfo, AudioPortType};
 mod port_info {
     use std::ptr::null;
 
@@ -207,7 +207,7 @@ mod port_info {
     #[derive(Debug, Default, Clone, PartialEq)]
     pub struct AudioPortInfo {
         pub id: ClapId,
-        pub name: Option<String>,
+        pub name: String,
         pub flags: u32,
         pub channel_count: u32,
         pub port_type: Option<AudioPortType>,
@@ -215,26 +215,20 @@ mod port_info {
     }
 
     impl AudioPortInfo {
-        pub fn builder() -> AudioPortInfoBuilder {
-            AudioPortInfoBuilder::new(Self::default())
-        }
-
         pub(super) fn fill_clap_audio_port_info(&self, info: &mut clap_audio_port_info) {
             info.id = self.id.into();
 
-            if let Some(name) = &self.name {
-                let n = name.len().min(info.name.len());
-                unsafe {
-                    std::ptr::copy_nonoverlapping(
-                        name.as_ptr(),
-                        info.name.as_mut_ptr() as *mut _,
-                        n,
-                    )
-                }
-                info.name[n] = b'\0' as _;
-            } else {
-                info.name[0] = b'\0' as _;
-            };
+            // info.name.let > 1 so no underflow
+            let n = self.name.len().min(info.name.len() - 1);
+            unsafe {
+                std::ptr::copy_nonoverlapping(
+                    self.name.as_ptr(),
+                    info.name.as_mut_ptr() as *mut _,
+                    n,
+                )
+            }
+            // n is within bounds
+            info.name[n] = b'\0' as _;
 
             info.flags = self.flags;
 
@@ -252,65 +246,6 @@ mod port_info {
                 .in_place_pair
                 .map(Into::into)
                 .unwrap_or(CLAP_INVALID_ID);
-        }
-    }
-
-    pub struct AudioPortInfoBuilder {
-        info: AudioPortInfo,
-    }
-
-    impl AudioPortInfoBuilder {
-        const fn new(info: AudioPortInfo) -> Self {
-            Self { info }
-        }
-
-        pub const fn id(&mut self, id: ClapId) -> &mut Self {
-            self.info.id = id;
-            self
-        }
-
-        pub fn name(&mut self, name: &str) -> &mut Self {
-            self.info.name = Some(name.to_string());
-            self
-        }
-
-        pub const fn port_is_main(&mut self) -> &mut Self {
-            self.info.flags |= CLAP_AUDIO_PORT_IS_MAIN;
-            self
-        }
-
-        pub const fn prefers_64_bits(&mut self) -> &mut Self {
-            self.info.flags |= CLAP_AUDIO_PORT_PREFERS_64BITS;
-            self
-        }
-
-        pub const fn supports_64_bits(&mut self) -> &mut Self {
-            self.info.flags |= CLAP_AUDIO_PORT_SUPPORTS_64BITS;
-            self
-        }
-
-        pub const fn requires_common_sample_size(&mut self) -> &mut Self {
-            self.info.flags |= CLAP_AUDIO_PORT_REQUIRES_COMMON_SAMPLE_SIZE;
-            self
-        }
-
-        pub fn channel_count(&mut self, n: u32) -> &mut Self {
-            self.info.channel_count = n;
-            self
-        }
-
-        pub const fn port_type(&mut self, port_type: AudioPortType) -> &mut Self {
-            self.info.port_type = Some(port_type);
-            self
-        }
-
-        pub const fn in_place_pair(&mut self, id: ClapId) -> &mut Self {
-            self.info.in_place_pair = Some(id);
-            self
-        }
-
-        pub fn build(&self) -> AudioPortInfo {
-            self.info.clone()
         }
     }
 
@@ -354,7 +289,7 @@ mod port_info {
 pub use static_ports::{MonoPorts, StereoPorts};
 mod static_ports {
     use crate::{
-        ext::audio_ports::{AudioPortInfo, AudioPortType, AudioPorts},
+        ext::audio_ports::{AudioPortFlags, AudioPortInfo, AudioPortType, AudioPorts},
         plugin::Plugin,
     };
 
@@ -379,37 +314,43 @@ mod static_ports {
         fn get(_: &P, index: u32, is_input: bool) -> Option<AudioPortInfo> {
             if is_input {
                 (index < IN).then_some(if index == 0 {
-                    AudioPortInfo::builder()
-                        .id(index.try_into().unwrap())
-                        .name("Main In")
-                        .port_is_main()
-                        .channel_count(1)
-                        .port_type(AudioPortType::Mono)
-                        .build()
+                    AudioPortInfo {
+                        id: index.try_into().unwrap(),
+                        name: "Main In".to_owned(),
+                        flags: AudioPortFlags::IsMain as u32,
+                        channel_count: 1,
+                        port_type: Some(AudioPortType::Mono),
+                        in_place_pair: None,
+                    }
                 } else {
-                    AudioPortInfo::builder()
-                        .id(index.try_into().unwrap())
-                        .name(format!("In {index}").as_str())
-                        .channel_count(1)
-                        .port_type(AudioPortType::Mono)
-                        .build()
+                    AudioPortInfo {
+                        id: index.try_into().unwrap(),
+                        name: format!("In {index}"),
+                        flags: 0,
+                        channel_count: 1,
+                        port_type: Some(AudioPortType::Mono),
+                        in_place_pair: None,
+                    }
                 })
             } else {
                 (index < OUT).then_some(if index == 0 {
-                    AudioPortInfo::builder()
-                        .id((IN + index).try_into().unwrap())
-                        .name("Main Out")
-                        .port_is_main()
-                        .channel_count(1)
-                        .port_type(AudioPortType::Mono)
-                        .build()
+                    AudioPortInfo {
+                        id: (IN + index).try_into().unwrap(),
+                        name: "Main Out".to_owned(),
+                        flags: AudioPortFlags::IsMain as u32,
+                        channel_count: 1,
+                        port_type: Some(AudioPortType::Mono),
+                        in_place_pair: None,
+                    }
                 } else {
-                    AudioPortInfo::builder()
-                        .id((IN + index).try_into().unwrap())
-                        .name(format!("Out {index}").as_str())
-                        .channel_count(1)
-                        .port_type(AudioPortType::Mono)
-                        .build()
+                    AudioPortInfo {
+                        id: (IN + index).try_into().unwrap(),
+                        name: format!("Out {index}"),
+                        flags: 0,
+                        channel_count: 1,
+                        port_type: Some(AudioPortType::Mono),
+                        in_place_pair: None,
+                    }
                 })
             }
         }
@@ -430,37 +371,43 @@ mod static_ports {
         fn get(_: &P, index: u32, is_input: bool) -> Option<AudioPortInfo> {
             if is_input {
                 (index < IN).then_some(if index == 0 {
-                    AudioPortInfo::builder()
-                        .id(index.try_into().unwrap())
-                        .name("Main In")
-                        .port_is_main()
-                        .channel_count(2)
-                        .port_type(AudioPortType::Stereo)
-                        .build()
+                    AudioPortInfo {
+                        id: index.try_into().unwrap(),
+                        name: "Main In".to_owned(),
+                        flags: AudioPortFlags::IsMain as u32,
+                        channel_count: 2,
+                        port_type: Some(AudioPortType::Stereo),
+                        in_place_pair: None,
+                    }
                 } else {
-                    AudioPortInfo::builder()
-                        .id(index.try_into().unwrap())
-                        .name(format!("In {index}").as_str())
-                        .channel_count(2)
-                        .port_type(AudioPortType::Stereo)
-                        .build()
+                    AudioPortInfo {
+                        id: index.try_into().unwrap(),
+                        name: format!("In {index}"),
+                        flags: 0,
+                        channel_count: 2,
+                        port_type: Some(AudioPortType::Stereo),
+                        in_place_pair: None,
+                    }
                 })
             } else {
                 (index < OUT).then_some(if index == 0 {
-                    AudioPortInfo::builder()
-                        .id((IN + index).try_into().unwrap())
-                        .name("Main Out")
-                        .port_is_main()
-                        .channel_count(2)
-                        .port_type(AudioPortType::Stereo)
-                        .build()
+                    AudioPortInfo {
+                        id: (IN + index).try_into().unwrap(),
+                        name: "Main Out".to_owned(),
+                        flags: AudioPortFlags::IsMain as u32,
+                        channel_count: 2,
+                        port_type: Some(AudioPortType::Stereo),
+                        in_place_pair: None,
+                    }
                 } else {
-                    AudioPortInfo::builder()
-                        .id((IN + index).try_into().unwrap())
-                        .name(format!("Out {index}").as_str())
-                        .channel_count(2)
-                        .port_type(AudioPortType::Stereo)
-                        .build()
+                    AudioPortInfo {
+                        id: (IN + index).try_into().unwrap(),
+                        name: format!("Out {index}"),
+                        flags: 0,
+                        channel_count: 2,
+                        port_type: Some(AudioPortType::Stereo),
+                        in_place_pair: None,
+                    }
                 })
             }
         }
