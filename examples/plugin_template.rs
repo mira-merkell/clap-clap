@@ -86,6 +86,8 @@ struct AudioThread {
 
 impl clap::AudioThread<MyPlug> for AudioThread {
     fn process(&mut self, process: &mut clap::Process) -> Result<clap::Status, clap::Error> {
+        // The `Process` API is almost entirely `const`.
+        // The methods are cheap to call in a loop on the audio thread.
         for i in 0..process.frames_count() as usize {
             // Get the input signal from the main input port.
             let in_l = process.audio_inputs(0).data32(0)[i];
