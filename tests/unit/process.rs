@@ -12,8 +12,6 @@ use crate::shims::events::{
     input_events::SHIM_CLAP_INPUT_EVENTS, output_events::SHIM_CLAP_OUTPUT_EVENTS,
 };
 
-mod frame;
-
 trait Float: Copy + Clone + Default + PartialEq {}
 impl Float for f32 {}
 impl Float for f64 {}

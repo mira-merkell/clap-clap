@@ -1,5 +1,6 @@
 //! A CLAP plugin runtime. ⧉⧉⧉
 
+pub mod audio_buffer;
 #[doc(hidden)]
 pub mod entry;
 pub mod events;

@@ -125,9 +125,7 @@ impl AudioThread<TestPlugin> for TestAudioThread {
     }
 
     fn process(&mut self, process: &mut Process) -> Result<Status, Error> {
-        let mut frames = process.frames();
-        #[allow(clippy::redundant_pattern_matching)]
-        while let Some(_) = frames.next() {
+        for _ in 0..process.frames_count() {
             self.frames_processed += 1;
         }
         Ok(Continue)
