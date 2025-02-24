@@ -86,22 +86,18 @@ struct AudioThread {
 
 impl clap::AudioThread<MyPlug> for AudioThread {
     fn process(&mut self, process: &mut clap::Process) -> Result<clap::Status, clap::Error> {
-        // Generate a lending iterator over frames of audio samples and events.
-        // The entire `Process` API, together with its derived types, is `const`.
-        // The methods are cheap to call in a loop on the audio thread.
-        let mut frames = process.frames();
-        while let Some(frame) = frames.next() {
+        for i in 0..process.frames_count() as usize {
             // Get the input signal from the main input port.
-            let in_l = frame.audio_input(0).data32(0);
-            let in_r = frame.audio_input(0).data32(1);
+            let in_l = process.audio_inputs(0).data32(0)[i];
+            let in_r = process.audio_inputs(0).data32(1)[i];
 
             // Process samples. Here we simply swap left and right channels.
             let out_l = in_r;
             let out_r = in_l;
 
             // Write the audio signal to the main output port.
-            *frame.audio_output(0).data32(0) = out_l;
-            *frame.audio_output(0).data32(1) = out_r;
+            process.audio_outputs(0).data32(0)[i] = out_l;
+            process.audio_outputs(0).data32(1)[i] = out_r;
         }
         Ok(clap::Status::Continue)
     }
