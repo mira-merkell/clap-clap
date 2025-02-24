@@ -19,7 +19,10 @@ impl Plugin for Plug {
     const SUPPORT_URL: &'static str = "ftp::/example.com";
     const VERSION: &'static str = "[34";
     const DESCRIPTION: &'static str = "none";
-    const FEATURES: &'static str = "fx stereo distor..0[";
+
+    fn features() -> impl Iterator<Item = &'static str> {
+        "fx stereo distor..0[".split_whitespace()
+    }
 
     fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<Self::AudioThread, clap_clap::Error> {
         Ok(())
@@ -68,10 +71,7 @@ fn FEATURES() {
         feat = unsafe { feat.add(1) };
     }
 
-    let expected: Vec<String> = Plug::FEATURES
-        .split_whitespace()
-        .map(|s| s.to_owned())
-        .collect();
+    let expected: Vec<String> = Plug::features().map(|s| s.to_owned()).collect();
 
     assert_eq!(features, expected);
 }
@@ -81,7 +81,7 @@ fn features_is_null_terminated() {
     let desc = PluginDescriptor::new::<Plug>().unwrap();
     let feat = desc.clap_plugin_descriptor().features;
 
-    let expected: Vec<&str> = Plug::FEATURES.split_whitespace().collect();
+    let expected: Vec<&str> = Plug::features().collect();
 
     let feat_term = unsafe { feat.add(expected.len()) };
     assert!(unsafe { *feat_term }.is_null());

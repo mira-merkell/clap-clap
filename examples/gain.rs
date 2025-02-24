@@ -98,7 +98,10 @@ impl clap::Plugin for Gain {
     const SUPPORT_URL: &'static str = "https://your-domain.com/support";
     const VERSION: &'static str = "1.4.2";
     const DESCRIPTION: &'static str = "The plugin description.";
-    const FEATURES: &'static str = "instrument stereo";
+
+    fn features() -> impl Iterator<Item = &'static str> {
+        "fx stereo gain".split_whitespace()
+    }
 
     fn init(&mut self, _: Arc<clap::Host>) -> Result<(), clap::Error> {
         Ok(())

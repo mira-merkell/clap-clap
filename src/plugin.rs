@@ -1,6 +1,7 @@
 use std::{
     ffi::NulError,
     fmt::Display,
+    iter::empty,
     marker::PhantomData,
     sync::{
         Arc, Mutex,
@@ -28,12 +29,25 @@ pub trait Plugin: Default + Extensions<Self> {
     const VERSION: &'static str = "";
     const DESCRIPTION: &'static str = "";
 
-    /// Arbitrary keywords separated by whitespace. For example: `"filter stereo
-    /// distortion"`. See the module [`plugin_features`] for a list of
-    /// standard feature names.
+    /// Plugin features as an arbitrary list of keywords.
+    ///
+    /// They can be matched by the host indexer and used to classify the plugin.
+    /// For some standard features, see module: [`plugin_features`].
+    ///
+    /// The default implementation returns an empty iterator.
+    ///
+    /// # Example
+    ///
+    /// ```no_compile,rust
+    /// fn features() -> impl Iterator<Item = &'static str> {
+    ///     "instrument stereo sampler".split_whitespace()
+    /// }
+    /// ```
     ///
     /// [`plugin_features`]: crate::plugin_features
-    const FEATURES: &'static str = "";
+    fn features() -> impl Iterator<Item = &'static str> {
+        empty()
+    }
 
     #[allow(unused_variables)]
     fn init(&mut self, host: Arc<Host>) -> Result<(), crate::Error> {
@@ -254,10 +268,8 @@ mod desc {
             let version = CString::new(P::VERSION)?;
             let description = CString::new(P::DESCRIPTION)?;
 
-            let features: Box<[CString]> = P::FEATURES
-                .split_whitespace()
-                .map(CString::new)
-                .collect::<Result<_, _>>()?;
+            let features: Box<[CString]> =
+                P::features().map(CString::new).collect::<Result<_, _>>()?;
             let mut clap_features: Vec<*const c_char> =
                 features.iter().map(|s| s.as_c_str().as_ptr()).collect();
             clap_features.push(null());
