@@ -84,14 +84,6 @@ can install as a `*.clap` file.
 
 [`Plugin`]: https://docs.rs/clap-clap/latest/clap_clap/plugin/trait.Plugin.html
 
-## Roadmap
-
-* New unstable minor versions, `0.x.0`, will be published once a month
-  throughout 2025.
-* The beta release of the first stable version: `1.0-beta` will be published in
-  Sep 2025.
-* The stable API will be released in Dec 2025.
-
 ## Contributing
 
 All contributions are welcome!
