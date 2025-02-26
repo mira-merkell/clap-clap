@@ -23,7 +23,7 @@ impl<'a> AudioBuffer<'a> {
         }
     }
 
-    const fn as_clap_audio_buffer(&self) -> &clap_audio_buffer {
+    const fn clap_audio_buffer(&self) -> &clap_audio_buffer {
         // SAFETY: By construction, audio_buffer can be only obtained from a shared
         // reference to Process.
         unsafe { self.clap_audio_buffer.as_ref().unwrap() }
@@ -36,7 +36,7 @@ impl<'a> AudioBuffer<'a> {
     pub const unsafe fn data32_unchecked(&self, channel: u32) -> &[f32] {
         debug_assert!(channel < self.channel_count());
         // SAFETY: The caller guarantees this dereferencing is safe.
-        let chan = unsafe { *self.as_clap_audio_buffer().data32.add(channel as usize) };
+        let chan = unsafe { *self.clap_audio_buffer().data32.add(channel as usize) };
 
         debug_assert!((self.process.frames_count() as u64) < usize::MAX as u64);
         // SAFETY: The CLAP host guarantees that the channel is at
@@ -65,7 +65,7 @@ impl<'a> AudioBuffer<'a> {
     pub const unsafe fn data64_unchecked(&self, channel: u32) -> &[f64] {
         debug_assert!(channel < self.channel_count());
         // SAFETY: The caller guarantees this dereferencing is safe.
-        let chan = unsafe { *self.as_clap_audio_buffer().data64.add(channel as usize) };
+        let chan = unsafe { *self.clap_audio_buffer().data64.add(channel as usize) };
 
         debug_assert!((self.process.frames_count() as u64) < usize::MAX as u64);
         // SAFETY: The CLAP host guarantees that the channel is at
@@ -88,15 +88,15 @@ impl<'a> AudioBuffer<'a> {
     }
 
     pub const fn channel_count(&self) -> u32 {
-        self.as_clap_audio_buffer().channel_count
+        self.clap_audio_buffer().channel_count
     }
 
     pub const fn latency(&self) -> u32 {
-        self.as_clap_audio_buffer().latency
+        self.clap_audio_buffer().latency
     }
 
     pub const fn constant_mask(&self) -> u64 {
-        self.as_clap_audio_buffer().constant_mask
+        self.clap_audio_buffer().constant_mask
     }
 }
 
@@ -120,14 +120,14 @@ impl<'a> AudioBufferMut<'a> {
         }
     }
 
-    const fn as_clap_audio_buffer(&self) -> &clap_audio_buffer {
+    const fn clap_audio_buffer(&self) -> &clap_audio_buffer {
         // SAFETY: The constructor guarantees that we have exclusive access to the audio
         // buffer. We know that the buffer remains constant for the lifetime of
         // self, so the aliasing is safe.
         unsafe { self.clap_audio_buffer.as_ref() }
     }
 
-    const fn as_clap_audio_buffer_mut(&mut self) -> &mut clap_audio_buffer {
+    const fn clap_audio_buffer_mut(&mut self) -> &mut clap_audio_buffer {
         // SAFETY: The constructor guarantees that we have exclusive access to the audio
         // buffer.
         unsafe { self.clap_audio_buffer.as_mut() }
@@ -140,7 +140,7 @@ impl<'a> AudioBufferMut<'a> {
     const unsafe fn data32_unchecked(&mut self, channel: u32) -> &mut [f32] {
         debug_assert!(channel < self.channel_count());
         // SAFETY: The caller guarantees this dereferencing is safe.
-        let chan = unsafe { *self.as_clap_audio_buffer_mut().data32.add(channel as usize) };
+        let chan = unsafe { *self.clap_audio_buffer_mut().data32.add(channel as usize) };
 
         debug_assert!((self.process.frames_count() as u64) < usize::MAX as u64);
         // SAFETY: The CLAP host guarantees that the channel is at
@@ -169,7 +169,7 @@ impl<'a> AudioBufferMut<'a> {
     const unsafe fn data64_unchecked(&mut self, channel: u32) -> &mut [f64] {
         debug_assert!(channel < self.channel_count());
         // SAFETY: The caller guarantees this dereferencing is safe.
-        let chan = unsafe { *self.as_clap_audio_buffer_mut().data64.add(channel as usize) };
+        let chan = unsafe { *self.clap_audio_buffer_mut().data64.add(channel as usize) };
 
         debug_assert!((self.process.frames_count() as u64) < usize::MAX as u64);
         // SAFETY: The CLAP host guarantees that the channel is at
@@ -192,14 +192,14 @@ impl<'a> AudioBufferMut<'a> {
     }
 
     pub const fn channel_count(&self) -> u32 {
-        self.as_clap_audio_buffer().channel_count
+        self.clap_audio_buffer().channel_count
     }
 
     pub const fn latency(&self) -> u32 {
-        self.as_clap_audio_buffer().latency
+        self.clap_audio_buffer().latency
     }
 
     pub const fn constant_mask(&self) -> u64 {
-        self.as_clap_audio_buffer().constant_mask
+        self.clap_audio_buffer().constant_mask
     }
 }
