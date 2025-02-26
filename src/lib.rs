@@ -67,7 +67,6 @@ pub enum Error {
     Host(host::Error),
     Id(id::Error),
     Plugin(plugin::Error),
-    Process(process::Error),
     User(Box<dyn std::error::Error + Send + 'static>),
 }
 
@@ -80,7 +79,6 @@ impl std::fmt::Display for Error {
             Events(e) => write!(f, "events error {e}"),
             Extension(e) => write!(f, "extension error {e}"),
             Host(e) => write!(f, "host error: {e}"),
-            Process(e) => write!(f, "process error: {e}"),
             Id(e) => write!(f, "id error: {e}"),
             User(e) => write!(f, "user error: {e}"),
         }
