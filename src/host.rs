@@ -30,7 +30,17 @@ impl Host {
     /// The function will panic if host description strings aren't properly
     /// validated UTF-8 strings.
     #[doc(hidden)]
-    pub const unsafe fn new(clap_host: *const clap_host) -> Self {
+    pub const unsafe fn new_unchecked(clap_host: *const clap_host) -> Self {
+        #[cfg(debug_assertions)]
+        {
+            assert!(!clap_host.is_null());
+            let clap_host = unsafe { &*clap_host };
+            assert!(clap_host.get_extension.is_some());
+            assert!(clap_host.request_callback.is_some());
+            assert!(clap_host.request_process.is_some());
+            assert!(clap_host.request_restart.is_some());
+        }
+
         Self { clap_host }
     }
 
@@ -77,10 +87,9 @@ macro_rules! impl_host_request {
                 pub fn $request_method(&self) {
                     let clap_host = self.clap_host();
                     if let Some(callback) = clap_host.$request_method {
-                        // SAFETY: The Host constructor checks if callback is
-                        // non-null during the initialization. The pointer is a valid function
-                        // obtained from the CLAP host. It is guaranteed be the host that the call
-                        // is safe.
+                        // SAFETY: By the Host constructon, the callback is non-null.
+                        // The pointer is a valid function obtained from the CLAP host. It is
+                        // guaranteed be the host that the call is safe.
                         unsafe { callback(&raw const *self.clap_host()) }
                     }
                 }
