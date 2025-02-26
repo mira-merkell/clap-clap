@@ -7,7 +7,7 @@ use std::ffi::{CStr, c_char, c_int, c_uint, c_ulong, c_void};
 
 pub const CLAP_VERSION_MAJOR: u32 = 1;
 pub const CLAP_VERSION_MINOR: u32 = 2;
-pub const CLAP_VERSION_REVISION: u32 = 3;
+pub const CLAP_VERSION_REVISION: u32 = 4;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -1531,6 +1531,8 @@ pub const CLAP_SURROUND_TFR: c_uint = 14;
 pub const CLAP_SURROUND_TBL: c_uint = 15;
 pub const CLAP_SURROUND_TBC: c_uint = 16;
 pub const CLAP_SURROUND_TBR: c_uint = 17;
+pub const CLAP_SURROUND_TSL: c_uint = 18;
+pub const CLAP_SURROUND_TSR: c_uint = 19;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
