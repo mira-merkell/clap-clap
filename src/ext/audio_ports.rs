@@ -85,7 +85,7 @@ impl<'a> HostAudioPorts<'a> {
     }
 }
 
-pub(crate) use ffi::ClapPluginAudioPorts;
+pub(crate) use ffi::PluginAudioPorts;
 mod ffi {
     use std::marker::PhantomData;
 
@@ -149,13 +149,13 @@ mod ffi {
             .is_some()
     }
 
-    pub struct ClapPluginAudioPorts<P> {
+    pub struct PluginAudioPorts<P> {
         #[allow(unused)]
         clap_plugin_audio_ports: clap_plugin_audio_ports,
         _marker: PhantomData<P>,
     }
 
-    impl<P: Plugin> ClapPluginAudioPorts<P> {
+    impl<P: Plugin> PluginAudioPorts<P> {
         pub fn new<A: AudioPorts<P>>(_: A) -> Self {
             Self {
                 clap_plugin_audio_ports: clap_plugin_audio_ports {

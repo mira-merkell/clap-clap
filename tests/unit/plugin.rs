@@ -157,14 +157,14 @@ unsafe fn build_plugin<P: Plugin>() -> ClapPlugin<P> {
 }
 
 unsafe fn destroy_plugin<P: Plugin>(plugin: ClapPlugin<P>) {
-    unsafe { plugin.as_ref().destroy.unwrap()(plugin.as_ref()) };
+    unsafe { plugin.clap_plugin().destroy.unwrap()(plugin.clap_plugin()) };
 }
 
 #[test]
 fn call_plugin_destructor() {
     let plugin = unsafe { build_plugin::<TestPlugin>() };
 
-    unsafe { plugin.as_ref().destroy.unwrap()(plugin.as_ref()) };
+    unsafe { plugin.clap_plugin().destroy.unwrap()(plugin.clap_plugin()) };
 
     assert!(CALL_PLUGIN_DESTRUCTOR.load(Ordering::Acquire) > 0);
 }
@@ -200,7 +200,7 @@ impl DerefMut for TestWrapper {
 #[test]
 fn call_audio_thread_destructor() {
     let plugin = TestWrapper::build();
-    let plugin = unsafe { plugin.as_ref() };
+    let plugin = unsafe { plugin.clap_plugin() };
 
     assert!(unsafe { plugin.init.unwrap()(plugin) });
     assert!(unsafe { plugin.activate.unwrap()(plugin, 0.0, 0, 0) });
@@ -222,7 +222,7 @@ macro_rules! test_plugin_descriptor {
                 fn $desc() {
                     let plugin = TestWrapper::build();
 
-                    let name = unsafe { CStr::from_ptr((*(plugin.as_ref().desc)).$desc) };
+                    let name = unsafe { CStr::from_ptr((*(plugin.clap_plugin().desc)).$desc) };
                     assert_eq!(TestPlugin::$plugin_desc, name.to_str().unwrap());
                 }
             )*
@@ -244,7 +244,7 @@ test_plugin_descriptor!(
 #[test]
 fn plugin_descriptor_features() {
     let wrap = TestWrapper::build();
-    let plugin = unsafe { wrap.as_ref() };
+    let plugin = unsafe { wrap.clap_plugin() };
     let mut feat = unsafe { (*plugin.desc).features };
 
     let mut features = Vec::new();
@@ -262,7 +262,7 @@ fn plugin_descriptor_features() {
 fn call_init() {
     let mut wrap = TestWrapper::build();
 
-    let clap_plugin = unsafe { wrap.as_ref() };
+    let clap_plugin = unsafe { wrap.clap_plugin() };
     assert!(unsafe { clap_plugin.init.unwrap()(clap_plugin) });
 
     let plugin = unsafe { wrap.plugin() };
@@ -274,7 +274,7 @@ fn call_init() {
 fn call_on_main_thread() {
     let mut wrap = TestWrapper::build();
 
-    let clap_plugin = unsafe { wrap.as_ref() };
+    let clap_plugin = unsafe { wrap.clap_plugin() };
     unsafe { clap_plugin.on_main_thread.unwrap()(clap_plugin) };
 
     let plugin = unsafe { wrap.plugin() };
@@ -285,7 +285,7 @@ fn call_on_main_thread() {
 fn call_activate() {
     let mut wrap = TestWrapper::build();
 
-    let clap_plugin = unsafe { wrap.as_ref() };
+    let clap_plugin = unsafe { wrap.clap_plugin() };
     unsafe { clap_plugin.init.unwrap()(clap_plugin) };
 
     unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.1, 1, 7) };
@@ -298,7 +298,7 @@ fn call_activate() {
 fn call_deactivate() {
     let mut wrap = TestWrapper::build();
 
-    let clap_plugin = unsafe { wrap.as_ref() };
+    let clap_plugin = unsafe { wrap.clap_plugin() };
     unsafe { clap_plugin.init.unwrap()(clap_plugin) };
     unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.1, 1, 7) };
 
@@ -313,7 +313,7 @@ fn call_deactivate() {
 fn call_start_processing() {
     let mut wrap = TestWrapper::build();
 
-    let clap_plugin = unsafe { wrap.as_ref() };
+    let clap_plugin = unsafe { wrap.clap_plugin() };
     unsafe { clap_plugin.init.unwrap()(clap_plugin) };
     unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.0, 2, 3) };
 
@@ -329,7 +329,7 @@ fn call_start_processing() {
 fn call_stop_processing() {
     let mut wrap = TestWrapper::build();
 
-    let clap_plugin = unsafe { wrap.as_ref() };
+    let clap_plugin = unsafe { wrap.clap_plugin() };
     unsafe { clap_plugin.init.unwrap()(clap_plugin) };
     unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.0, 2, 3) };
 
@@ -345,7 +345,7 @@ fn call_stop_processing() {
 fn call_reset() {
     let mut wrap = TestWrapper::build();
 
-    let clap_plugin = unsafe { wrap.as_ref() };
+    let clap_plugin = unsafe { wrap.clap_plugin() };
     unsafe { clap_plugin.init.unwrap()(clap_plugin) };
     unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.0, 2, 3) };
 
@@ -361,7 +361,7 @@ fn call_reset() {
 fn call_process() {
     let mut wrap = TestWrapper::build();
 
-    let clap_plugin = unsafe { wrap.as_ref() };
+    let clap_plugin = unsafe { wrap.clap_plugin() };
     unsafe { clap_plugin.init.unwrap()(clap_plugin) };
     unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.0, 2, 3) };
 
@@ -402,7 +402,7 @@ fn call_get_extension_audio_ports() {
     let mut wrap = TestWrapper::build();
     let audio_ins = TestAudioPorts::count(unsafe { wrap.plugin() }, true);
 
-    let clap_plugin = unsafe { wrap.as_ref() };
+    let clap_plugin = unsafe { wrap.clap_plugin() };
 
     // Fetch clap_plugin_audio_ports extension.
     let ext =
@@ -425,7 +425,7 @@ fn call_get_extension_audio_ports() {
 fn is_active() {
     let wrap = TestWrapper::build();
 
-    let clap_plugin = unsafe { wrap.as_ref() };
+    let clap_plugin = unsafe { wrap.clap_plugin() };
     unsafe { clap_plugin.init.unwrap()(clap_plugin) };
 
     assert!(!wrap.is_active());
@@ -437,7 +437,7 @@ fn is_active() {
 fn is_inactive() {
     let wrap = TestWrapper::build();
 
-    let clap_plugin = unsafe { wrap.as_ref() };
+    let clap_plugin = unsafe { wrap.clap_plugin() };
     unsafe { clap_plugin.init.unwrap()(clap_plugin) };
     assert!(!wrap.is_active());
     unsafe { clap_plugin.activate.unwrap()(clap_plugin, 1.1, 1, 7) };

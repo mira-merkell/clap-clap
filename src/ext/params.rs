@@ -227,7 +227,7 @@ impl<P: Plugin> Params<P> for () {
     fn flush(_: &P::AudioThread, _: &InputEvents, _: &OutputEvents) {}
 }
 
-pub(crate) use ffi::ClapPluginParams;
+pub(crate) use ffi::PluginParams;
 
 use crate::ffi::clap_param_info;
 
@@ -500,13 +500,13 @@ mod ffi {
         }
     }
 
-    pub struct ClapPluginParams<P> {
+    pub struct PluginParams<P> {
         #[allow(unused)]
         clap_plugin_params: clap_plugin_params,
         _marker: PhantomData<P>,
     }
 
-    impl<P: Plugin> ClapPluginParams<P> {
+    impl<P: Plugin> PluginParams<P> {
         pub fn new<E: Params<P>>(_: E) -> Self {
             Self {
                 clap_plugin_params: clap_plugin_params {
