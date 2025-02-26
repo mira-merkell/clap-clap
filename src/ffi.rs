@@ -7,7 +7,7 @@ use std::ffi::{CStr, c_char, c_int, c_uint, c_ulong, c_void};
 
 pub const CLAP_VERSION_MAJOR: u32 = 1;
 pub const CLAP_VERSION_MINOR: u32 = 2;
-pub const CLAP_VERSION_REVISION: u32 = 4;
+pub const CLAP_VERSION_REVISION: u32 = 5;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
