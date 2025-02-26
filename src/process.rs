@@ -86,7 +86,7 @@ impl Process {
         // SAFETY: We just checked if transport is non-null. We know that
         // clap_event_transport is constant and valid for the duration of self,
         // so it's safe to create a shared reference to it for the lifetime of self.
-        let header = unsafe { Header::new(&transport.header) };
+        let header = unsafe { Header::new_unchecked(&transport.header) };
         // SAFETY: The host ensures that header is a header of a clap_event_transport.
         Some(unsafe { Transport::new_unchecked(header) })
     }

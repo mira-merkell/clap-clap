@@ -21,13 +21,12 @@ use crate::{
 };
 
 macro_rules! impl_event_cast_methods {
-    ($name:tt, $name_unchk:tt, $type:ty, $cast_type:ty, $clap_id:ident $(,)?) => {
+    ($name:tt, $name_unchecked:tt, $type:ty, $cast_type:ty, $clap_id:ident $(,)?) => {
         /// # Safety
         #[doc = concat!("The caller must ensure that this `Header` has correct \
             size and type to contain the header and the payload of event of the \
-            returned type: `", stringify!($name), "`.")
-                                                                                                ]
-        pub const unsafe fn $name_unchk(&self) -> $type {
+            returned type: `", stringify!($name), "`.")]
+        pub const unsafe fn $name_unchecked(&self) -> $type {
             unsafe { <$type>::new_unchecked(self) }
         }
 
@@ -62,7 +61,7 @@ impl Header {
     ///
     /// This is to make possible to cast `&raw const *header` pointer to
     /// a pointer to the concrete event type.
-    pub const unsafe fn new(header: &clap_event_header) -> &Self {
+    pub const unsafe fn new_unchecked(header: &clap_event_header) -> &Self {
         let len = header.size as usize;
         let data = &raw const *header as *const _;
         unsafe { &*(slice_from_raw_parts::<u8>(data, len) as *const _) }
@@ -209,7 +208,7 @@ macro_rules! impl_event_builder {
 
             fn event(&self) -> Self::Event<'_> {
                 // SAFETY: By construction, `self.header` is a valid header of the event type.
-                let header = unsafe { Header::new(&self.0.header) };
+                let header = unsafe { Header::new_unchecked(&self.0.header) };
                 unsafe { header.$cast_method() }
             }
         }
@@ -837,7 +836,7 @@ impl<'a> InputEvents<'a> {
     pub unsafe fn get_unchecked(&self, index: u32) -> &Header {
         // SAFETY: By construction, the pointer `self.get` is Some.
         let header = unsafe { &*self.0.get.unwrap()(self.0, index) };
-        unsafe { Header::new(header) }
+        unsafe { Header::new_unchecked(header) }
     }
 
     /// # Panic

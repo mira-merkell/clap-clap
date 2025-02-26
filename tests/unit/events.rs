@@ -45,7 +45,7 @@ fn cast_header() {
         data: [0, 0, 0],
     };
 
-    let header = unsafe { Header::new(&event.header) };
+    let header = unsafe { Header::new_unchecked(&event.header) };
     assert_eq!(header.time(), 1);
     assert_eq!(header.space_id(), 2);
     assert_eq!(header.flags(), 3);
@@ -84,7 +84,7 @@ mod param_value {
             value: 0.0,
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         assert_eq!(Err(events::Error::PayloadSize(33)), header.param_value())
     }
 
@@ -107,7 +107,7 @@ mod param_value {
             value: 0.0,
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         assert_eq!(
             Err(events::Error::OtherType(CLAP_EVENT_NOTE_CHOKE as u16)),
             header.param_value()
@@ -133,7 +133,7 @@ mod param_value {
             value: 123.456,
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         let _ = header.midi().unwrap_err();
         let event = header.param_value().unwrap();
         assert_eq!(event.port_index(), 87);
@@ -201,7 +201,7 @@ mod param_mod {
             amount: 0.0,
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         assert_eq!(Err(events::Error::PayloadSize(33)), header.param_mod())
     }
 
@@ -224,7 +224,7 @@ mod param_mod {
             amount: 0.0,
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         assert_eq!(
             Err(events::Error::OtherType(CLAP_EVENT_NOTE_CHOKE as u16)),
             header.param_mod()
@@ -250,7 +250,7 @@ mod param_mod {
             amount: 123.456,
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         let _ = header.midi().unwrap_err();
         let event = header.param_mod().unwrap();
         assert_eq!(event.port_index(), 87);
@@ -323,7 +323,7 @@ mod transport {
             tsig_denom: 0,
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         assert_eq!(Err(events::Error::PayloadSize(33)), header.transport())
     }
 
@@ -352,7 +352,7 @@ mod transport {
             tsig_denom: 0,
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         assert_eq!(
             Err(events::Error::OtherType(CLAP_EVENT_NOTE_CHOKE as u16)),
             header.transport()
@@ -384,7 +384,7 @@ mod transport {
             tsig_denom: 0,
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         let _ = header.param_value().unwrap_err();
         let event = header.transport().unwrap();
         assert_eq!(event.loop_end_beats(), BeatTime(110011));
@@ -447,7 +447,7 @@ mod midi {
             data: [0, 0, 0],
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         assert_eq!(Err(events::Error::PayloadSize(3)), header.midi())
     }
 
@@ -465,7 +465,7 @@ mod midi {
             data: [0, 0, 0],
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         assert_eq!(
             Err(events::Error::OtherType(CLAP_EVENT_NOTE_CHOKE as u16)),
             header.midi()
@@ -486,7 +486,7 @@ mod midi {
             data: [1, 2, 3],
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         let midi = header.midi().unwrap();
         assert_eq!(midi.data(), &[1, 2, 3]);
         assert_eq!(midi.port_index(), 87);
@@ -544,7 +544,7 @@ mod midi2 {
             data: [0, 0, 0, 0],
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         assert_eq!(Err(events::Error::PayloadSize(3)), header.midi2())
     }
 
@@ -562,7 +562,7 @@ mod midi2 {
             data: [0, 0, 0, 0],
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         assert_eq!(
             Err(events::Error::OtherType(CLAP_EVENT_NOTE_CHOKE as u16)),
             header.midi2()
@@ -583,7 +583,7 @@ mod midi2 {
             data: [1, 2, 3, 4],
         };
 
-        let header = unsafe { Header::new(&event.header) };
+        let header = unsafe { Header::new_unchecked(&event.header) };
         let midi = header.midi2().unwrap();
         assert_eq!(midi.data(), &[1, 2, 3, 4]);
         assert_eq!(midi.port_index(), 87);
@@ -947,7 +947,7 @@ mod output_events {
 
                 if test_bed.pushed.len() < test_bed.capacity {
                     let event = unsafe { &*event };
-                    let header = unsafe { Header::new(event) };
+                    let header = unsafe { Header::new_unchecked(event) };
                     let bytes = header.to_bytes().to_owned().into_boxed_slice();
 
                     test_bed.pushed.push(bytes);
