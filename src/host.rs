@@ -100,6 +100,11 @@ macro_rules! impl_host_request {
 
 impl_host_request!(request_process, request_restart, request_callback);
 
+// SAFETY: !Send for raw pointers is not for safety, just as a lint.
+unsafe impl Send for Host {}
+// SAFETY: !Sync for raw pointers is not for safety, just as a lint.
+unsafe impl Sync for Host {}
+
 pub struct HostExtensions<'a> {
     host: &'a Host,
 }
