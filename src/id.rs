@@ -2,25 +2,6 @@ use std::fmt::{Display, Formatter};
 
 use crate::ffi::{self, CLAP_INVALID_ID};
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Error {
-    InvalidId,
-    Overflow,
-    Underflow,
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::InvalidId => write!(f, "invalid ID"),
-            Error::Overflow => write!(f, "overflow during type conversion"),
-            Error::Underflow => write!(f, "underflow during type conversion"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
 /// A type that corresponds to CLAP's `clap_id`.
 ///
 /// It is either a `u32` value less that [`u32::MAX`], or a value that
@@ -90,6 +71,31 @@ impl TryFrom<usize> for ClapId {
 
 impl From<ClapId> for ffi::clap_id {
     fn from(value: ClapId) -> Self {
-        value.0.unwrap_or(ffi::CLAP_INVALID_ID)
+        value.0.unwrap_or(CLAP_INVALID_ID)
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Error {
+    InvalidId,
+    Overflow,
+    Underflow,
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::InvalidId => write!(f, "invalid ID"),
+            Error::Overflow => write!(f, "overflow during type conversion"),
+            Error::Underflow => write!(f, "underflow during type conversion"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<Error> for crate::Error {
+    fn from(value: Error) -> Self {
+        Self::Id(value)
     }
 }
