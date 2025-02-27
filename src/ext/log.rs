@@ -32,8 +32,10 @@ impl<'a> HostLog<'a> {
         }
     }
 
-    /// This function logs a `CStr` by the host.  It avoids memory allocation,
-    /// and fallible Rust string to C string conversion.
+    /// Send a `CStr` to the host's log.  
+    ///
+    /// By logging a `CStr`, instead of `&str`, the function avoids memory
+    /// allocation, and a fallible Rust-string-to-C-string conversion.
     pub fn log_cstr(&self, severity: Severity, msg: &CStr) {
         // SAFETY: By construction, the callback must be a valid function pointer,
         // and the call is thread-safe.
@@ -74,8 +76,8 @@ pub enum Severity {
     Warning,
     Error,
     Fatal,
-    ClapHostMisbehaving,
-    ClapPluginMisbehaving,
+    HostMisbehaving,
+    PluginMisbehaving,
 }
 
 impl From<Severity> for clap_log_severity {
@@ -88,8 +90,8 @@ impl From<Severity> for clap_log_severity {
             Warning => CLAP_LOG_WARNING,
             Error => CLAP_LOG_ERROR,
             Fatal => CLAP_LOG_FATAL,
-            ClapHostMisbehaving => CLAP_LOG_HOST_MISBEHAVING,
-            ClapPluginMisbehaving => CLAP_LOG_PLUGIN_MISBEHAVING,
+            HostMisbehaving => CLAP_LOG_HOST_MISBEHAVING,
+            PluginMisbehaving => CLAP_LOG_PLUGIN_MISBEHAVING,
         }
     }
 }
