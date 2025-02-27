@@ -13,8 +13,11 @@ The library documentation is available at [docs.rs][documentation].
 ## Goals
 
 * Provide a dynamical runtime environment to access [CLAP API] from safe Rust.
-* Follow closely the CLAP module structure and terminology.
+* Follow closely CLAP module structure and terminology.
 * Build a plugin testbed and a debugging platform.
+
+New minor versions, `0.x.0` will be published once a month throughout 2025. The
+stable version: `1.0.0-beta` planned for Sep 2025.
 
 [CLAP API]: https://github.com/free-audio/clap/tree/main/include/clap
 
@@ -46,7 +49,7 @@ name of the library is OS-specific:
 Copy the file to where your DAW can find it and rename it to:
 `plugin_template.clap`.
 
-[`examples/plugin_template.rs`]: ./examples/plugin_template.rs
+[`./examples/plugin_template.rs`]: ./examples/plugin_template.rs
 
 ## Installation
 
