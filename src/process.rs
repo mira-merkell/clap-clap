@@ -2,10 +2,7 @@
 //!
 //! The facilities here are mostly const functions to access audio buffers
 //! and event lists in a safe way.
-use std::{
-    fmt::{Display, Formatter},
-    ptr::NonNull,
-};
+use std::ptr::NonNull;
 
 use crate::{
     audio_buffer::{AudioBuffer, AudioBufferMut},
@@ -81,17 +78,16 @@ impl Process {
     /// If None, then this is a free running host and no transport events will
     /// be provided.
     pub const fn transport(&self) -> Option<Transport<'_>> {
-        if self.clap_process().transport.is_null() {
-            return None;
-        }
-        // SAFETY: We just checked if transport is non-null. We know that
-        // clap_event_transfer is constant and valid for the duration of self,
-        // so it's safe to create a shared reference to it for the lifetime of self.
-        let header = unsafe { &(*self.clap_process().transport).header };
-        // SAFETY: We just crated a reference to clap_event_header from a valid
+        // SAFETY: The host ensures that transport, if non-null, points to a valid
         // clap_event_transport.
-        let header = unsafe { Header::new(header) };
-        // SAFETY: We know that header is a header of a clap_event_transport.
+        let Some(transport) = (unsafe { self.clap_process().transport.as_ref() }) else {
+            return None;
+        };
+        // SAFETY: We just checked if transport is non-null. We know that
+        // clap_event_transport is constant and valid for the duration of self,
+        // so it's safe to create a shared reference to it for the lifetime of self.
+        let header = unsafe { Header::new_unchecked(&transport.header) };
+        // SAFETY: The host ensures that header is a header of a clap_event_transport.
         Some(unsafe { Transport::new_unchecked(header) })
     }
 
@@ -132,7 +128,7 @@ impl Process {
 
     /// # Safety
     ///
-    /// 1. The audio output number `n` must be less that
+    /// 1. The audio output number `n` must be less than
     ///    self.audio_outputs_count()
     /// 2. The audio output number `n` must fit into usize (cast).
     const unsafe fn audio_outputs_unchecked(&mut self, n: u32) -> AudioBufferMut<'_> {
@@ -161,14 +157,14 @@ impl Process {
     pub const fn in_events(&self) -> InputEvents {
         // SAFETY: By construction, the pointer is non-null.
         let in_events = unsafe { &*self.clap_process().in_events };
-        // SAFETY: By construction, the pointers are Some.
+        // SAFETY: By construction, the pointers to `in_events` methods are Some.
         unsafe { InputEvents::new_unchecked(in_events) }
     }
 
     pub fn out_events(&self) -> OutputEvents {
         // SAFETY: By construction, the pointer is non-null.
         let out_events = unsafe { &*self.clap_process().out_events };
-        // SAFETY: By construction, the pointer is Some.
+        // SAFETY: By construction, the pointer to `out_events` method is Some.
         unsafe { OutputEvents::new_unchecked(out_events) }
     }
 }
@@ -190,22 +186,5 @@ impl From<Status> for clap_process_status {
             Tail => CLAP_PROCESS_TAIL,
             Sleep => CLAP_PROCESS_SLEEP,
         }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Error {}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "process")
-    }
-}
-
-impl std::error::Error for Error {}
-
-impl From<Error> for crate::Error {
-    fn from(value: Error) -> Self {
-        Self::Process(value)
     }
 }

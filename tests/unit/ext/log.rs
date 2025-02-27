@@ -115,11 +115,11 @@ fn host_log_misbehaving() {
         ..Default::default()
     }
     .test(CheckLogMsg {
-        severity: Severity::ClapHostMisbehaving,
+        severity: Severity::HostMisbehaving,
         msg: "this is a host misbehaving",
     })
     .test(CheckLogMsg {
-        severity: Severity::ClapPluginMisbehaving,
+        severity: Severity::PluginMisbehaving,
         msg: "this is a plugin misbehaving",
     });
 }

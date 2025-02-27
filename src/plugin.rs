@@ -10,7 +10,7 @@ use std::{
 };
 
 use crate::{
-    ext::{Extensions, audio_ports::ClapPluginAudioPorts},
+    ext::{Extensions, audio_ports::PluginAudioPorts},
     ffi::clap_plugin,
     host::Host,
     process,
@@ -85,16 +85,16 @@ impl<P: Plugin> AudioThread<P> for () {
     }
 }
 
-struct ClapPluginExtensions<P> {
-    audio_ports: Option<ClapPluginAudioPorts<P>>,
-    params: Option<ClapPluginParams<P>>,
+struct PluginExtensions<P> {
+    audio_ports: Option<PluginAudioPorts<P>>,
+    params: Option<PluginParams<P>>,
 }
 
-impl<P: Plugin> ClapPluginExtensions<P> {
+impl<P: Plugin> PluginExtensions<P> {
     fn new() -> Self {
         Self {
-            audio_ports: <P as Extensions<P>>::audio_ports().map(ClapPluginAudioPorts::new),
-            params: <P as Extensions<P>>::params().map(ClapPluginParams::new),
+            audio_ports: <P as Extensions<P>>::audio_ports().map(PluginAudioPorts::new),
+            params: <P as Extensions<P>>::params().map(PluginParams::new),
         }
     }
 }
@@ -105,7 +105,7 @@ pub(crate) struct Runtime<P: Plugin> {
     pub(crate) descriptor: PluginDescriptor,
     pub(crate) host: Arc<Host>,
     pub(crate) plugin: P,
-    plugin_extensions: Mutex<ClapPluginExtensions<P>>,
+    plugin_extensions: Mutex<PluginExtensions<P>>,
 }
 
 impl<P: Plugin> Runtime<P> {
@@ -116,7 +116,7 @@ impl<P: Plugin> Runtime<P> {
             plugin: P::default(),
             audio_thread: None,
             host,
-            plugin_extensions: Mutex::new(ClapPluginExtensions::new()),
+            plugin_extensions: Mutex::new(PluginExtensions::new()),
         })
     }
 
@@ -138,7 +138,7 @@ impl<P: Plugin> Runtime<P> {
     /// This can requirement can be met during plugin initialization and
     /// destruction.
     unsafe fn from_clap_plugin(clap_plugin: ClapPlugin<P>) -> Self {
-        let plugin_data = unsafe { clap_plugin.as_ref() }.plugin_data as *mut _;
+        let plugin_data = unsafe { clap_plugin.clap_plugin() }.plugin_data as *mut _;
         // Safety:
         // We can transmute the pointer to plugin_data like this, because:
         // 1. We have exclusive reference to it.
@@ -177,7 +177,8 @@ impl<P: Plugin> ClapPlugin<P> {
     ///
     /// The caller must ensure that the wrapped pointer to clap_plugin is
     /// dereferencable and that Rust aliasing rules of shared references hold.
-    pub const unsafe fn as_ref<'a>(&self) -> &'a clap_plugin {
+    #[doc(hidden)]
+    pub const unsafe fn clap_plugin<'a>(&self) -> &'a clap_plugin {
         // SAFETY: ClapPlugin constructor guarantees that dereferencing the inner
         // pointer is safe.
         unsafe { &*self.clap_plugin }
@@ -224,7 +225,7 @@ impl<P: Plugin> ClapPlugin<P> {
     }
 
     /// Obtain a mutex to plugin extensions.
-    const fn plugin_extensions(&mut self) -> &Mutex<ClapPluginExtensions<P>> {
+    const fn plugin_extensions(&mut self) -> &Mutex<PluginExtensions<P>> {
         let runtime: *mut Runtime<P> = unsafe { *self.clap_plugin }.plugin_data as *mut _;
         unsafe { &(*runtime).plugin_extensions }
     }
@@ -302,10 +303,10 @@ mod desc {
         }
 
         pub fn plugin_id(&self) -> &CStr {
-            self.id.as_ref()
+            self.id.as_c_str()
         }
 
-        pub fn clap_plugin_descriptor(&self) -> &clap_plugin_descriptor {
+        pub const fn clap_plugin_descriptor(&self) -> &clap_plugin_descriptor {
             &self.clap_plugin_descriptor
         }
     }
@@ -314,7 +315,7 @@ mod desc {
 #[doc(hidden)]
 pub use desc::PluginDescriptor;
 
-use crate::ext::params::ClapPluginParams;
+use crate::ext::params::PluginParams;
 
 mod ffi {
     use std::{
@@ -334,7 +335,7 @@ mod ffi {
     };
 
     #[allow(warnings, unused)]
-    extern "C-unwind" fn init<P: Plugin>(plugin: *const clap_plugin) -> bool {
+    unsafe extern "C-unwind" fn init<P: Plugin>(plugin: *const clap_plugin) -> bool {
         if plugin.is_null() {
             return false;
         }
@@ -350,7 +351,7 @@ mod ffi {
         runtime.plugin.init(host).is_ok()
     }
 
-    extern "C-unwind" fn destroy<P: Plugin>(plugin: *const clap_plugin) {
+    unsafe extern "C-unwind" fn destroy<P: Plugin>(plugin: *const clap_plugin) {
         if plugin.is_null() {
             return;
         }
@@ -366,7 +367,7 @@ mod ffi {
         drop(runtime)
     }
 
-    extern "C-unwind" fn activate<P: Plugin>(
+    unsafe extern "C-unwind" fn activate<P: Plugin>(
         plugin: *const clap_plugin,
         sample_rate: f64,
         min_frames_count: u32,
@@ -397,7 +398,7 @@ mod ffi {
             .is_some()
     }
 
-    extern "C-unwind" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
+    unsafe extern "C-unwind" fn deactivate<P: Plugin>(plugin: *const clap_plugin) {
         if plugin.is_null() {
             return;
         }
@@ -420,7 +421,7 @@ mod ffi {
         runtime.active.store(false, Ordering::Release)
     }
 
-    extern "C-unwind" fn start_processing<P: Plugin>(plugin: *const clap_plugin) -> bool {
+    unsafe extern "C-unwind" fn start_processing<P: Plugin>(plugin: *const clap_plugin) -> bool {
         if plugin.is_null() {
             return false;
         }
@@ -438,7 +439,7 @@ mod ffi {
         audio_thread.start_processing().is_ok()
     }
 
-    extern "C-unwind" fn stop_processing<P: Plugin>(plugin: *const clap_plugin) {
+    unsafe extern "C-unwind" fn stop_processing<P: Plugin>(plugin: *const clap_plugin) {
         if plugin.is_null() {
             return;
         }
@@ -456,7 +457,7 @@ mod ffi {
         audio_thread.stop_processing();
     }
 
-    extern "C-unwind" fn reset<P: Plugin>(plugin: *const clap_plugin) {
+    unsafe extern "C-unwind" fn reset<P: Plugin>(plugin: *const clap_plugin) {
         if plugin.is_null() {
             return;
         }
@@ -475,7 +476,7 @@ mod ffi {
     }
 
     #[allow(warnings, unused)]
-    extern "C-unwind" fn process<P: Plugin>(
+    unsafe extern "C-unwind" fn process<P: Plugin>(
         plugin: *const clap_plugin,
         process: *const clap_process,
     ) -> clap_process_status {
@@ -508,7 +509,7 @@ mod ffi {
     }
 
     #[allow(warnings, unused)]
-    extern "C-unwind" fn get_extension<P: Plugin>(
+    unsafe extern "C-unwind" fn get_extension<P: Plugin>(
         plugin: *const clap_plugin,
         id: *const c_char,
     ) -> *const c_void {
@@ -543,7 +544,7 @@ mod ffi {
         null()
     }
 
-    extern "C-unwind" fn on_main_thread<P: Plugin>(plugin: *const clap_plugin) {
+    unsafe extern "C-unwind" fn on_main_thread<P: Plugin>(plugin: *const clap_plugin) {
         if plugin.is_null() {
             return;
         }

@@ -21,13 +21,21 @@ pub mod version;
 
 pub mod prelude {
     #[doc(inline)]
-    pub use crate::ext::audio_ports::{AudioPorts, MonoPorts, StereoPorts};
-    #[doc(inline)]
     pub use crate::{
         Error, entry,
-        ext::Extensions,
+        events::{InputEvents, OutputEvents},
+        ext::{
+            Extensions,
+            audio_ports::{AudioPorts, MonoPorts, StereoPorts},
+            log::{HostLog, Severity},
+            params::{
+                HostParams, ParamClearFlags, ParamInfo, ParamInfoFlags, ParamRescanFlags, Params,
+            },
+        },
         host::Host,
+        id::ClapId,
         plugin::{AudioThread, Plugin},
+        plugin_features::*,
         process::{Process, Status},
     };
 }
@@ -67,7 +75,6 @@ pub enum Error {
     Host(host::Error),
     Id(id::Error),
     Plugin(plugin::Error),
-    Process(process::Error),
     User(Box<dyn std::error::Error + Send + 'static>),
 }
 
@@ -80,7 +87,6 @@ impl std::fmt::Display for Error {
             Events(e) => write!(f, "events error {e}"),
             Extension(e) => write!(f, "extension error {e}"),
             Host(e) => write!(f, "host error: {e}"),
-            Process(e) => write!(f, "process error: {e}"),
             Id(e) => write!(f, "id error: {e}"),
             User(e) => write!(f, "user error: {e}"),
         }

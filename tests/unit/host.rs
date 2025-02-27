@@ -88,7 +88,7 @@ impl<'a> TestBed<'a> {
 
         // Self-referential fields.
         bed.clap_host.host_data = (&raw mut *bed).cast();
-        bed.host = Some(unsafe { Host::new(&raw mut bed.clap_host) });
+        bed.host = Some(unsafe { Host::new_unchecked(&raw mut bed.clap_host) });
 
         Box::into_pin(bed)
     }
