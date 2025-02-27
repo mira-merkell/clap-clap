@@ -30,20 +30,20 @@ pub enum ParamInfoFlags {
     /// Is this param stepped? (integer values only)
     /// if so the double value is converted to integer using a cast (equivalent
     /// to trunc).
-    IsStepped = CLAP_PARAM_IS_STEPPED,
+    Stepped = CLAP_PARAM_IS_STEPPED,
     /// Useful for periodic parameters like a phase
-    IsPeriodic = CLAP_PARAM_IS_PERIODIC,
+    Periodic = CLAP_PARAM_IS_PERIODIC,
     /// The parameter should not be shown to the user, because it is currently
     /// not used. It is not necessary to process automation for this
     /// parameter.
-    IsHidden = CLAP_PARAM_IS_HIDDEN,
+    Hidden = CLAP_PARAM_IS_HIDDEN,
     /// The parameter can't be changed by the host.
-    IsReadonly = CLAP_PARAM_IS_READONLY,
+    Readonly = CLAP_PARAM_IS_READONLY,
     /// This parameter is used to merge the plugin and host bypass button.
     /// It implies that the parameter is stepped.
     /// min: 0 -> bypass off
     /// max: 1 -> bypass on
-    IsBypass = CLAP_PARAM_IS_BYPASS,
+    Bypass = CLAP_PARAM_IS_BYPASS,
     /// When set:
     /// - automation can be recorded
     /// - automation can be played back
@@ -56,25 +56,25 @@ pub enum ParamInfoFlags {
     /// re-allocate its working buffers, then it should call
     /// host->request_restart(), and perform the change once the plugin is
     /// re-activated.
-    IsAutomatable = CLAP_PARAM_IS_AUTOMATABLE,
+    Automatable = CLAP_PARAM_IS_AUTOMATABLE,
     /// Does this parameter support per note automations?
-    IsAutomatablePerNoteId = CLAP_PARAM_IS_AUTOMATABLE_PER_NOTE_ID,
+    AutomatablePerNoteId = CLAP_PARAM_IS_AUTOMATABLE_PER_NOTE_ID,
     /// Does this parameter support per key automations?
-    IsAutomatablePerKey = CLAP_PARAM_IS_AUTOMATABLE_PER_KEY,
+    AutomatablePerKey = CLAP_PARAM_IS_AUTOMATABLE_PER_KEY,
     /// Does this parameter support per channel automations?
-    IsAutomatablePerChannel = CLAP_PARAM_IS_AUTOMATABLE_PER_CHANNEL,
+    AutomatablePerChannel = CLAP_PARAM_IS_AUTOMATABLE_PER_CHANNEL,
     /// Does this parameter support per port automations?
-    IsAutomatablePerPort = CLAP_PARAM_IS_AUTOMATABLE_PER_PORT,
+    AutomatablePerPort = CLAP_PARAM_IS_AUTOMATABLE_PER_PORT,
     /// Does this parameter support the modulation signal?
-    IsModulatable = CLAP_PARAM_IS_MODULATABLE,
+    Modulatable = CLAP_PARAM_IS_MODULATABLE,
     /// Does this parameter support per note modulations?
-    IsModulatablePerNoteId = CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID,
+    ModulatablePerNoteId = CLAP_PARAM_IS_MODULATABLE_PER_NOTE_ID,
     /// Does this parameter support per key modulations?
-    IsModulatablePerKey = CLAP_PARAM_IS_MODULATABLE_PER_KEY,
+    ModulatablePerKey = CLAP_PARAM_IS_MODULATABLE_PER_KEY,
     /// Does this parameter support per channel modulations?
-    IsModulatablePerChannel = CLAP_PARAM_IS_MODULATABLE_PER_CHANNEL,
+    ModulatablePerChannel = CLAP_PARAM_IS_MODULATABLE_PER_CHANNEL,
     /// Does this parameter support per port modulations?
-    IsModulatablePerPort = CLAP_PARAM_IS_MODULATABLE_PER_PORT,
+    ModulatablePerPort = CLAP_PARAM_IS_MODULATABLE_PER_PORT,
     /// Any change to this parameter will affect the plugin output and requires
     /// to be done via process() if the plugin is active.
     ///
@@ -84,7 +84,7 @@ pub enum ParamInfoFlags {
     /// This parameter represents an enumerated value.
     /// If you set this flag, then you must set IsStepped too.
     /// All values from min to max must not have a blank value_to_text().
-    IsEnum = CLAP_PARAM_IS_ENUM,
+    Enum = CLAP_PARAM_IS_ENUM,
 }
 
 impl_flags_u32!(ParamInfoFlags);
@@ -97,32 +97,6 @@ pub struct ParamInfo {
 
     pub flags: u32,
 
-    // This value is optional and set by the plugin.
-    // Its purpose is to provide fast access to the plugin parameter object by
-    // caching its pointer. For instance:
-    //
-    // in clap_plugin_params.get_info():
-    //    Parameter *p = findParameter(param_id);
-    //    param_info->cookie = p;
-    //
-    // later, in clap_plugin.process():
-    //
-    //    Parameter *p = (Parameter *)event->cookie;
-    //    if (!p) [[unlikely]]
-    //       p = findParameter(event->param_id);
-    //
-    // where findParameter() is a function the plugin implements to map
-    // parameter ids to internal objects.
-    //
-    // Important:
-    //  - The cookie is invalidated by a call to clap_host_params->rescan(CLAP_PARAM_RESCAN_ALL) or
-    //    when the plugin is destroyed.
-    //  - The host will either provide the cookie as issued or nullptr in events addressing
-    //    parameters.
-    //  - The plugin must gracefully handle the case of a cookie which is nullptr.
-    //  - Many plugins will process the parameter events more quickly if the host can provide the
-    //    cookie in a faster time than a hashmap lookup per param per event.
-    // pub cookie: Option<NonNull<c_void>>,
     /// The display name. eg: "Volume". This does not need to be unique. Do not
     /// include the module text in this. The host should concatenate/format
     /// the module + name in the case where showing the name alone would be
@@ -235,7 +209,7 @@ mod ffi {
     use std::{
         ffi::{CStr, c_char},
         marker::PhantomData,
-        ptr::slice_from_raw_parts_mut,
+        ptr::{copy_nonoverlapping, slice_from_raw_parts_mut},
     };
 
     use crate::{
@@ -247,6 +221,23 @@ mod ffi {
         },
         plugin::{ClapPlugin, Plugin},
     };
+
+    /// # SAFETY:
+    ///
+    /// `N` must be larger than 0. `src` and `dst` buffers must be
+    /// non-overlapping.
+    ///
+    /// A trailing null byte will be added.  At most `N-1` bytes will be copied.
+    unsafe fn copy_utf8_to_cstr<const N: usize>(src: &str, dst: &mut [c_char; N]) {
+        // N > 0, so subtracting 1 won't underflow.
+        let n = src.len().min(N - 1);
+        // SAFETY: The caller upholds the safety requirements.
+        unsafe {
+            copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr() as *mut _, n);
+        }
+        // n is within bounds.
+        dst[n] = b'\0' as _;
+    }
 
     extern "C-unwind" fn count<E, P>(plugin: *const clap_plugin) -> u32
     where
@@ -302,33 +293,14 @@ mod ffi {
         param_info.id = info.id.into();
         param_info.flags = info.flags;
 
-        // param_info.name.len() > 0, so subtracting 1 won't underflow.
-        let n = info.name.len().min(param_info.name.len() - 1);
-        unsafe {
-            std::ptr::copy_nonoverlapping(
-                info.name.as_ptr(),
-                param_info.name.as_mut_ptr() as *mut _,
-                n,
-            )
-        }
-        // n is within bounds:
-        param_info.name[n] = b'\0' as _;
+        // SAFETY: `param_info.name.len() > 0`, and the buffers aren't overlapping.
+        unsafe { copy_utf8_to_cstr(&info.name, &mut param_info.name) };
+        // SAFETY: `param_info.module.len() > 0`, and the buffers aren't overlapping.
+        unsafe { copy_utf8_to_cstr(&info.module, &mut param_info.module) };
 
-        // param_info.name.len() > 0, so subtracting 1 won't underflow.
-        let n = info.module.len().min(param_info.module.len() - 1);
-        unsafe {
-            std::ptr::copy_nonoverlapping(
-                info.module.as_ptr(),
-                param_info.module.as_mut_ptr() as *mut _,
-                n,
-            )
-        }
-        // n is within bounds:
-        param_info.module[n] = b'\0' as _;
-
-        param_info.default_value = info.default_value;
         param_info.min_value = info.min_value;
         param_info.max_value = info.max_value;
+        param_info.default_value = info.default_value;
         true
     }
 
@@ -389,7 +361,7 @@ mod ffi {
         let plugin = unsafe { clap_plugin.plugin() };
 
         let out_buffer_capacity = if out_buffer_capacity > 0 {
-            debug_assert!((out_buffer_capacity as u64) < usize::MAX as u64);
+            debug_assert!(usize::try_from(out_buffer_capacity).is_ok());
             out_buffer_capacity as usize
         } else {
             return true;
@@ -399,9 +371,9 @@ mod ffi {
         } else {
             return false;
         };
-        // We need to fill `buf` with zeroes, so that the user supplied string will be
+        // We fill `buf` with zeroes, so that the user supplied string will be
         // null-terminated no matter what length.
-        buf.iter_mut().for_each(|b| *b = b'\0');
+        buf.fill(b'\0');
 
         let Ok(param_id) = param_id.try_into() else {
             return false;
@@ -530,10 +502,10 @@ pub enum ParamRescanFlags {
     /// The host will scan all the parameters value.
     /// The host will not record those changes as automation points.
     /// New values takes effect immediately.
-    ClapParamRescanValues = CLAP_PARAM_RESCAN_VALUES,
+    Values = CLAP_PARAM_RESCAN_VALUES,
     /// The value to text conversion changed, and the text needs to be rendered
     /// again.
-    ClapParamRescanText = CLAP_PARAM_RESCAN_TEXT,
+    Text = CLAP_PARAM_RESCAN_TEXT,
     /// The parameter info did change, use this flag for:
     /// - name change
     /// - module change
@@ -541,7 +513,7 @@ pub enum ParamRescanFlags {
     /// - is_hidden (flag)
     ///
     /// New info takes effect immediately.
-    ClapParamRescanInfo = CLAP_PARAM_RESCAN_INFO,
+    Info = CLAP_PARAM_RESCAN_INFO,
     /// Invalidates everything the host knows about parameters.
     /// It can only be used while the plugin is deactivated.
     /// If the plugin is activated use clap_host->restart() and delay any change
@@ -561,7 +533,7 @@ pub enum ParamRescanFlags {
     ///   - min_value
     ///   - max_value
     ///   - cookie
-    ClapParamRescanAll = CLAP_PARAM_RESCAN_ALL,
+    All = CLAP_PARAM_RESCAN_ALL,
 }
 
 impl_flags_u32!(ParamRescanFlags);
@@ -570,11 +542,11 @@ impl_flags_u32!(ParamRescanFlags);
 #[repr(u32)]
 pub enum ParamClearFlags {
     /// Clears all possible references to a parameter
-    ClapParamClearAll = CLAP_PARAM_CLEAR_ALL,
+    All = CLAP_PARAM_CLEAR_ALL,
     /// Clears all automations to a parameter
-    ClapParamClearAutomations = CLAP_PARAM_CLEAR_AUTOMATIONS,
+    Automations = CLAP_PARAM_CLEAR_AUTOMATIONS,
     /// Clears all modulations to a parameter
-    ClapParamClearModulations = CLAP_PARAM_CLEAR_MODULATIONS,
+    Modulations = CLAP_PARAM_CLEAR_MODULATIONS,
 }
 
 impl_flags_u32!(ParamClearFlags);
