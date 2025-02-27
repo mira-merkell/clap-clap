@@ -4,7 +4,7 @@
 
 A [CLAP] plugin runtime. Very much WIP. 🚧
 
-The library documentation is available at [docs.rs][documentation].
+Documentation is available at [docs.rs][documentation].
 
 [CLAP]: https://cleveraudio.org
 
@@ -19,7 +19,21 @@ The library documentation is available at [docs.rs][documentation].
 New minor versions, `0.x.0` will be published once a month throughout 2025. The
 stable version: `1.0.0-beta` planned for Sep 2025.
 
+Already implemented [extensions]:
+
+* [`audio_ports`] (host / plugin)
+* [`log`] (host)
+* [`params`] (host / plugin)
+
 [CLAP API]: https://github.com/free-audio/clap/tree/main/include/clap
+
+[extensions]: https://docs.rs/clap-clap/latest/clap_clap/ext/index.html
+
+[`audio_ports`]: https://docs.rs/clap-clap/latest/clap_clap/ext/audio_ports/index.html
+
+[`log`]: https://docs.rs/clap-clap/latest/clap_clap/ext/log/index.html
+
+[`params`]:https://docs.rs/clap-clap/latest/clap_clap/ext/params/index.html
 
 ## Example (plugin template)
 
