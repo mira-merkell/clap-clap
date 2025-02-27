@@ -155,12 +155,16 @@ pub trait Params<P: Plugin> {
         param_id: ClapId,
         value: f64,
         out_buf: &mut [u8],
-    ) -> Result<(), Error>;
+    ) -> Result<(), crate::Error>;
 
     /// Converts the null-terminated UTF-8 param_value_text into a double and
     /// writes it to out_value. The host can use this to convert user input
     /// into a parameter value.
-    fn text_to_value(plugin: &P, param_id: ClapId, param_value_text: &str) -> Result<f64, Error>;
+    fn text_to_value(
+        plugin: &P,
+        param_id: ClapId,
+        param_value_text: &str,
+    ) -> Result<f64, crate::Error>;
 
     /// Flushes a set of parameter changes.
     /// This method must not be called concurrently to clap_plugin->process().
@@ -188,12 +192,12 @@ impl<P: Plugin> Params<P> for () {
         None
     }
 
-    fn value_to_text(_: &P, _: ClapId, value: f64, _: &mut [u8]) -> Result<(), Error> {
-        Err(Error::ConvertToText(value))
+    fn value_to_text(_: &P, _: ClapId, value: f64, _: &mut [u8]) -> Result<(), crate::Error> {
+        Err(Error::ConvertToText(value).into())
     }
 
-    fn text_to_value(_: &P, _: ClapId, _: &str) -> Result<f64, Error> {
-        Err(Error::ConvertToValue)
+    fn text_to_value(_: &P, _: ClapId, _: &str) -> Result<f64, crate::Error> {
+        Err(Error::ConvertToValue.into())
     }
 
     fn flush_inactive(_: &P, _: &InputEvents, _: &OutputEvents) {}
@@ -414,7 +418,8 @@ mod ffi {
             let text = unsafe { param_value_text.as_ref() }
                 .map(|p| unsafe { CStr::from_ptr(p) }.to_str())
                 .ok_or(Error::Nullptr)??;
-            let value = E::text_to_value(plugin, param_id.try_into()?, text)?;
+            let value = E::text_to_value(plugin, param_id.try_into()?, text)
+                .map_err(|_| Error::ConvertToValue)?;
             unsafe { out_value.as_mut() }
                 .map(|v| *v = value)
                 .ok_or(Error::Nullptr)
@@ -435,7 +440,7 @@ mod ffi {
             return;
         };
         let in_events = if r#in.size.is_some() && r#in.get.is_some() {
-            unsafe { InputEvents::new_unchecked(&*r#in) }
+            unsafe { InputEvents::new_unchecked(r#in) }
         } else {
             return;
         };

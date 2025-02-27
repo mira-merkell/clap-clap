@@ -19,10 +19,7 @@
 
 use std::sync::Arc;
 
-use clap_clap::{
-    plugin_features::{PLUGIN_FEATURE_AUDIO_EFFECT, PLUGIN_FEATURE_STEREO},
-    prelude as clap,
-};
+use clap_clap::prelude as clap;
 
 // A plugin must implement `Default` trait.  The plugin instance will be created
 // by the host with the call to `MyPlug::default()`.
@@ -54,7 +51,11 @@ impl clap::Plugin for MyPlug {
     const DESCRIPTION: &'static str = "The plugin description.";
 
     fn features() -> impl Iterator<Item = &'static str> {
-        [PLUGIN_FEATURE_AUDIO_EFFECT, PLUGIN_FEATURE_STEREO].into_iter()
+        [
+            clap::PLUGIN_FEATURE_AUDIO_EFFECT,
+            clap::PLUGIN_FEATURE_STEREO,
+        ]
+        .into_iter()
     }
 
     fn init(&mut self, host: Arc<clap::Host>) -> Result<(), clap::Error> {

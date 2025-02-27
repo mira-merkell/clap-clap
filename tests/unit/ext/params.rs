@@ -113,7 +113,7 @@ impl Params<TestPlugin> for TestParams {
         _: ClapId,
         value: f64,
         out_buf: &mut [u8],
-    ) -> Result<(), clap_clap::ext::params::Error> {
+    ) -> Result<(), Error> {
         for (d, &s) in out_buf.iter_mut().zip(format!("{value:.3}").as_bytes()) {
             *d = s;
         }
@@ -124,12 +124,12 @@ impl Params<TestPlugin> for TestParams {
         _: &TestPlugin,
         param_id: ClapId,
         param_value_text: &str,
-    ) -> Result<f64, clap_clap::ext::params::Error> {
+    ) -> Result<f64, Error> {
         if param_id != ClapId::from(0) {
-            return Err(ConvertToValue);
+            return Err(ConvertToValue.into());
         }
 
-        param_value_text.parse().map_err(|_| ConvertToValue)
+        param_value_text.parse().map_err(|_| ConvertToValue.into())
     }
 
     fn flush_inactive(plugin: &TestPlugin, _: &InputEvents, _: &OutputEvents) {

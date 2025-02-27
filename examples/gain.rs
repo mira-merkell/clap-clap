@@ -3,12 +3,7 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-use clap_clap::{
-    events::{InputEvents, OutputEvents},
-    ext::params::{Error, ParamInfo, ParamInfoFlags, Params},
-    id::ClapId,
-    prelude as clap,
-};
+use clap_clap::prelude as clap;
 
 // A plugin must implement `Default` trait.  The plugin instance will be created
 // by the host with the call to `MyPlug::default()`.
@@ -32,23 +27,24 @@ impl clap::Extensions<Self> for Gain {
         Some(clap::StereoPorts::<1, 1>)
     }
 
-    fn params() -> Option<impl Params<Self>> {
+    fn params() -> Option<impl clap::Params<Self>> {
         Some(GainParam)
     }
 }
 
 struct GainParam;
 
-impl Params<Gain> for GainParam {
+impl clap::Params<Gain> for GainParam {
     fn count(_: &Gain) -> u32 {
         1
     }
 
-    fn get_info(_: &Gain, param_index: u32) -> Option<ParamInfo> {
+    fn get_info(_: &Gain, param_index: u32) -> Option<clap::ParamInfo> {
         if param_index == 0 {
-            Some(ParamInfo {
-                id: ClapId::from(0),
-                flags: ParamInfoFlags::RequiresProcess as u32 | ParamInfoFlags::Modulatable as u32,
+            Some(clap::ParamInfo {
+                id: clap::ClapId::from(0),
+                flags: clap::ParamInfoFlags::RequiresProcess as u32
+                    | clap::ParamInfoFlags::Modulatable as u32,
                 name: "Gain".to_string(),
                 module: "gain".to_string(),
                 min_value: 0.0,
@@ -60,8 +56,8 @@ impl Params<Gain> for GainParam {
         }
     }
 
-    fn get_value(plugin: &Gain, param_id: ClapId) -> Option<f64> {
-        if param_id == ClapId::from(0) {
+    fn get_value(plugin: &Gain, param_id: clap::ClapId) -> Option<f64> {
+        if param_id == clap::ClapId::from(0) {
             let gain = f64::from_bits(plugin.gain.0.load(Ordering::Relaxed));
             let gain_mod = f64::from_bits(plugin.gain.1.load(Ordering::Relaxed));
             Some(gain + gain_mod)
@@ -70,20 +66,36 @@ impl Params<Gain> for GainParam {
         }
     }
 
-    fn value_to_text(_: &Gain, _: ClapId, value: f64, out_buf: &mut [u8]) -> Result<(), Error> {
+    fn value_to_text(
+        _: &Gain,
+        _: clap::ClapId,
+        value: f64,
+        out_buf: &mut [u8],
+    ) -> Result<(), clap::Error> {
         for (out, &c) in out_buf.iter_mut().zip(format!("{value:.2}").as_bytes()) {
             *out = c;
         }
         Ok(())
     }
 
-    fn text_to_value(_: &Gain, _: ClapId, param_value_text: &str) -> Result<f64, Error> {
-        param_value_text.parse().map_err(|_| Error::ConvertToValue)
+    fn text_to_value(
+        _: &Gain,
+        _: clap::ClapId,
+        param_value_text: &str,
+    ) -> Result<f64, clap::Error> {
+        param_value_text
+            .parse()
+            .map_err(|_| clap_clap::ext::params::Error::ConvertToValue.into())
     }
 
-    fn flush_inactive(_: &Gain, _: &InputEvents, _: &OutputEvents) {}
+    fn flush_inactive(_: &Gain, _: &clap::InputEvents, _: &clap::OutputEvents) {}
 
-    fn flush(_: &<Gain as clap::Plugin>::AudioThread, _: &InputEvents, _: &OutputEvents) {}
+    fn flush(
+        _: &<Gain as clap::Plugin>::AudioThread,
+        _: &clap::InputEvents,
+        _: &clap::OutputEvents,
+    ) {
+    }
 }
 
 impl clap::Plugin for Gain {

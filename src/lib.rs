@@ -23,6 +23,7 @@ pub mod prelude {
     #[doc(inline)]
     pub use crate::{
         Error, entry,
+        events::{InputEvents, OutputEvents},
         ext::{
             Extensions,
             audio_ports::{AudioPorts, MonoPorts, StereoPorts},
@@ -32,7 +33,9 @@ pub mod prelude {
             },
         },
         host::Host,
+        id::ClapId,
         plugin::{AudioThread, Plugin},
+        plugin_features::*,
         process::{Process, Status},
     };
 }
