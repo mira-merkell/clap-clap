@@ -18,5 +18,9 @@ name = "gain"
 crate-type = ["cdylib"]
 
 [[example]]
+name = "midi_thru"
+crate-type = ["cdylib"]
+
+[[example]]
 name = "plugin_template"
 crate-type = ["cdylib"]
