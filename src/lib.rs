@@ -26,8 +26,12 @@ pub mod prelude {
         events::{InputEvents, OutputEvents},
         ext::{
             Extensions,
-            audio_ports::{AudioPorts, MonoPorts, StereoPorts},
+            audio_ports::{
+                AudioPortFlags, AudioPortInfo, AudioPortType, AudioPorts, MonoPorts, RescanFlags,
+                StereoPorts,
+            },
             log::{HostLog, Severity},
+            note_ports::{NoteDialect, NotePortInfo, NotePorts},
             params::{
                 HostParams, ParamClearFlags, ParamInfo, ParamInfoFlags, ParamRescanFlags, Params,
             },
