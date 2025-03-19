@@ -2,23 +2,41 @@
 
 use std::{
     fmt::{Display, Formatter},
+    mem,
     ptr::{null_mut, slice_from_raw_parts},
 };
 
 use crate::{
     ffi::{
-        CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_MIDI, CLAP_EVENT_MIDI2, CLAP_EVENT_PARAM_MOD,
-        CLAP_EVENT_PARAM_VALUE, CLAP_EVENT_TRANSPORT, CLAP_TRANSPORT_HAS_BEATS_TIMELINE,
-        CLAP_TRANSPORT_HAS_SECONDS_TIMELINE, CLAP_TRANSPORT_HAS_TEMPO,
-        CLAP_TRANSPORT_HAS_TIME_SIGNATURE, CLAP_TRANSPORT_IS_LOOP_ACTIVE,
+        CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_DONT_RECORD, CLAP_EVENT_IS_LIVE, CLAP_EVENT_MIDI,
+        CLAP_EVENT_MIDI2, CLAP_EVENT_NOTE_CHOKE, CLAP_EVENT_NOTE_END, CLAP_EVENT_NOTE_OFF,
+        CLAP_EVENT_NOTE_ON, CLAP_EVENT_PARAM_MOD, CLAP_EVENT_PARAM_VALUE, CLAP_EVENT_TRANSPORT,
+        CLAP_TRANSPORT_HAS_BEATS_TIMELINE, CLAP_TRANSPORT_HAS_SECONDS_TIMELINE,
+        CLAP_TRANSPORT_HAS_TEMPO, CLAP_TRANSPORT_HAS_TIME_SIGNATURE, CLAP_TRANSPORT_IS_LOOP_ACTIVE,
         CLAP_TRANSPORT_IS_PLAYING, CLAP_TRANSPORT_IS_RECORDING, CLAP_TRANSPORT_IS_WITHIN_PRE_ROLL,
-        clap_event_header, clap_event_midi, clap_event_midi2, clap_event_param_mod,
-        clap_event_param_value, clap_event_transport, clap_input_events, clap_output_events,
+        clap_event_header, clap_event_midi, clap_event_midi2, clap_event_note,
+        clap_event_param_mod, clap_event_param_value, clap_event_transport, clap_input_events,
+        clap_output_events,
     },
     fixedpoint::{BeatTime, SecTime},
     id::ClapId,
     impl_flags_u32,
 };
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[repr(u32)]
+pub enum EventFlags {
+    /// Indicate a live user event, for example a user turning a physical knob
+    /// or playing a physical key.
+    IsLive = CLAP_EVENT_IS_LIVE,
+    /// Indicate that the event should not be recorded.
+    /// For example this is useful when a parameter changes because of a MIDI
+    /// CC, because if the host records both the MIDI CC automation and the
+    /// parameter automation there will be a conflict.
+    DontRecord = CLAP_EVENT_DONT_RECORD,
+}
+
+impl_flags_u32!(EventFlags);
 
 macro_rules! impl_event_cast_methods {
     ($name:tt, $name_unchecked:tt, $type:ty, $cast_type:ty, $clap_id:ident $(,)?) => {
@@ -37,7 +55,7 @@ macro_rules! impl_event_cast_methods {
             if self.size() != size_of::<$cast_type>() as u32 {
                 return Err(Error::PayloadSize(self.size()));
             }
-            // SAFETY: We just checked if `self` is a event of type to be cast to.
+            // SAFETY: We just checked if `self` is an event of type to be cast to.
             Ok(unsafe { <$type>::new_unchecked(self) })
         }
     };
@@ -105,6 +123,30 @@ impl Header {
 
     pub const fn r#type(&self) -> u16 {
         self.as_clap_event_header().r#type
+    }
+
+    /// # Safety
+    /// The caller must ensure that this `Header` has correct
+    /// size and type to contain the header and the payload of event of the
+    /// returned type: `note`.
+    pub const unsafe fn note_unchecked(&self) -> Note {
+        unsafe { Note::new_unchecked(self) }
+    }
+
+    pub const fn note(&self) -> Result<Note, Error> {
+        if self.r#type() != CLAP_EVENT_NOTE_ON as u16
+            && self.r#type() != CLAP_EVENT_NOTE_OFF as u16
+            && self.r#type() != CLAP_EVENT_NOTE_CHOKE as u16
+            && self.r#type() != CLAP_EVENT_NOTE_END as u16
+        {
+            return Err(Error::OtherType(self.r#type()));
+        }
+
+        if self.size() != size_of::<clap_event_note>() as u32 {
+            return Err(Error::PayloadSize(self.size()));
+        }
+        // SAFETY: We just checked if `self` is an event of type to be cast to.
+        Ok(unsafe { Note::new_unchecked(self) })
     }
 
     impl_event_cast_methods!(
@@ -214,6 +256,113 @@ macro_rules! impl_event_builder {
         }
     };
 }
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+#[repr(u16)]
+pub enum NoteKind {
+    On = CLAP_EVENT_NOTE_ON as u16,
+    Off = CLAP_EVENT_NOTE_OFF as u16,
+    Choke = CLAP_EVENT_NOTE_CHOKE as u16,
+    End = CLAP_EVENT_NOTE_END as u16,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Note<'a> {
+    header: &'a Header,
+    pub kind: NoteKind,
+}
+
+impl<'a> Note<'a> {
+    /// # Safety
+    ///
+    /// The `header` must be a header of type: `clap_event_note`.
+    pub const unsafe fn new_unchecked(header: &'a Header) -> Self {
+        // SAFETY: By the constructor safety requirements, the cast is sound,
+        // because NoteKind is repr(u16) and it is a valid note event.
+        let kind: NoteKind = unsafe { mem::transmute(header.r#type()) };
+
+        Self { header, kind }
+    }
+
+    const fn as_clap_event_note(&self) -> &clap_event_note {
+        // SAFETY: By construction, this cast is safe.
+        unsafe { self.header.cast_unchecked() }
+    }
+
+    impl_event_const_getter!(note_id, as_clap_event_note, i32);
+    impl_event_const_getter!(port_index, as_clap_event_note, i16);
+    impl_event_const_getter!(channel, as_clap_event_note, i16);
+    impl_event_const_getter!(key, as_clap_event_note, i16);
+    impl_event_const_getter!(velocity, as_clap_event_note, f64);
+
+    pub const fn build(kind: NoteKind) -> NoteBuilder {
+        NoteBuilder::new(kind)
+    }
+
+    pub fn update(&self) -> NoteBuilder {
+        NoteBuilder::with_note(self)
+    }
+}
+
+impl Event for Note<'_> {
+    fn header(&self) -> &Header {
+        self.header
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct NoteBuilder(clap_event_note);
+
+impl NoteBuilder {
+    pub const fn new(kind: NoteKind) -> Self {
+        Self(clap_event_note {
+            header: clap_event_header {
+                size: size_of::<clap_event_note>() as u32,
+                time: 0,
+                space_id: CLAP_CORE_EVENT_SPACE_ID,
+                r#type: kind as u16,
+                flags: 0,
+            },
+            note_id: 0,
+            port_index: 0,
+            channel: 0,
+            key: 0,
+            velocity: 0.0,
+        })
+    }
+
+    pub fn with_note(note: &Note<'_>) -> Self {
+        // SAFETY: ParamValue constructor guarantees that this cast is safe, and we can
+        // copy the object of type: `clap_event_param_value`.
+        Self(*unsafe { note.header().cast_unchecked() })
+    }
+
+    impl_event_builder_setter!(note_id, i32);
+    impl_event_builder_setter!(port_index, i16);
+    impl_event_builder_setter!(channel, i16);
+    impl_event_builder_setter!(key, i16);
+    impl_event_builder_setter!(velocity, f64);
+
+    pub const fn kind(self, value: NoteKind) -> Self {
+        let mut build = self;
+        build.0.header.r#type = value as u16;
+        build
+    }
+}
+
+impl Default for NoteBuilder {
+    fn default() -> Self {
+        Self::new(NoteKind::On)
+    }
+}
+
+impl From<clap_event_note> for NoteBuilder {
+    fn from(value: clap_event_note) -> Self {
+        Self(value)
+    }
+}
+
+impl_event_builder!(NoteBuilder, Note<'a>, note_unchecked);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ParamValue<'a> {
