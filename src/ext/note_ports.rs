@@ -6,6 +6,7 @@ use crate::{
         CLAP_NOTE_DIALECT_MIDI2, clap_note_port_info,
     },
     id::ClapId,
+    impl_flags_u32,
     plugin::Plugin,
 };
 
@@ -39,6 +40,8 @@ pub enum NoteDialect {
     /// Uses clap_event_midi2
     Midi2 = CLAP_NOTE_DIALECT_MIDI2,
 }
+
+impl_flags_u32!(NoteDialect);
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct NotePortInfo {
