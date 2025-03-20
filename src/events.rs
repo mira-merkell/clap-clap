@@ -887,113 +887,6 @@ impl From<clap_event_transport> for TransportBuilder {
 impl_event_builder!(TransportBuilder, Transport<'a>, transport_unchecked);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Midi2<'a> {
-    header: &'a Header,
-}
-
-impl<'a> Midi2<'a> {
-    /// # Safety
-    ///
-    /// The `header` must be a header of type: `clap_event_midi2`.
-    pub const unsafe fn new_unchecked(header: &'a Header) -> Self {
-        Self { header }
-    }
-
-    const fn as_clap_event_midi2(&self) -> &clap_event_midi2 {
-        // SAFETY: By construction, this cast is safe.
-        unsafe { self.header.cast_unchecked() }
-    }
-
-    impl_event_const_getter!(port_index, as_clap_event_midi2, u16);
-
-    pub const fn data(&self) -> &[u32; 4] {
-        &self.as_clap_event_midi2().data
-    }
-
-    /// # Example
-    ///
-    /// ```rust
-    /// # use clap_clap::events::{Event, EventBuilder,Midi2};
-    /// let midi = Midi2::build().port_index(1).time(3);
-    /// let event = midi.event();
-    ///
-    /// assert_eq!(event.port_index(), 1);
-    /// assert_eq!(event.header().time(), 3);
-    /// ```
-    pub const fn build() -> Midi2Builder {
-        Midi2Builder::new()
-    }
-
-    /// # Example
-    ///
-    /// ```rust
-    /// # use clap_clap::events::{Event, EventBuilder,Midi2};
-    /// let midi = Midi2::build().port_index(1).data([1, 2, 3, 4]);
-    /// let event = midi.event();
-    ///
-    /// let other_midi = event.update().data([4, 5, 6, 7]);
-    /// let other_event = other_midi.event();
-    ///
-    /// assert_eq!(event.port_index(), 1);
-    /// assert_eq!(event.data(), &[1, 2, 3, 4]);
-    ///
-    /// assert_eq!(other_event.port_index(), 1);
-    /// assert_eq!(other_event.data(), &[4, 5, 6, 7]);
-    /// ```
-    pub fn update(&self) -> Midi2Builder {
-        Midi2Builder::with_midi2(self)
-    }
-}
-
-impl Event for Midi2<'_> {
-    fn header(&self) -> &Header {
-        self.header
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct Midi2Builder(clap_event_midi2);
-
-impl Midi2Builder {
-    pub const fn new() -> Self {
-        Self(clap_event_midi2 {
-            header: clap_event_header {
-                size: size_of::<clap_event_midi2>() as u32,
-                time: 0,
-                space_id: CLAP_CORE_EVENT_SPACE_ID,
-                r#type: CLAP_EVENT_MIDI2 as u16,
-                flags: 0,
-            },
-            port_index: 0,
-            data: [0; 4],
-        })
-    }
-
-    pub fn with_midi2(midi: &Midi2<'_>) -> Self {
-        // SAFETY: Midi constructor guarantees that this cast is safe, and we can copy
-        // the object of type: `clap_event_midi2`.
-        Self(*unsafe { midi.header().cast_unchecked() })
-    }
-
-    impl_event_builder_setter!(port_index, u16);
-    impl_event_builder_setter!(data, [u32; 4]);
-}
-
-impl Default for Midi2Builder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl From<clap_event_midi2> for Midi2Builder {
-    fn from(value: clap_event_midi2) -> Self {
-        Self(value)
-    }
-}
-
-impl_event_builder!(Midi2Builder, Midi2<'a>, midi2_unchecked);
-
-#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Midi<'a> {
     header: &'a Header,
 }
@@ -1099,6 +992,113 @@ impl From<clap_event_midi> for MidiBuilder {
 }
 
 impl_event_builder!(MidiBuilder, Midi<'a>, midi_unchecked);
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Midi2<'a> {
+    header: &'a Header,
+}
+
+impl<'a> Midi2<'a> {
+    /// # Safety
+    ///
+    /// The `header` must be a header of type: `clap_event_midi2`.
+    pub const unsafe fn new_unchecked(header: &'a Header) -> Self {
+        Self { header }
+    }
+
+    const fn as_clap_event_midi2(&self) -> &clap_event_midi2 {
+        // SAFETY: By construction, this cast is safe.
+        unsafe { self.header.cast_unchecked() }
+    }
+
+    impl_event_const_getter!(port_index, as_clap_event_midi2, u16);
+
+    pub const fn data(&self) -> &[u32; 4] {
+        &self.as_clap_event_midi2().data
+    }
+
+    /// # Example
+    ///
+    /// ```rust
+    /// # use clap_clap::events::{Event, EventBuilder,Midi2};
+    /// let midi = Midi2::build().port_index(1).time(3);
+    /// let event = midi.event();
+    ///
+    /// assert_eq!(event.port_index(), 1);
+    /// assert_eq!(event.header().time(), 3);
+    /// ```
+    pub const fn build() -> Midi2Builder {
+        Midi2Builder::new()
+    }
+
+    /// # Example
+    ///
+    /// ```rust
+    /// # use clap_clap::events::{Event, EventBuilder,Midi2};
+    /// let midi = Midi2::build().port_index(1).data([1, 2, 3, 4]);
+    /// let event = midi.event();
+    ///
+    /// let other_midi = event.update().data([4, 5, 6, 7]);
+    /// let other_event = other_midi.event();
+    ///
+    /// assert_eq!(event.port_index(), 1);
+    /// assert_eq!(event.data(), &[1, 2, 3, 4]);
+    ///
+    /// assert_eq!(other_event.port_index(), 1);
+    /// assert_eq!(other_event.data(), &[4, 5, 6, 7]);
+    /// ```
+    pub fn update(&self) -> Midi2Builder {
+        Midi2Builder::with_midi2(self)
+    }
+}
+
+impl Event for Midi2<'_> {
+    fn header(&self) -> &Header {
+        self.header
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Midi2Builder(clap_event_midi2);
+
+impl Midi2Builder {
+    pub const fn new() -> Self {
+        Self(clap_event_midi2 {
+            header: clap_event_header {
+                size: size_of::<clap_event_midi2>() as u32,
+                time: 0,
+                space_id: CLAP_CORE_EVENT_SPACE_ID,
+                r#type: CLAP_EVENT_MIDI2 as u16,
+                flags: 0,
+            },
+            port_index: 0,
+            data: [0; 4],
+        })
+    }
+
+    pub fn with_midi2(midi: &Midi2<'_>) -> Self {
+        // SAFETY: Midi constructor guarantees that this cast is safe, and we can copy
+        // the object of type: `clap_event_midi2`.
+        Self(*unsafe { midi.header().cast_unchecked() })
+    }
+
+    impl_event_builder_setter!(port_index, u16);
+    impl_event_builder_setter!(data, [u32; 4]);
+}
+
+impl Default for Midi2Builder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl From<clap_event_midi2> for Midi2Builder {
+    fn from(value: clap_event_midi2) -> Self {
+        Self(value)
+    }
+}
+
+impl_event_builder!(Midi2Builder, Midi2<'a>, midi2_unchecked);
 
 pub struct InputEvents<'a>(&'a clap_input_events);
 
