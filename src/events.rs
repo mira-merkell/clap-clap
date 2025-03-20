@@ -9,14 +9,17 @@ use std::{
 use crate::{
     ffi::{
         CLAP_CORE_EVENT_SPACE_ID, CLAP_EVENT_DONT_RECORD, CLAP_EVENT_IS_LIVE, CLAP_EVENT_MIDI,
-        CLAP_EVENT_MIDI2, CLAP_EVENT_NOTE_CHOKE, CLAP_EVENT_NOTE_END, CLAP_EVENT_NOTE_OFF,
-        CLAP_EVENT_NOTE_ON, CLAP_EVENT_PARAM_MOD, CLAP_EVENT_PARAM_VALUE, CLAP_EVENT_TRANSPORT,
+        CLAP_EVENT_MIDI2, CLAP_EVENT_NOTE_CHOKE, CLAP_EVENT_NOTE_END, CLAP_EVENT_NOTE_EXPRESSION,
+        CLAP_EVENT_NOTE_OFF, CLAP_EVENT_NOTE_ON, CLAP_EVENT_PARAM_MOD, CLAP_EVENT_PARAM_VALUE,
+        CLAP_EVENT_TRANSPORT, CLAP_NOTE_EXPRESSION_BRIGHTNESS, CLAP_NOTE_EXPRESSION_EXPRESSION,
+        CLAP_NOTE_EXPRESSION_PAN, CLAP_NOTE_EXPRESSION_PRESSURE, CLAP_NOTE_EXPRESSION_TUNING,
+        CLAP_NOTE_EXPRESSION_VIBRATO, CLAP_NOTE_EXPRESSION_VOLUME,
         CLAP_TRANSPORT_HAS_BEATS_TIMELINE, CLAP_TRANSPORT_HAS_SECONDS_TIMELINE,
         CLAP_TRANSPORT_HAS_TEMPO, CLAP_TRANSPORT_HAS_TIME_SIGNATURE, CLAP_TRANSPORT_IS_LOOP_ACTIVE,
         CLAP_TRANSPORT_IS_PLAYING, CLAP_TRANSPORT_IS_RECORDING, CLAP_TRANSPORT_IS_WITHIN_PRE_ROLL,
         clap_event_header, clap_event_midi, clap_event_midi2, clap_event_note,
-        clap_event_param_mod, clap_event_param_value, clap_event_transport, clap_input_events,
-        clap_output_events,
+        clap_event_note_expression, clap_event_param_mod, clap_event_param_value,
+        clap_event_transport, clap_input_events, clap_note_expression, clap_output_events,
     },
     fixedpoint::{BeatTime, SecTime},
     id::ClapId,
@@ -148,6 +151,14 @@ impl Header {
         // SAFETY: We just checked if `self` is an event of type to be cast to.
         Ok(unsafe { Note::new_unchecked(self) })
     }
+
+    impl_event_cast_methods!(
+        note_expression,
+        note_expression_unchecked,
+        NoteExpression,
+        clap_event_note_expression,
+        CLAP_EVENT_NOTE_EXPRESSION
+    );
 
     impl_event_cast_methods!(
         param_value,
@@ -363,6 +374,132 @@ impl From<clap_event_note> for NoteBuilder {
 }
 
 impl_event_builder!(NoteBuilder, Note<'a>, note_unchecked);
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+#[repr(u32)]
+pub enum NoteExpressionId {
+    /// with 0 < x <= 4, plain = 20 * log(x)
+    Volume = CLAP_NOTE_EXPRESSION_VOLUME as u32,
+
+    /// pan, 0 left, 0.5 center, 1 right
+    Pan = CLAP_NOTE_EXPRESSION_PAN as u32,
+
+    /// Relative tuning in semitones, from -120 to +120. Semitones are in
+    /// equal temperament and are doubles; the resulting note would be
+    /// retuned by `100 * evt->value` cents.
+    Tuning = CLAP_NOTE_EXPRESSION_TUNING as u32,
+
+    /// 0..1
+    Vibrato = CLAP_NOTE_EXPRESSION_VIBRATO as u32,
+    Expression = CLAP_NOTE_EXPRESSION_EXPRESSION as u32,
+    Brightness = CLAP_NOTE_EXPRESSION_BRIGHTNESS as u32,
+    Pressure = CLAP_NOTE_EXPRESSION_PRESSURE as u32,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct NoteExpression<'a> {
+    header: &'a Header,
+}
+
+impl<'a> NoteExpression<'a> {
+    /// # Safety
+    ///
+    /// The `header` must be a header of type: `clap_event_note_expression`.
+    pub const unsafe fn new_unchecked(header: &'a Header) -> Self {
+        Self { header }
+    }
+
+    const fn as_clap_event_note_expression(&self) -> &clap_event_note_expression {
+        // SAFETY: By construction, this cast is safe.
+        unsafe { self.header.cast_unchecked() }
+    }
+
+    impl_event_const_getter!(note_id, as_clap_event_note_expression, i32);
+    impl_event_const_getter!(port_index, as_clap_event_note_expression, i16);
+    impl_event_const_getter!(channel, as_clap_event_note_expression, i16);
+    impl_event_const_getter!(key, as_clap_event_note_expression, i16);
+    impl_event_const_getter!(value, as_clap_event_note_expression, f64);
+
+    pub const fn expression_id(&self) -> NoteExpressionId {
+        let id = self.as_clap_event_note_expression().expression_id;
+        // SAFETY: NoteExpressionId is repr(u32) and id is a valid expression_id by
+        // construction.
+        unsafe { mem::transmute(id) }
+    }
+
+    pub const fn build(expression_id: NoteExpressionId) -> NoteExpressionBuilder {
+        NoteExpressionBuilder::new(expression_id)
+    }
+
+    pub fn update(&self) -> NoteExpressionBuilder {
+        NoteExpressionBuilder::with_note_expression(self)
+    }
+}
+
+impl Event for NoteExpression<'_> {
+    fn header(&self) -> &Header {
+        self.header
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct NoteExpressionBuilder(clap_event_note_expression);
+
+impl NoteExpressionBuilder {
+    pub const fn new(expression_id: NoteExpressionId) -> Self {
+        Self(clap_event_note_expression {
+            header: clap_event_header {
+                size: size_of::<clap_event_note_expression>() as u32,
+                time: 0,
+                space_id: CLAP_CORE_EVENT_SPACE_ID,
+                r#type: CLAP_EVENT_NOTE_EXPRESSION as u16,
+                flags: 0,
+            },
+            expression_id: expression_id as clap_note_expression,
+            note_id: 0,
+            port_index: 0,
+            channel: 0,
+            key: 0,
+            value: 0.0,
+        })
+    }
+
+    pub fn with_note_expression(expression: &NoteExpression<'_>) -> Self {
+        // SAFETY: NoteExpression constructor guarantees that this cast is safe, and we
+        // can copy the object of type: `clap_event_note_expression`.
+        Self(*unsafe { expression.header().cast_unchecked() })
+    }
+
+    impl_event_builder_setter!(note_id, i32);
+    impl_event_builder_setter!(port_index, i16);
+    impl_event_builder_setter!(channel, i16);
+    impl_event_builder_setter!(key, i16);
+    impl_event_builder_setter!(value, f64);
+
+    pub const fn expression_id(self, value: NoteExpressionId) -> Self {
+        let mut build = self;
+        build.0.expression_id = value as clap_note_expression;
+        build
+    }
+}
+
+impl Default for NoteExpressionBuilder {
+    fn default() -> Self {
+        Self::new(NoteExpressionId::Volume)
+    }
+}
+
+impl From<clap_event_note_expression> for NoteExpressionBuilder {
+    fn from(value: clap_event_note_expression) -> Self {
+        Self(value)
+    }
+}
+
+impl_event_builder!(
+    NoteExpressionBuilder,
+    NoteExpression<'a>,
+    note_expression_unchecked
+);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ParamValue<'a> {
