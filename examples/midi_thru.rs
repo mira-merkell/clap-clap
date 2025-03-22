@@ -1,3 +1,9 @@
+//! This example shows how to implement a simple MIDI Thru device using plugin
+//! NotePorts extension.
+//!
+//! The plugin simply passes all MIDI or MIDI2 data received from its input port
+//! further on to the output port.
+
 use std::sync::Arc;
 
 use clap_clap::prelude as clap;
@@ -7,7 +13,7 @@ struct MidiThru;
 
 impl clap::Extensions<Self> for MidiThru {
     fn note_ports() -> Option<impl clap::NotePorts<Self>> {
-        Some(Self::default())
+        Some(Self {})
     }
 }
 
@@ -20,14 +26,16 @@ impl clap::NotePorts<Self> for MidiThru {
         if index == 0 && is_input {
             Some(clap::NotePortInfo {
                 id: clap::ClapId::from(0),
-                supported_dialects: clap::NoteDialect::Midi as u32,
+                supported_dialects: clap::NoteDialect::Midi as u32
+                    | clap::NoteDialect::Midi2 as u32,
                 preferred_dialect: clap::NoteDialect::Midi as u32,
                 name: "In 1".to_string(),
             })
         } else if index == 0 {
             Some(clap::NotePortInfo {
                 id: clap::ClapId::from(0),
-                supported_dialects: clap::NoteDialect::Midi as u32,
+                supported_dialects: clap::NoteDialect::Midi as u32
+                    | clap::NoteDialect::Midi2 as u32,
                 preferred_dialect: clap::NoteDialect::Midi as u32,
                 name: "Out 1".to_string(),
             })
@@ -50,7 +58,7 @@ impl clap::Plugin for MidiThru {
     const DESCRIPTION: &'static str = "The plugin description.";
 
     fn features() -> impl Iterator<Item = &'static str> {
-        "fx midi instrument".split_whitespace()
+        "fx midi thru".split_whitespace()
     }
 
     fn init(&mut self, _: Arc<clap::Host>) -> Result<(), clap::Error> {
@@ -65,37 +73,21 @@ impl clap::Plugin for MidiThru {
 
 impl clap::AudioThread<Self> for MidiThru {
     fn process(&mut self, process: &mut clap::Process) -> Result<clap::Status, clap::Error> {
-        let nframes = process.frames_count();
-        let nev = process.in_events().size();
-        let mut ev_index = 0;
-        let mut next_ev_frame = if nev > 0 { 0 } else { nframes };
+        let in_events = process.in_events();
+        let mut out_events = process.out_events();
 
-        let mut i = 0;
-        while i < nframes {
-            while ev_index < nev && next_ev_frame == i {
-                {
-                    let in_events = process.in_events();
-                    let header = in_events.get(ev_index);
-                    if header.time() != i {
-                        next_ev_frame = header.time();
-                        break;
-                    }
+        for i in 0..in_events.size() {
+            let header = in_events.get(i);
 
-                    if let Ok(midi) = header.midi() {
-                        let _ = process.out_events().try_push(midi);
-                    }
-                }
-
-                ev_index += 1;
-
-                if ev_index == nev {
-                    next_ev_frame = nframes;
-                    break;
-                }
+            if let Ok(midi) = header.midi() {
+                let _ = out_events.try_push(midi);
             }
 
-            i += 1;
+            if let Ok(midi2) = header.midi2() {
+                let _ = out_events.try_push(midi2);
+            }
         }
+
         Ok(clap::Status::Continue)
     }
 }
