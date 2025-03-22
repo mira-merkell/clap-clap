@@ -120,3 +120,167 @@ mod plugin_note_ports {
         assert_eq!(note_ports.get(0, false), port_info);
     }
 }
+
+mod host_note_ports {
+    use std::{error::Error, pin::Pin};
+
+    use clap_clap::{
+        ext::note_ports::NoteDialect,
+        host,
+        host::Error::{Callback, ExtensionNotFound},
+    };
+
+    use crate::host::{ExtNotePortsConfig, Test, TestBed, TestConfig};
+
+    struct CheckNotePortNotImpl<E: Error> {
+        error: E,
+    }
+
+    impl Test for CheckNotePortNotImpl<host::Error> {
+        fn test(self, bed: Pin<&mut TestBed>) {
+            let host = unsafe { bed.host_mut() };
+            let err = host.get_extension().note_ports().unwrap_err();
+            assert_eq!(err, self.error);
+        }
+    }
+
+    #[test]
+    fn note_port_not_impl() {
+        TestConfig::default().test(CheckNotePortNotImpl {
+            error: ExtensionNotFound("note_ports"),
+        });
+    }
+
+    #[test]
+    fn note_port_no_method_supported_dialects() {
+        TestConfig {
+            ext_note_ports: Some(ExtNotePortsConfig {
+                null_supported_dialects: true,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+        .test(CheckNotePortNotImpl {
+            error: Callback("supported_dialects"),
+        });
+    }
+
+    #[test]
+    fn note_port_no_method_rescan() {
+        TestConfig {
+            ext_note_ports: Some(ExtNotePortsConfig {
+                null_rescan: true,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+        .test(CheckNotePortNotImpl {
+            error: Callback("rescan"),
+        });
+    }
+
+    struct CheckSupportedDialect {
+        supported: NoteDialect,
+        not_supported: Option<NoteDialect>,
+    }
+
+    impl Test for CheckSupportedDialect {
+        fn test(self, mut bed: Pin<&mut TestBed>) {
+            let host = unsafe { bed.as_mut().host_mut() };
+            let note_ports = host.get_extension().note_ports().unwrap();
+
+            assert!(self.supported.is_set(note_ports.supported_dialects()));
+
+            if let Some(flag) = self.not_supported {
+                assert!(!flag.is_set(note_ports.supported_dialects()));
+            }
+        }
+    }
+
+    #[test]
+    fn note_port_supported_flag_01() {
+        TestConfig {
+            ext_note_ports: Some(ExtNotePortsConfig {
+                supported_dialects: !0, // all flags supported
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+        .test(CheckSupportedDialect {
+            supported: NoteDialect::Clap,
+            not_supported: None,
+        })
+        .test(CheckSupportedDialect {
+            supported: NoteDialect::MidiMPE,
+            not_supported: None,
+        });
+    }
+
+    #[test]
+    fn note_port_supported_flag_02() {
+        TestConfig {
+            ext_note_ports: Some(ExtNotePortsConfig {
+                supported_dialects: !(NoteDialect::Clap as u32),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+        .test(CheckSupportedDialect {
+            supported: NoteDialect::MidiMPE,
+            not_supported: Some(NoteDialect::Clap),
+        })
+        .test(CheckSupportedDialect {
+            supported: NoteDialect::Midi2,
+            not_supported: Some(NoteDialect::Clap),
+        });
+    }
+
+    #[test]
+    fn note_port_supported_flag_03() {
+        TestConfig {
+            ext_note_ports: Some(ExtNotePortsConfig {
+                supported_dialects: NoteDialect::Clap as u32,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+        .test(CheckSupportedDialect {
+            supported: NoteDialect::Clap,
+            not_supported: Some(NoteDialect::Midi),
+        })
+        .test(CheckSupportedDialect {
+            supported: NoteDialect::Clap,
+            not_supported: Some(NoteDialect::Midi2),
+        });
+    }
+
+    struct CheckRescanFlags {
+        flags: u32,
+    }
+
+    impl Test for CheckRescanFlags {
+        fn test(self, mut bed: Pin<&mut TestBed>) {
+            let host = unsafe { bed.as_mut().host_mut() };
+            let note_ports = host.get_extension().note_ports().unwrap();
+
+            note_ports.rescan(self.flags);
+
+            assert_eq!(
+                bed.ext_note_ports.as_ref().unwrap().call_rescan_flags,
+                self.flags
+            );
+        }
+    }
+
+    #[test]
+    fn note_port_impl_flag_channel_count() {
+        TestConfig {
+            ext_note_ports: Some(ExtNotePortsConfig::default()),
+            ..Default::default()
+        }
+        .test(CheckRescanFlags { flags: 0 })
+        .test(CheckRescanFlags { flags: 1 })
+        .test(CheckRescanFlags { flags: 127 })
+        .test(CheckRescanFlags { flags: 128 });
+    }
+}

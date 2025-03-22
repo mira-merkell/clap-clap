@@ -70,6 +70,11 @@ impl NotePortInfo {
 
 pub(crate) use ffi::PluginNotePorts;
 
+use crate::{
+    ffi::{CLAP_NOTE_PORTS_RESCAN_ALL, CLAP_NOTE_PORTS_RESCAN_NAMES, clap_host_note_ports},
+    host::Host,
+};
+
 mod ffi {
     use std::marker::PhantomData;
 
@@ -149,6 +154,56 @@ mod ffi {
                 _marker: PhantomData,
             }
         }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+#[repr(u32)]
+pub enum RescanFlags {
+    /// The ports have changed, the host shall perform a full scan of the ports.
+    /// This flag can only be used if the plugin is not active.
+    /// If the plugin active, call host.request_restart() and then call rescan()
+    /// when the host calls deactivate()
+    All = CLAP_NOTE_PORTS_RESCAN_ALL,
+    /// The ports name did change, the host can scan them right away.
+    Names = CLAP_NOTE_PORTS_RESCAN_NAMES,
+}
+
+impl_flags_u32!(RescanFlags);
+
+#[derive(Debug)]
+pub struct HostNotePorts<'a> {
+    host: &'a Host,
+    clap_host_note_ports: &'a clap_host_note_ports,
+}
+
+impl<'a> HostNotePorts<'a> {
+    /// # Safety
+    ///
+    /// All extension interface function pointers must be non-null (Some), and
+    /// the functions must be thread-safe.
+    pub(crate) const unsafe fn new_unchecked(
+        host: &'a Host,
+        clap_host_note_ports: &'a clap_host_note_ports,
+    ) -> Self {
+        Self {
+            host,
+            clap_host_note_ports,
+        }
+    }
+
+    pub fn supported_dialects(&self) -> u32 {
+        // SAFETY: By construction, the callback must be a valid function pointer,
+        // and the call is thread-safe.
+        let callback = self.clap_host_note_ports.supported_dialects.unwrap();
+        unsafe { callback(self.host.clap_host()) }
+    }
+
+    pub fn rescan(&self, flags: u32) {
+        // SAFETY: By construction, the callback must be a valid function pointer,
+        // and the call is thread-safe.
+        let callback = self.clap_host_note_ports.rescan.unwrap();
+        unsafe { callback(self.host.clap_host(), flags) };
     }
 }
 

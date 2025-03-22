@@ -8,8 +8,9 @@ use std::{
 
 use clap_clap::{
     ffi::{
-        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, CLAP_EXT_PARAMS, clap_host, clap_host_audio_ports,
-        clap_host_log, clap_host_params, clap_id, clap_log_severity,
+        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS, clap_host,
+        clap_host_audio_ports, clap_host_log, clap_host_note_ports, clap_host_params, clap_id,
+        clap_log_severity,
     },
     host::Host,
     version::CLAP_VERSION,
@@ -28,6 +29,7 @@ pub struct TestConfig<'a> {
 
     pub ext_audio_ports: Option<ExtAudioPortsConfig>,
     pub ext_log: Option<ExtLogConfig>,
+    pub ext_note_ports: Option<ExtNotePortsConfig>,
     pub ext_params: Option<ExtParamsConfig>,
 }
 
@@ -55,6 +57,7 @@ pub struct TestBed<'a> {
 
     pub ext_audio_ports: Option<ExtAudioPorts>,
     pub ext_log: Option<ExtLog>,
+    pub ext_note_ports: Option<ExtNotePorts>,
     pub ext_params: Option<ExtParams>,
 
     _marker: PhantomPinned,
@@ -80,6 +83,7 @@ impl<'a> TestBed<'a> {
 
             ext_audio_ports: config.ext_audio_ports.map(ExtAudioPorts::new),
             ext_log: config.ext_log.map(ExtLog::new),
+            ext_note_ports: config.ext_note_ports.map(ExtNotePorts::new),
             ext_params: config.ext_params.map(ExtParams::new),
 
             config,
@@ -123,6 +127,11 @@ extern "C-unwind" fn get_extension(
     if extension_id == CLAP_EXT_LOG {
         if let Some(ext) = &bed.ext_log {
             return (&raw const ext.clap_host_log).cast();
+        }
+    }
+    if extension_id == CLAP_EXT_NOTE_PORTS {
+        if let Some(ext) = &bed.ext_note_ports {
+            return (&raw const ext.clap_host_note_ports).cast();
         }
     }
     if extension_id == CLAP_EXT_PARAMS {
@@ -237,6 +246,52 @@ extern "C-unwind" fn ext_log_log(
     if let Some(ext) = &bed.ext_log {
         let mut buf = ext.log_msg.lock().unwrap();
         buf.push((severity, msg))
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct ExtNotePortsConfig {
+    pub supported_dialects: u32,
+    pub null_supported_dialects: bool,
+    pub null_rescan: bool,
+}
+
+#[derive(Debug)]
+pub struct ExtNotePorts {
+    config: ExtNotePortsConfig,
+    pub clap_host_note_ports: clap_host_note_ports,
+    pub call_rescan_flags: u32,
+}
+
+impl ExtNotePorts {
+    fn new(config: ExtNotePortsConfig) -> Self {
+        Self {
+            config,
+            clap_host_note_ports: clap_host_note_ports {
+                supported_dialects: (!config.null_supported_dialects)
+                    .then_some(ext_note_ports_supported_dialects),
+                rescan: (!config.null_rescan).then_some(ext_note_ports_rescan),
+            },
+            call_rescan_flags: 0,
+        }
+    }
+}
+
+extern "C-unwind" fn ext_note_ports_supported_dialects(host: *const clap_host) -> u32 {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    if let Some(ext) = &bed.ext_note_ports {
+        ext.config.supported_dialects
+    } else {
+        0
+    }
+}
+
+extern "C-unwind" fn ext_note_ports_rescan(host: *const clap_host, flags: u32) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    if let Some(ext) = &mut bed.ext_note_ports {
+        ext.call_rescan_flags = flags;
     }
 }
 

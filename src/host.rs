@@ -4,10 +4,12 @@ use std::{
 };
 
 use crate::{
-    ext::{audio_ports::HostAudioPorts, log::HostLog, params::HostParams},
+    ext::{
+        audio_ports::HostAudioPorts, log::HostLog, note_ports::HostNotePorts, params::HostParams,
+    },
     ffi::{
-        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, CLAP_EXT_PARAMS, clap_host, clap_host_audio_ports,
-        clap_host_log, clap_host_params,
+        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS, clap_host,
+        clap_host_audio_ports, clap_host_log, clap_host_note_ports, clap_host_params,
     },
     version::ClapVersion,
 };
@@ -144,6 +146,26 @@ impl<'a> HostExtensions<'a> {
 
         // SAFETY: We just checked if the methods are non-null (Some).
         Ok(unsafe { HostAudioPorts::new_unchecked(self.host, clap_host_audio_ports) })
+    }
+
+    pub fn note_ports(&self) -> Result<HostNotePorts<'a>, Error> {
+        let clap_host_note_ports = self
+            .get_extension_ptr(CLAP_EXT_NOTE_PORTS)
+            .ok_or(Error::ExtensionNotFound("note_ports"))?;
+
+        // SAFETY: We just checked if the pointer to clap_host_note_ports
+        // is non-null. We return a reference to it for the lifetime of Host.
+        let clap_host_note_ports: &clap_host_note_ports = unsafe { &*clap_host_note_ports.cast() };
+
+        let _ = clap_host_note_ports
+            .supported_dialects
+            .ok_or(Error::Callback("supported_dialects"))?;
+        let _ = clap_host_note_ports
+            .rescan
+            .ok_or(Error::Callback("rescan"))?;
+
+        // SAFETY: We just checked if the methods are non-null (Some).
+        Ok(unsafe { HostNotePorts::new_unchecked(self.host, clap_host_note_ports) })
     }
 
     pub fn log(&self) -> Result<HostLog<'a>, Error> {
