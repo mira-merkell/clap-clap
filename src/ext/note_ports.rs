@@ -43,6 +43,12 @@ pub enum NoteDialect {
 
 impl_flags_u32!(NoteDialect);
 
+impl NoteDialect {
+    pub fn all() -> u32 {
+        !0
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct NotePortInfo {
     pub id: ClapId,

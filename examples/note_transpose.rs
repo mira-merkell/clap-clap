@@ -1,23 +1,22 @@
-//! This example shows how to implement a simple MIDI Thru device using plugin
-//! NotePorts extension.
+//! This example shows how to implement the NotePorts plugin extension.
 //!
-//! The plugin simply passes all MIDI or MIDI2 data received from its input port
-//! further on to the output port.
+//! The plugin transposes incoming CLAP notes by a perfect fifth and passes all
+//! MIDI or MIDI2 data unchanged.
 
 use std::sync::Arc;
 
-use clap_clap::prelude as clap;
+use clap_clap::{events::EventBuilder, prelude as clap};
 
 #[derive(Default)]
-struct MidiThru;
+struct Transpose;
 
-impl clap::Extensions<Self> for MidiThru {
+impl clap::Extensions<Self> for Transpose {
     fn note_ports() -> Option<impl clap::NotePorts<Self>> {
         Some(Self {})
     }
 }
 
-impl clap::NotePorts<Self> for MidiThru {
+impl clap::NotePorts<Self> for Transpose {
     fn count(_: &Self, _: bool) -> u32 {
         1
     }
@@ -26,17 +25,15 @@ impl clap::NotePorts<Self> for MidiThru {
         if index == 0 && is_input {
             Some(clap::NotePortInfo {
                 id: clap::ClapId::from(0),
-                supported_dialects: clap::NoteDialect::Midi as u32
-                    | clap::NoteDialect::Midi2 as u32,
-                preferred_dialect: clap::NoteDialect::Midi as u32,
+                supported_dialects: clap::NoteDialect::all(),
+                preferred_dialect: clap::NoteDialect::Clap as u32,
                 name: "In 1".to_string(),
             })
         } else if index == 0 {
             Some(clap::NotePortInfo {
                 id: clap::ClapId::from(0),
-                supported_dialects: clap::NoteDialect::Midi as u32
-                    | clap::NoteDialect::Midi2 as u32,
-                preferred_dialect: clap::NoteDialect::Midi as u32,
+                supported_dialects: clap::NoteDialect::all(),
+                preferred_dialect: clap::NoteDialect::Clap as u32,
                 name: "Out 1".to_string(),
             })
         } else {
@@ -45,7 +42,7 @@ impl clap::NotePorts<Self> for MidiThru {
     }
 }
 
-impl clap::Plugin for MidiThru {
+impl clap::Plugin for Transpose {
     type AudioThread = Self;
 
     const ID: &'static str = "com.your-company.YourPlugin";
@@ -71,13 +68,22 @@ impl clap::Plugin for MidiThru {
     }
 }
 
-impl clap::AudioThread<Self> for MidiThru {
+impl clap::AudioThread<Self> for Transpose {
     fn process(&mut self, process: &mut clap::Process) -> Result<clap::Status, clap::Error> {
         let in_events = process.in_events();
         let mut out_events = process.out_events();
 
         for i in 0..in_events.size() {
             let header = in_events.get(i);
+
+            if let Ok(note) = header.note() {
+                let n = note.update().key(note.key() + 7); // Transpose notes by a perfect fifth.
+                let _ = out_events.try_push(n.event());
+            }
+
+            if let Ok(note_expr) = header.note_expression() {
+                let _ = out_events.try_push(note_expr);
+            }
 
             if let Ok(midi) = header.midi() {
                 let _ = out_events.try_push(midi);
@@ -93,4 +99,4 @@ impl clap::AudioThread<Self> for MidiThru {
 }
 
 // Export clap_entry symbols and build a plugin factory.
-clap::entry!(MidiThru);
+clap::entry!(Transpose);

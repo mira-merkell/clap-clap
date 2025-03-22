@@ -225,6 +225,7 @@ macro_rules! impl_event_const_getter {
 
 macro_rules! impl_event_builder_setter {
     ($name:tt, $type:ty $(,)*) => {
+        #[must_use]
         pub const fn $name(self, value: $type) -> Self {
             let mut build = self;
             build.0.$name = value;
