@@ -3,8 +3,10 @@ use std::fmt::{Display, Formatter};
 use crate::{
     ffi::{
         CLAP_NOTE_DIALECT_CLAP, CLAP_NOTE_DIALECT_MIDI, CLAP_NOTE_DIALECT_MIDI_MPE,
-        CLAP_NOTE_DIALECT_MIDI2, clap_note_port_info,
+        CLAP_NOTE_DIALECT_MIDI2, CLAP_NOTE_PORTS_RESCAN_ALL, CLAP_NOTE_PORTS_RESCAN_NAMES,
+        clap_host_note_ports, clap_note_port_info,
     },
+    host::Host,
     id::ClapId,
     impl_flags_u32,
     plugin::Plugin,
@@ -75,11 +77,6 @@ impl NotePortInfo {
 }
 
 pub(crate) use ffi::PluginNotePorts;
-
-use crate::{
-    ffi::{CLAP_NOTE_PORTS_RESCAN_ALL, CLAP_NOTE_PORTS_RESCAN_NAMES, clap_host_note_ports},
-    host::Host,
-};
 
 mod ffi {
     use std::marker::PhantomData;
@@ -218,7 +215,7 @@ pub enum Error {}
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "")
+        write!(f, "note ports")
     }
 }
 

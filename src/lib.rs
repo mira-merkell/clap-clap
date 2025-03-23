@@ -23,7 +23,7 @@ pub mod prelude {
     #[doc(inline)]
     pub use crate::{
         Error, entry,
-        events::{self, InputEvents, OutputEvents},
+        events::{self, Event, EventBuilder, InputEvents, OutputEvents},
         ext::{
             self, Extensions,
             audio_ports::{

@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use clap_clap::{events::EventBuilder, prelude as clap};
+use clap_clap::prelude as clap;
 
 #[derive(Default)]
 struct Transpose;
@@ -17,24 +17,25 @@ impl clap::Extensions<Self> for Transpose {
 }
 
 impl clap::NotePorts<Self> for Transpose {
-    fn count(_: &Self, _: bool) -> u32 {
-        1
+    fn count(_: &Self, _is_input: bool) -> u32 {
+        2 // two in, two out
     }
 
     fn get(_: &Self, index: u32, is_input: bool) -> Option<clap::NotePortInfo> {
-        if index == 0 && is_input {
+        if index < 2 {
             Some(clap::NotePortInfo {
-                id: clap::ClapId::from(0),
+                id: if is_input {
+                    clap::ClapId::from(index as u16)
+                } else {
+                    clap::ClapId::from(index as u16 + 2)
+                },
                 supported_dialects: clap::NoteDialect::all(),
                 preferred_dialect: clap::NoteDialect::Clap as u32,
-                name: "In 1".to_string(),
-            })
-        } else if index == 0 {
-            Some(clap::NotePortInfo {
-                id: clap::ClapId::from(0),
-                supported_dialects: clap::NoteDialect::all(),
-                preferred_dialect: clap::NoteDialect::Clap as u32,
-                name: "Out 1".to_string(),
+                name: if is_input {
+                    format!("In {index}")
+                } else {
+                    format!("Out {index}")
+                },
             })
         } else {
             None
@@ -55,7 +56,7 @@ impl clap::Plugin for Transpose {
     const DESCRIPTION: &'static str = "The plugin description.";
 
     fn features() -> impl Iterator<Item = &'static str> {
-        "fx midi thru".split_whitespace()
+        "fx transpose midi thru".split_whitespace()
     }
 
     fn init(&mut self, _: Arc<clap::Host>) -> Result<(), clap::Error> {
@@ -77,6 +78,7 @@ impl clap::AudioThread<Self> for Transpose {
             let header = in_events.get(i);
 
             if let Ok(note) = header.note() {
+                use clap::EventBuilder;
                 let n = note.update().key(note.key() + 7); // Transpose notes by a perfect fifth.
                 let _ = out_events.try_push(n.event());
             }
