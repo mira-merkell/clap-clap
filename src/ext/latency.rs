@@ -15,6 +15,9 @@ impl<P: Plugin> Latency<P> for () {
 }
 
 pub(crate) use ffi::PluginLatency;
+
+use crate::{ffi::clap_host_latency, host::Host};
+
 mod ffi {
     use std::marker::PhantomData;
 
@@ -59,6 +62,36 @@ mod ffi {
                 },
                 _marker: PhantomData,
             }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct HostLatency<'a> {
+    host: &'a Host,
+    clap_host_latency: &'a clap_host_latency,
+}
+
+impl<'a> HostLatency<'a> {
+    /// # Safety
+    ///
+    /// All extension interface function pointers must be non-null (Some), and
+    /// the functions must be thread-safe.
+    pub(crate) const unsafe fn new_unchecked(
+        host: &'a Host,
+        clap_host_latency: &'a clap_host_latency,
+    ) -> Self {
+        Self {
+            host,
+            clap_host_latency,
+        }
+    }
+
+    pub fn changed(&self) {
+        // SAFETY: By construction, the pointer to the interface function: changed() is
+        // non-null.
+        unsafe {
+            self.clap_host_latency.changed.unwrap()(self.host.clap_host());
         }
     }
 }
