@@ -23,18 +23,16 @@ pub mod prelude {
     #[doc(inline)]
     pub use crate::{
         Error, entry,
-        events::{InputEvents, OutputEvents},
+        events::{self, InputEvents, OutputEvents},
         ext::{
-            Extensions,
+            self, Extensions,
             audio_ports::{
-                AudioPortFlags, AudioPortInfo, AudioPortType, AudioPorts, MonoPorts, RescanFlags,
-                StereoPorts,
+                self, AudioPortFlags, AudioPortInfo, AudioPortType, AudioPorts, HostAudioPorts,
+                MonoPorts, StereoPorts,
             },
-            log::{HostLog, Severity},
-            note_ports::{NoteDialect, NotePortInfo, NotePorts},
-            params::{
-                HostParams, ParamClearFlags, ParamInfo, ParamInfoFlags, ParamRescanFlags, Params,
-            },
+            log::{self, HostLog, Severity},
+            note_ports::{self, HostNotePorts, NoteDialect, NotePortInfo, NotePorts},
+            params::{self, HostParams, ParamInfo, Params},
         },
         host::Host,
         id::ClapId,

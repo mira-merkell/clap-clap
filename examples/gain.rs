@@ -43,8 +43,8 @@ impl clap::Params<Gain> for GainParam {
         if param_index == 0 {
             Some(clap::ParamInfo {
                 id: clap::ClapId::from(0),
-                flags: clap::ParamInfoFlags::RequiresProcess as u32
-                    | clap::ParamInfoFlags::Modulatable as u32,
+                flags: clap::params::InfoFlags::RequiresProcess as u32
+                    | clap::params::InfoFlags::Modulatable as u32,
                 name: "Gain".to_string(),
                 module: "gain".to_string(),
                 min_value: 0.0,
