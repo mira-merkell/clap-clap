@@ -87,6 +87,7 @@ impl<P: Plugin> AudioThread<P> for () {
 
 struct PluginExtensions<P> {
     audio_ports: Option<PluginAudioPorts<P>>,
+    note_ports: Option<PluginNotePorts<P>>,
     params: Option<PluginParams<P>>,
 }
 
@@ -94,6 +95,7 @@ impl<P: Plugin> PluginExtensions<P> {
     fn new() -> Self {
         Self {
             audio_ports: <P as Extensions<P>>::audio_ports().map(PluginAudioPorts::new),
+            note_ports: <P as Extensions<P>>::note_ports().map(PluginNotePorts::new),
             params: <P as Extensions<P>>::params().map(PluginParams::new),
         }
     }
@@ -315,7 +317,7 @@ mod desc {
 #[doc(hidden)]
 pub use desc::PluginDescriptor;
 
-use crate::ext::params::PluginParams;
+use crate::ext::{note_ports::PluginNotePorts, params::PluginParams};
 
 mod ffi {
     use std::{
@@ -327,8 +329,8 @@ mod ffi {
 
     use crate::{
         ffi::{
-            CLAP_EXT_AUDIO_PORTS, CLAP_EXT_PARAMS, CLAP_PROCESS_ERROR, clap_plugin, clap_process,
-            clap_process_status,
+            CLAP_EXT_AUDIO_PORTS, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS, CLAP_PROCESS_ERROR,
+            clap_plugin, clap_process, clap_process_status,
         },
         plugin::{AudioThread, ClapPlugin, Plugin, Runtime},
         process::Process,
@@ -532,12 +534,16 @@ mod ffi {
         };
 
         if id == CLAP_EXT_AUDIO_PORTS {
-            if let Some(audio_ports) = &extensions.audio_ports {
-                return &raw const *audio_ports as *const c_void;
+            if let Some(ext) = &extensions.audio_ports {
+                return &raw const *ext as *const c_void;
+            }
+        } else if id == CLAP_EXT_NOTE_PORTS {
+            if let Some(ext) = &extensions.note_ports {
+                return (&raw const *ext).cast();
             }
         } else if id == CLAP_EXT_PARAMS {
-            if let Some(params) = &extensions.params {
-                return (&raw const *params).cast();
+            if let Some(ext) = &extensions.params {
+                return (&raw const *ext).cast();
             }
         }
 

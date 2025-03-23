@@ -18,5 +18,9 @@ name = "gain"
 crate-type = ["cdylib"]
 
 [[example]]
+name = "note_transpose"
+crate-type = ["cdylib"]
+
+[[example]]
 name = "plugin_template"
 crate-type = ["cdylib"]

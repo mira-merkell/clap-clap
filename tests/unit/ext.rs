@@ -1,5 +1,6 @@
 mod audio_ports;
 mod log;
+mod note_ports;
 mod params;
 
 use std::{
@@ -12,13 +13,14 @@ use std::{
 use clap_clap::{
     ext::{
         audio_ports::AudioPortInfo,
+        note_ports::NotePortInfo,
         params::{Error, ParamInfo},
     },
     factory::{Factory, FactoryHost, FactoryPluginPrototype},
     ffi::{
-        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_PARAMS, clap_audio_port_info, clap_event_header,
-        clap_input_events, clap_output_events, clap_plugin, clap_plugin_audio_ports,
-        clap_plugin_params,
+        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS, clap_audio_port_info,
+        clap_event_header, clap_input_events, clap_note_port_info, clap_output_events, clap_plugin,
+        clap_plugin_audio_ports, clap_plugin_note_ports, clap_plugin_params,
     },
     id::ClapId,
     plugin::{ClapPlugin, Plugin},
@@ -46,6 +48,7 @@ impl<P: Plugin + Copy + 'static> TestConfig<P> {
 pub struct TestBed<P> {
     clap_plugin: *const clap_plugin,
     pub ext_audio_ports: Option<ExtAudioPorts>,
+    pub ext_note_ports: Option<ExtNotePorts>,
     pub ext_params: Option<ExtParams>,
     _config: TestConfig<P>,
 }
@@ -72,6 +75,7 @@ impl<P: Plugin + 'static> TestBed<P> {
             Self {
                 clap_plugin,
                 ext_audio_ports: ExtAudioPorts::try_new_unchecked(clap_plugin),
+                ext_note_ports: ExtNotePorts::try_new_unchecked(clap_plugin),
                 ext_params: ExtParams::try_new_unchecked(clap_plugin),
                 _config: config,
             }
@@ -151,6 +155,55 @@ impl ExtAudioPorts {
                 channel_count: info.channel_count,
                 port_type: port_type.try_into().ok(),
                 in_place_pair: ClapId::try_from(info.in_place_pair).ok(),
+            })
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ExtNotePorts {
+    clap_plugin: *const clap_plugin,
+    clap_plugin_note_ports: *const clap_plugin_note_ports,
+}
+
+impl ExtNotePorts {
+    /// # Safety
+    ///
+    /// clap_plugin must be non-null.
+    pub unsafe fn try_new_unchecked(clap_plugin: *const clap_plugin) -> Option<Self> {
+        assert!(!clap_plugin.is_null());
+        let extension = unsafe {
+            (*clap_plugin).get_extension.unwrap()(clap_plugin, CLAP_EXT_NOTE_PORTS.as_ptr())
+        };
+
+        unsafe { extension.as_ref() }.map(|ext| Self {
+            clap_plugin,
+            clap_plugin_note_ports: (&raw const *ext).cast(),
+        })
+    }
+
+    pub fn count(&self, is_input: bool) -> u32 {
+        let note_ports = unsafe { self.clap_plugin_note_ports.as_ref() }.unwrap();
+        unsafe { note_ports.count.unwrap()(self.clap_plugin, is_input) }
+    }
+
+    pub fn get(&self, index: u32, is_input: bool) -> Option<NotePortInfo> {
+        let note_ports = unsafe { self.clap_plugin_note_ports.as_ref() }.unwrap();
+        let mut info = MaybeUninit::<clap_note_port_info>::uninit();
+
+        if unsafe { note_ports.get.unwrap()(self.clap_plugin, index, is_input, info.as_mut_ptr()) }
+        {
+            let info = unsafe { info.assume_init() };
+
+            let name = unsafe { CStr::from_ptr(info.name.as_ptr()) };
+
+            Some(NotePortInfo {
+                id: ClapId::try_from(info.id).unwrap_or(ClapId::invalid_id()),
+                supported_dialects: info.supported_dialects,
+                preferred_dialect: info.preferred_dialect,
+                name: name.to_str().map(|s| s.to_owned()).unwrap(),
             })
         } else {
             None

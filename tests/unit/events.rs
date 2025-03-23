@@ -53,6 +53,277 @@ fn cast_header() {
     assert_eq!(header.r#type(), CLAP_EVENT_MIDI as u16);
 }
 
+mod note {
+    use clap_clap::{
+        events,
+        events::{EventBuilder, Header, Note, NoteKind},
+        ffi::{
+            CLAP_EVENT_NOTE_CHOKE, CLAP_EVENT_NOTE_END, CLAP_EVENT_NOTE_OFF, CLAP_EVENT_NOTE_ON,
+            CLAP_EVENT_TRANSPORT, clap_event_header, clap_event_note,
+        },
+    };
+
+    #[test]
+    fn try_01() {
+        let event = clap_event_note {
+            header: clap_event_header {
+                size: 33,
+                time: 0,
+                space_id: 0,
+                r#type: CLAP_EVENT_NOTE_ON as u16,
+                flags: 0,
+            },
+            note_id: 0,
+            port_index: 0,
+            channel: 0,
+            key: 0,
+            velocity: 0.0,
+        };
+
+        let header = unsafe { Header::new_unchecked(&event.header) };
+        assert_eq!(Err(events::Error::PayloadSize(33)), header.note())
+    }
+
+    #[test]
+    fn try_02() {
+        let event = clap_event_note {
+            header: clap_event_header {
+                size: size_of::<clap_event_note>() as u32,
+                time: 0,
+                space_id: 0,
+                r#type: CLAP_EVENT_TRANSPORT as u16,
+                flags: 0,
+            },
+            note_id: 0,
+            port_index: 0,
+            channel: 0,
+            key: 0,
+            velocity: 0.0,
+        };
+
+        let header = unsafe { Header::new_unchecked(&event.header) };
+        assert_eq!(
+            Err(events::Error::OtherType(CLAP_EVENT_TRANSPORT as u16)),
+            header.param_value()
+        )
+    }
+
+    macro_rules! try_note {
+        ($name:tt, $clap_type:ident, $kind:ident) => {
+            #[test]
+            fn $name() {
+                use NoteKind::$kind;
+
+                let event = clap_event_note {
+                    header: clap_event_header {
+                        size: size_of::<clap_event_note>() as u32,
+                        time: 0,
+                        space_id: 0,
+                        r#type: $clap_type as u16,
+                        flags: 0,
+                    },
+                    note_id: 0,
+                    port_index: 87,
+                    channel: 1,
+                    key: 0,
+                    velocity: 123.456,
+                };
+
+                let header = unsafe { Header::new_unchecked(&event.header) };
+                let _ = header.midi().unwrap_err();
+                let event = header.note().unwrap();
+                assert_eq!(event.port_index(), 87);
+                assert_eq!(event.velocity(), 123.456);
+
+                assert_eq!(event.kind, $kind);
+            }
+        };
+    }
+
+    try_note!(try_note_on, CLAP_EVENT_NOTE_ON, On);
+    try_note!(try_note_off, CLAP_EVENT_NOTE_OFF, Off);
+    try_note!(try_note_choke, CLAP_EVENT_NOTE_CHOKE, Choke);
+    try_note!(try_note_end, CLAP_EVENT_NOTE_END, End);
+
+    #[test]
+    fn build() {
+        let value1 = Note::build(NoteKind::Choke).port_index(1).velocity(123.456);
+        let value2 = value1.port_index(3);
+
+        let event1 = value1.event();
+        let event2 = value2.event();
+
+        assert_eq!(event1.velocity(), 123.456);
+        assert_eq!(event2.velocity(), 123.456);
+
+        assert_eq!(event1.port_index(), 1);
+        assert_eq!(event2.port_index(), 3);
+
+        assert_eq!(event1.kind, NoteKind::Choke);
+        assert_eq!(event2.kind, NoteKind::Choke);
+    }
+
+    #[test]
+    fn update() {
+        let value1 = Note::build(NoteKind::End).port_index(1).velocity(123.456);
+        let event1 = value1.event();
+
+        let value2 = Note::update(&event1).port_index(3);
+        let event2 = value2.event();
+
+        assert_eq!(event1.velocity(), 123.456);
+        assert_eq!(event2.velocity(), 123.456);
+
+        assert_eq!(event1.port_index(), 1);
+        assert_eq!(event2.port_index(), 3);
+
+        assert_eq!(event1.kind, NoteKind::End);
+        assert_eq!(event2.kind, NoteKind::End);
+    }
+}
+
+mod note_expression {
+    use clap_clap::{
+        events,
+        events::{EventBuilder, Header, NoteExpression, NoteExpressionId},
+        ffi::{
+            CLAP_EVENT_NOTE_EXPRESSION, CLAP_EVENT_TRANSPORT, clap_event_header,
+            clap_event_note_expression,
+        },
+    };
+
+    #[test]
+    fn try_01() {
+        let event = clap_event_note_expression {
+            header: clap_event_header {
+                size: 33,
+                time: 0,
+                space_id: 0,
+                r#type: CLAP_EVENT_NOTE_EXPRESSION as u16,
+                flags: 0,
+            },
+            expression_id: 0,
+            note_id: 0,
+            port_index: 0,
+            channel: 0,
+            key: 0,
+            value: 0.0,
+        };
+
+        let header = unsafe { Header::new_unchecked(&event.header) };
+        assert_eq!(
+            Err(events::Error::PayloadSize(33)),
+            header.note_expression()
+        )
+    }
+
+    #[test]
+    fn try_02() {
+        let event = clap_event_note_expression {
+            header: clap_event_header {
+                size: size_of::<clap_event_note_expression>() as u32,
+                time: 0,
+                space_id: 0,
+                r#type: CLAP_EVENT_TRANSPORT as u16,
+                flags: 0,
+            },
+            expression_id: 0,
+            note_id: 0,
+            port_index: 0,
+            channel: 0,
+            key: 0,
+            value: 0.0,
+        };
+
+        let header = unsafe { Header::new_unchecked(&event.header) };
+        assert_eq!(
+            Err(events::Error::OtherType(CLAP_EVENT_TRANSPORT as u16)),
+            header.param_value()
+        )
+    }
+
+    macro_rules! try_note_expression {
+        ($name:tt, $expression_id:ident) => {
+            #[test]
+            fn $name() {
+                use NoteExpressionId::$expression_id;
+
+                let event = clap_event_note_expression {
+                    header: clap_event_header {
+                        size: size_of::<clap_event_note_expression>() as u32,
+                        time: 0,
+                        space_id: 0,
+                        r#type: CLAP_EVENT_NOTE_EXPRESSION as u16,
+                        flags: 0,
+                    },
+                    expression_id: $expression_id as _,
+                    note_id: 0,
+                    port_index: 87,
+                    channel: 1,
+                    key: 0,
+                    value: 123.456,
+                };
+
+                let header = unsafe { Header::new_unchecked(&event.header) };
+                let _ = header.midi().unwrap_err();
+                let event = header.note_expression().unwrap();
+                assert_eq!(event.port_index(), 87);
+                assert_eq!(event.value(), 123.456);
+
+                assert_eq!(event.expression_id(), $expression_id);
+            }
+        };
+    }
+
+    try_note_expression!(try_expr_volume, Volume);
+    try_note_expression!(try_expr_pan, Pan);
+    try_note_expression!(try_expr_tuning, Tuning);
+    try_note_expression!(try_expr_vibrato, Vibrato);
+    try_note_expression!(try_expr_expression, Expression);
+    try_note_expression!(try_expr_brightness, Brightness);
+    try_note_expression!(try_expr_pressure, Pressure);
+
+    #[test]
+    fn build() {
+        let value1 = NoteExpression::build(NoteExpressionId::Brightness)
+            .port_index(1)
+            .value(123.456);
+        let value2 = value1.port_index(3);
+
+        let event1 = value1.event();
+        let event2 = value2.event();
+
+        assert_eq!(event1.value(), 123.456);
+        assert_eq!(event2.value(), 123.456);
+
+        assert_eq!(event1.port_index(), 1);
+        assert_eq!(event2.port_index(), 3);
+
+        assert_eq!(event1.expression_id(), NoteExpressionId::Brightness);
+        assert_eq!(event2.expression_id(), NoteExpressionId::Brightness);
+    }
+
+    #[test]
+    fn update() {
+        let value1 = NoteExpression::build(NoteExpressionId::Tuning)
+            .port_index(1)
+            .value(123.456);
+        let event1 = value1.event();
+
+        let value2 = NoteExpression::update(&event1).port_index(3);
+        let event2 = value2.event();
+
+        assert_eq!(event1.value(), 123.456);
+        assert_eq!(event2.value(), 123.456);
+
+        assert_eq!(event1.port_index(), 1);
+        assert_eq!(event2.port_index(), 3);
+
+        assert_eq!(event1.expression_id(), NoteExpressionId::Tuning);
+        assert_eq!(event2.expression_id(), NoteExpressionId::Tuning);
+    }
+}
+
 mod param_value {
     use std::ptr::null_mut;
 

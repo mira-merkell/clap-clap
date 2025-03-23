@@ -26,7 +26,7 @@ use crate::{
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u32)]
-pub enum ParamInfoFlags {
+pub enum InfoFlags {
     /// Is this param stepped? (integer values only)
     /// if so the double value is converted to integer using a cast (equivalent
     /// to trunc).
@@ -87,7 +87,7 @@ pub enum ParamInfoFlags {
     Enum = CLAP_PARAM_IS_ENUM,
 }
 
-impl_flags_u32!(ParamInfoFlags);
+impl_flags_u32!(InfoFlags);
 
 /// Describes a parameter.
 #[derive(Debug, Clone, PartialEq)]
@@ -502,7 +502,7 @@ mod ffi {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u32)]
-pub enum ParamRescanFlags {
+pub enum RescanFlags {
     /// The parameter values did change, e.g. after loading a preset.
     /// The host will scan all the parameters value.
     /// The host will not record those changes as automation points.
@@ -541,11 +541,11 @@ pub enum ParamRescanFlags {
     All = CLAP_PARAM_RESCAN_ALL,
 }
 
-impl_flags_u32!(ParamRescanFlags);
+impl_flags_u32!(RescanFlags);
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u32)]
-pub enum ParamClearFlags {
+pub enum ClearFlags {
     /// Clears all possible references to a parameter
     All = CLAP_PARAM_CLEAR_ALL,
     /// Clears all automations to a parameter
@@ -554,7 +554,7 @@ pub enum ParamClearFlags {
     Modulations = CLAP_PARAM_CLEAR_MODULATIONS,
 }
 
-impl_flags_u32!(ParamClearFlags);
+impl_flags_u32!(ClearFlags);
 
 #[derive(Debug)]
 pub struct HostParams<'a> {

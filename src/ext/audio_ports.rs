@@ -218,7 +218,7 @@ mod port_info {
         pub(super) fn fill_clap_audio_port_info(&self, info: &mut clap_audio_port_info) {
             info.id = self.id.into();
 
-            // info.name.let > 1 so no underflow
+            // info.name.len > 1 so no underflow
             let n = self.name.len().min(info.name.len() - 1);
             unsafe {
                 std::ptr::copy_nonoverlapping(
