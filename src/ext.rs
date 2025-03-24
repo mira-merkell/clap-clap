@@ -14,11 +14,10 @@
 //! [`Host::get_extension()']: crate::host::Host::get_extension
 //! [`StereoPorts`]: audio_ports::StereoPorts
 
-
 use std::fmt::{Display, Formatter};
 
 use crate::{
-    ext::{audio_ports::AudioPorts, note_ports::NotePorts, params::Params},
+    ext::{audio_ports::AudioPorts, latency::Latency, note_ports::NotePorts, params::Params},
     plugin::Plugin,
 };
 

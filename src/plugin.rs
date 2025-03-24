@@ -319,7 +319,7 @@ mod desc {
 #[doc(hidden)]
 pub use desc::PluginDescriptor;
 
-use crate::ext::{note_ports::PluginNotePorts, latency::PluginLatency, params::PluginParams};
+use crate::ext::{latency::PluginLatency, note_ports::PluginNotePorts, params::PluginParams};
 
 mod ffi {
     use std::{
@@ -331,8 +331,8 @@ mod ffi {
 
     use crate::{
         ffi::{
-            CLAP_EXT_AUDIO_PORTS, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS, CLAP_PROCESS_ERROR,
-            clap_plugin, clap_process, clap_process_status,
+            CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS,
+            CLAP_PROCESS_ERROR, clap_plugin, clap_process, clap_process_status,
         },
         plugin::{AudioThread, ClapPlugin, Plugin, Runtime},
         process::Process,

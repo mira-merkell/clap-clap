@@ -20,9 +20,10 @@ use clap_clap::{
     },
     factory::{Factory, FactoryHost, FactoryPluginPrototype},
     ffi::{
-        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS, clap_audio_port_info,
-        clap_event_header, clap_input_events, clap_note_port_info, clap_output_events, clap_plugin,
-        clap_plugin_audio_ports, clap_plugin_note_ports, clap_plugin_params,
+        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS,
+        clap_audio_port_info, clap_event_header, clap_input_events, clap_note_port_info,
+        clap_output_events, clap_plugin, clap_plugin_audio_ports, clap_plugin_latency,
+        clap_plugin_note_ports, clap_plugin_params,
     },
     id::ClapId,
     plugin::{ClapPlugin, Plugin},

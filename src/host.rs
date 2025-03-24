@@ -5,11 +5,13 @@ use std::{
 
 use crate::{
     ext::{
-        audio_ports::HostAudioPorts, log::HostLog, note_ports::HostNotePorts, params::HostParams,
+        audio_ports::HostAudioPorts, latency::HostLatency, log::HostLog, note_ports::HostNotePorts,
+        params::HostParams,
     },
     ffi::{
-        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS, clap_host,
-        clap_host_audio_ports, clap_host_log, clap_host_note_ports, clap_host_params,
+        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY, CLAP_EXT_LOG, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS,
+        clap_host, clap_host_audio_ports, clap_host_latency, clap_host_log, clap_host_note_ports,
+        clap_host_params,
     },
     version::ClapVersion,
 };
