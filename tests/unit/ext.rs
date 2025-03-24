@@ -1,10 +1,12 @@
 mod audio_ports;
+mod latency;
 mod log;
 mod note_ports;
 mod params;
 
 use std::{
     ffi::{CStr, CString},
+    fmt::{Debug, Formatter},
     marker::PhantomData,
     mem::MaybeUninit,
     ptr::{null, null_mut},
@@ -18,9 +20,10 @@ use clap_clap::{
     },
     factory::{Factory, FactoryHost, FactoryPluginPrototype},
     ffi::{
-        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS, clap_audio_port_info,
-        clap_event_header, clap_input_events, clap_note_port_info, clap_output_events, clap_plugin,
-        clap_plugin_audio_ports, clap_plugin_note_ports, clap_plugin_params,
+        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS,
+        clap_audio_port_info, clap_event_header, clap_input_events, clap_note_port_info,
+        clap_output_events, clap_plugin, clap_plugin_audio_ports, clap_plugin_latency,
+        clap_plugin_note_ports, clap_plugin_params,
     },
     id::ClapId,
     plugin::{ClapPlugin, Plugin},
@@ -32,22 +35,38 @@ trait Test<P: Plugin> {
     fn test(self, bed: &mut TestBed<P>);
 }
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Default)]
 struct TestConfig<P> {
+    set_plug: Option<Box<dyn Fn(&mut P) + 'static>>,
     _marker: PhantomData<P>,
 }
 
+impl<P: Plugin> Debug for TestConfig<P> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TestConfig")
+            .field("set_plug", &self.set_plug.is_some())
+            .finish()
+    }
+}
+
 impl<P: Plugin + Copy + 'static> TestConfig<P> {
-    fn test(self, case: impl Test<P>) -> Self {
+    fn with_op<F: Fn(&mut P) + 'static>(op: F) -> Self {
+        TestConfig {
+            set_plug: Some(Box::new(op)),
+            ..Default::default()
+        }
+    }
+
+    fn test(self, case: impl Test<P>) {
         TestBed::new(self).test(case);
-        self
     }
 }
 
 #[derive(Debug)]
-pub struct TestBed<P> {
+pub struct TestBed<P: Plugin> {
     clap_plugin: *const clap_plugin,
     pub ext_audio_ports: Option<ExtAudioPorts>,
+    pub ext_latency: Option<ExtLatency>,
     pub ext_note_ports: Option<ExtNotePorts>,
     pub ext_params: Option<ExtParams>,
     _config: TestConfig<P>,
@@ -71,11 +90,18 @@ impl<P: Plugin + 'static> TestBed<P> {
             .unwrap();
         assert!(!clap_plugin.is_null());
 
+        // Set plugin parameters specified by TestConfig
+        if let Some(op) = config.set_plug.as_ref() {
+            let mut plugin = unsafe { ClapPlugin::new_unchecked(clap_plugin) };
+            op(unsafe { plugin.plugin() })
+        }
+
         unsafe {
             Self {
                 clap_plugin,
                 ext_audio_ports: ExtAudioPorts::try_new_unchecked(clap_plugin),
                 ext_note_ports: ExtNotePorts::try_new_unchecked(clap_plugin),
+                ext_latency: ExtLatency::try_new_unchecked(clap_plugin),
                 ext_params: ExtParams::try_new_unchecked(clap_plugin),
                 _config: config,
             }
@@ -98,7 +124,7 @@ impl<P: Plugin + 'static> TestBed<P> {
     }
 }
 
-impl<P> Drop for TestBed<P> {
+impl<P: Plugin> Drop for TestBed<P> {
     fn drop(&mut self) {
         assert!(!self.clap_plugin.is_null());
         let clap_plugin = unsafe { &*self.clap_plugin };
@@ -208,6 +234,34 @@ impl ExtNotePorts {
         } else {
             None
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct ExtLatency {
+    clap_plugin: *const clap_plugin,
+    clap_plugin_latency: *const clap_plugin_latency,
+}
+
+impl ExtLatency {
+    /// # Safety
+    ///
+    /// clap_plugin must be non-null.
+    pub unsafe fn try_new_unchecked(clap_plugin: *const clap_plugin) -> Option<Self> {
+        assert!(!clap_plugin.is_null());
+        let extension = unsafe {
+            (*clap_plugin).get_extension.unwrap()(clap_plugin, CLAP_EXT_LATENCY.as_ptr())
+        };
+
+        unsafe { extension.as_ref() }.map(|ext| Self {
+            clap_plugin,
+            clap_plugin_latency: (&raw const *ext).cast(),
+        })
+    }
+
+    pub fn get(&self) -> u32 {
+        let latency = unsafe { self.clap_plugin_latency.as_ref() }.unwrap();
+        unsafe { latency.get.unwrap()(self.clap_plugin) }
     }
 }
 

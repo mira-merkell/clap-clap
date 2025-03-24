@@ -5,11 +5,13 @@ use std::{
 
 use crate::{
     ext::{
-        audio_ports::HostAudioPorts, log::HostLog, note_ports::HostNotePorts, params::HostParams,
+        audio_ports::HostAudioPorts, latency::HostLatency, log::HostLog, note_ports::HostNotePorts,
+        params::HostParams,
     },
     ffi::{
-        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS, clap_host,
-        clap_host_audio_ports, clap_host_log, clap_host_note_ports, clap_host_params,
+        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY, CLAP_EXT_LOG, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS,
+        clap_host, clap_host_audio_ports, clap_host_latency, clap_host_log, clap_host_note_ports,
+        clap_host_params,
     },
     version::ClapVersion,
 };
@@ -166,6 +168,24 @@ impl<'a> HostExtensions<'a> {
 
         // SAFETY: We just checked if the methods are non-null (Some).
         Ok(unsafe { HostNotePorts::new_unchecked(self.host, clap_host_note_ports) })
+    }
+
+    pub fn latency(&self) -> Result<HostLatency<'a>, Error> {
+        let clap_host_latency = self
+            .get_extension_ptr(CLAP_EXT_LATENCY)
+            .ok_or(Error::ExtensionNotFound("latency"))?;
+
+        // SAFETY: We just checked if the pointer to clap_log is non-null. We return a
+        // reference to it for the lifetime of Host.
+        let clap_host_latency: &clap_host_latency = unsafe { &*clap_host_latency.cast() };
+
+        let _ = clap_host_latency
+            .changed
+            .ok_or(Error::Callback("latency"))?;
+
+        // SAFETY: We just checked if the pointer to clap_host_latency, and all its
+        // methods, are non-null.
+        Ok(unsafe { HostLatency::new_unchecked(self.host, clap_host_latency) })
     }
 
     pub fn log(&self) -> Result<HostLog<'a>, Error> {

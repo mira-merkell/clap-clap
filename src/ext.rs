@@ -14,21 +14,26 @@
 //! [`Host::get_extension()']: crate::host::Host::get_extension
 //! [`StereoPorts`]: audio_ports::StereoPorts
 
+use std::fmt::{Display, Formatter};
+
+use crate::{
+    ext::{audio_ports::AudioPorts, latency::Latency, note_ports::NotePorts, params::Params},
+    plugin::Plugin,
+};
+
 pub mod audio_ports;
+pub mod latency;
 pub mod log;
 pub mod note_ports;
 pub mod params;
 
-use std::fmt::{Display, Formatter};
-
-use crate::{
-    ext::{audio_ports::AudioPorts, note_ports::NotePorts, params::Params},
-    plugin::Plugin,
-};
-
 /// Plugin extensions.
 pub trait Extensions<P: Plugin> {
     fn audio_ports() -> Option<impl AudioPorts<P>> {
+        None::<()>
+    }
+
+    fn latency() -> Option<impl Latency<P>> {
         None::<()>
     }
 
