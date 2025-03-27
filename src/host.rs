@@ -150,26 +150,6 @@ impl<'a> HostExtensions<'a> {
         Ok(unsafe { HostAudioPorts::new_unchecked(self.host, clap_host_audio_ports) })
     }
 
-    pub fn note_ports(&self) -> Result<HostNotePorts<'a>, Error> {
-        let clap_host_note_ports = self
-            .get_extension_ptr(CLAP_EXT_NOTE_PORTS)
-            .ok_or(Error::ExtensionNotFound("note_ports"))?;
-
-        // SAFETY: We just checked if the pointer to clap_host_note_ports
-        // is non-null. We return a reference to it for the lifetime of Host.
-        let clap_host_note_ports: &clap_host_note_ports = unsafe { &*clap_host_note_ports.cast() };
-
-        let _ = clap_host_note_ports
-            .supported_dialects
-            .ok_or(Error::Callback("supported_dialects"))?;
-        let _ = clap_host_note_ports
-            .rescan
-            .ok_or(Error::Callback("rescan"))?;
-
-        // SAFETY: We just checked if the methods are non-null (Some).
-        Ok(unsafe { HostNotePorts::new_unchecked(self.host, clap_host_note_ports) })
-    }
-
     pub fn latency(&self) -> Result<HostLatency<'a>, Error> {
         let clap_host_latency = self
             .get_extension_ptr(CLAP_EXT_LATENCY)
@@ -202,6 +182,26 @@ impl<'a> HostExtensions<'a> {
         // SAFETY: We just checked if the pointer to clap_host_log, and all its methods,
         // are non-null.
         Ok(unsafe { HostLog::new_unchecked(self.host, clap_host_log) })
+    }
+
+    pub fn note_ports(&self) -> Result<HostNotePorts<'a>, Error> {
+        let clap_host_note_ports = self
+            .get_extension_ptr(CLAP_EXT_NOTE_PORTS)
+            .ok_or(Error::ExtensionNotFound("note_ports"))?;
+
+        // SAFETY: We just checked if the pointer to clap_host_note_ports
+        // is non-null. We return a reference to it for the lifetime of Host.
+        let clap_host_note_ports: &clap_host_note_ports = unsafe { &*clap_host_note_ports.cast() };
+
+        let _ = clap_host_note_ports
+            .supported_dialects
+            .ok_or(Error::Callback("supported_dialects"))?;
+        let _ = clap_host_note_ports
+            .rescan
+            .ok_or(Error::Callback("rescan"))?;
+
+        // SAFETY: We just checked if the methods are non-null (Some).
+        Ok(unsafe { HostNotePorts::new_unchecked(self.host, clap_host_note_ports) })
     }
 
     pub fn params(&self) -> Result<HostParams<'a>, Error> {
