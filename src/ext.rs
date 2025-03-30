@@ -17,7 +17,10 @@
 use std::fmt::{Display, Formatter};
 
 use crate::{
-    ext::{audio_ports::AudioPorts, latency::Latency, note_ports::NotePorts, params::Params},
+    ext::{
+        audio_ports::AudioPorts, latency::Latency, note_ports::NotePorts, params::Params,
+        state::State,
+    },
     plugin::Plugin,
 };
 
@@ -26,6 +29,7 @@ pub mod latency;
 pub mod log;
 pub mod note_ports;
 pub mod params;
+pub mod state;
 
 /// Plugin extensions.
 pub trait Extensions<P: Plugin> {
@@ -44,6 +48,10 @@ pub trait Extensions<P: Plugin> {
     fn params() -> Option<impl Params<P>> {
         None::<()>
     }
+
+    fn state() -> Option<impl State<P>> {
+        None::<()>
+    }
 }
 
 #[derive(Debug)]
@@ -52,6 +60,7 @@ pub enum Error {
     AudioPorts(audio_ports::Error),
     NotePorts(note_ports::Error),
     Params(params::Error),
+    State(state::Error),
 }
 
 impl Display for Error {
@@ -61,6 +70,7 @@ impl Display for Error {
             Error::AudioPorts(e) => write!(f, "audio_ports: {e}"),
             Error::NotePorts(e) => write!(f, "note_ports: {e}"),
             Error::Params(e) => write!(f, "params: {e}"),
+            Error::State(e) => write!(f, "state: {e}"),
         }
     }
 }
