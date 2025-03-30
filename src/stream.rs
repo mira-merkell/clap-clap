@@ -18,7 +18,7 @@ use std::{
 use crate::ffi::{clap_istream, clap_ostream};
 
 #[derive(Debug)]
-struct IStream(*const clap_istream);
+pub struct IStream(*const clap_istream);
 
 impl IStream {
     /// # Safety
@@ -26,11 +26,12 @@ impl IStream {
     /// The pointer to `clap_istream` must be non-null and must point to a valid
     /// input stream handle provided by the host. In particular, the function
     /// pointer clap_istream.read must be non-null.
-    pub(crate) const unsafe fn new_unchecked(clap_istream: *const clap_istream) -> Self {
+    pub const unsafe fn new_unchecked(clap_istream: *const clap_istream) -> Self {
         Self(clap_istream)
     }
 
-    pub(crate) const fn clap_istream(&self) -> &clap_istream {
+    #[doc(hidden)]
+    const fn clap_istream(&self) -> &clap_istream {
         // SAFETY: By construction, the pointer is non-null and points to a valid
         // clap_istream instance.
         unsafe { self.0.as_ref().unwrap() }
@@ -55,7 +56,7 @@ impl Read for IStream {
 }
 
 #[derive(Debug)]
-struct OStream(*const clap_ostream);
+pub struct OStream(*const clap_ostream);
 
 impl OStream {
     /// # Safety
