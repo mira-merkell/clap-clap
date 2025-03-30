@@ -31,7 +31,7 @@ impl IStream {
     }
 
     #[doc(hidden)]
-    const fn clap_istream(&self) -> &clap_istream {
+    pub const fn clap_istream(&self) -> &clap_istream {
         // SAFETY: By construction, the pointer is non-null and points to a valid
         // clap_istream instance.
         unsafe { self.0.as_ref().unwrap() }
@@ -68,7 +68,8 @@ impl OStream {
         Self(clap_ostream)
     }
 
-    const fn clap_ostream(&self) -> &clap_ostream {
+    #[doc(hidden)]
+    pub const fn clap_ostream(&self) -> &clap_ostream {
         // SAFETY: By construction, the pointer is non-null and points to a valid
         // clap_ostream instance.
         unsafe { self.0.as_ref().unwrap() }

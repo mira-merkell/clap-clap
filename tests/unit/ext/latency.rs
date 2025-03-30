@@ -8,7 +8,7 @@ mod plugin_latency {
     };
 
     use crate::{
-        ext::{Test, TestBed, TestConfig},
+        ext::{Test, TestBed},
         shims::plugin::ShimPlugin,
     };
 
@@ -29,7 +29,7 @@ mod plugin_latency {
 
     #[test]
     fn no_ports_shim() {
-        TestConfig::<ShimPlugin>::default().test(CheckNoExt::default());
+        TestBed::<ShimPlugin>::default().test(CheckNoExt::default());
     }
 
     #[derive(Default, Copy, Clone)]
@@ -64,7 +64,7 @@ mod plugin_latency {
 
     #[test]
     fn no_ports_ports() {
-        TestConfig::<TestPlug>::default().test(CheckNoExt::default());
+        TestBed::<TestPlug>::default().test(CheckNoExt::default());
     }
 
     struct CheckLatency;
@@ -80,15 +80,15 @@ mod plugin_latency {
 
     #[test]
     fn plugin_latency_0() {
-        TestConfig::<TestPlug>::default().test(CheckLatency);
+        TestBed::<TestPlug>::default().test(CheckLatency);
     }
 
     #[test]
     fn plugin_latency_1() {
-        TestConfig::<TestPlug>::with_op(|p| p.latency = 0).test(CheckLatency);
-        TestConfig::<TestPlug>::with_op(|p| p.latency = 1).test(CheckLatency);
-        TestConfig::<TestPlug>::with_op(|p| p.latency = 10).test(CheckLatency);
-        TestConfig::<TestPlug>::with_op(|p| p.latency = 999).test(CheckLatency);
+        TestBed::<TestPlug>::with_op(|p| p.latency = 0).test(CheckLatency);
+        TestBed::<TestPlug>::with_op(|p| p.latency = 1).test(CheckLatency);
+        TestBed::<TestPlug>::with_op(|p| p.latency = 10).test(CheckLatency);
+        TestBed::<TestPlug>::with_op(|p| p.latency = 999).test(CheckLatency);
     }
 }
 

@@ -15,20 +15,26 @@ use clap_clap::{
     prelude::{Process, Status, Status::Continue},
 };
 
-use crate::{
-    ext::{TestBed, TestConfig},
-    shims::plugin::ShimPlugin,
-};
+use crate::{ext::TestBed, shims::plugin::ShimPlugin};
 
 #[test]
 fn no_impl_params() {
-    let bed = TestBed::<ShimPlugin>::new(TestConfig::default());
+    let bed = TestBed::<ShimPlugin>::default();
     assert!(bed.ext_params.is_none())
 }
 
 struct TestPlugin {
     info: Vec<ParamInfo>,
     call_flush: UnsafeCell<bool>,
+}
+
+impl Clone for TestPlugin {
+    fn clone(&self) -> Self {
+        Self {
+            info: self.info.clone(),
+            call_flush: UnsafeCell::new(unsafe { *self.call_flush.get() }),
+        }
+    }
 }
 
 impl Default for TestPlugin {
@@ -150,7 +156,7 @@ impl Params<TestPlugin> for TestParams {
 
 #[test]
 fn check_params_count() {
-    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+    let bed = TestBed::<TestPlugin>::default();
 
     let params = bed.ext_params.as_ref().unwrap();
 
@@ -159,7 +165,7 @@ fn check_params_count() {
 
 #[test]
 fn check_params_get_info() {
-    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+    let bed = TestBed::<TestPlugin>::default();
 
     let params = bed.ext_params.as_ref().unwrap();
 
@@ -170,7 +176,7 @@ fn check_params_get_info() {
 
 #[test]
 fn check_get_value() {
-    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+    let bed = TestBed::<TestPlugin>::default();
 
     let params = bed.ext_params.as_ref().unwrap();
 
@@ -181,7 +187,7 @@ fn check_get_value() {
 
 #[test]
 fn check_value_to_text_01() {
-    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+    let bed = TestBed::<TestPlugin>::default();
 
     let params = bed.ext_params.as_ref().unwrap();
 
@@ -194,7 +200,7 @@ fn check_value_to_text_01() {
 
 #[test]
 fn check_value_to_text_02() {
-    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+    let bed = TestBed::<TestPlugin>::default();
 
     let params = bed.ext_params.as_ref().unwrap();
 
@@ -207,7 +213,7 @@ fn check_value_to_text_02() {
 
 #[test]
 fn check_value_to_text_03() {
-    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+    let bed = TestBed::<TestPlugin>::default();
 
     let params = bed.ext_params.as_ref().unwrap();
 
@@ -220,7 +226,7 @@ fn check_value_to_text_03() {
 
 #[test]
 fn check_text_to_value() {
-    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+    let bed = TestBed::<TestPlugin>::default();
 
     let params = bed.ext_params.as_ref().unwrap();
 
@@ -245,7 +251,7 @@ fn check_text_to_value() {
 
 #[test]
 fn check_flush_inactive() {
-    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+    let bed = TestBed::<TestPlugin>::default();
     let params = bed.ext_params.as_ref().unwrap();
 
     assert!(!bed.plugin().is_active());
@@ -262,7 +268,7 @@ fn check_flush_inactive() {
 
 #[test]
 fn check_flush_active() {
-    let bed = TestBed::<TestPlugin>::new(TestConfig::default());
+    let bed = TestBed::<TestPlugin>::default();
     let params = bed.ext_params.as_ref().unwrap();
 
     bed.activate();

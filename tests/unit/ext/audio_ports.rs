@@ -13,7 +13,7 @@ mod plugin_audio_ports {
     };
 
     use crate::{
-        ext::{Test, TestBed, TestConfig},
+        ext::{Test, TestBed},
         shims::plugin::ShimPlugin,
     };
 
@@ -34,7 +34,7 @@ mod plugin_audio_ports {
 
     #[test]
     fn no_ports_shim() {
-        TestConfig::<ShimPlugin>::default().test(CheckNoPorts::default());
+        TestBed::<ShimPlugin>::default().test(CheckNoPorts::default());
     }
 
     #[derive(Default, Copy, Clone)]
@@ -88,12 +88,12 @@ mod plugin_audio_ports {
 
     #[test]
     fn no_ports_ports() {
-        TestConfig::<Ports>::default().test(CheckNoPorts::default());
+        TestBed::<Ports>::default().test(CheckNoPorts::default());
     }
 
     #[test]
     fn ports_input_output_count() {
-        let bed = &mut TestBed::new(TestConfig::<Ports>::default());
+        let bed = &mut TestBed::<Ports>::default();
 
         let audio_ports = bed.ext_audio_ports.as_ref().unwrap();
 
@@ -105,7 +105,7 @@ mod plugin_audio_ports {
 
     #[test]
     fn ports_input_info() {
-        let bed = &mut TestBed::new(TestConfig::<Ports>::default());
+        let bed = &mut TestBed::<Ports>::default();
 
         let audio_ports = bed.ext_audio_ports.as_ref().unwrap();
 
@@ -116,7 +116,7 @@ mod plugin_audio_ports {
 
     #[test]
     fn ports_output_info() {
-        let bed = &mut TestBed::new(TestConfig::<Ports>::default());
+        let bed = &mut TestBed::<Ports>::default();
 
         let audio_ports = bed.ext_audio_ports.as_ref().unwrap();
 

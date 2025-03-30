@@ -120,6 +120,7 @@ impl<P: Plugin> State<P> for () {
 pub enum Error {
     Read,
     Write,
+    Eof,
 }
 
 impl Display for Error {
@@ -128,6 +129,7 @@ impl Display for Error {
         match self {
             Read => write!(f, "read error"),
             Write => write!(f, "write error"),
+            Eof => write!(f, "end of file"),
         }
     }
 }

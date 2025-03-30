@@ -3,9 +3,10 @@ mod latency;
 mod log;
 mod note_ports;
 mod params;
+mod state;
 
 use std::{
-    ffi::{CStr, CString},
+    ffi::{CStr, CString, c_void},
     fmt::{Debug, Formatter},
     marker::PhantomData,
     mem::MaybeUninit,
@@ -21,12 +22,14 @@ use clap_clap::{
     factory::{Factory, FactoryHost, FactoryPluginPrototype},
     ffi::{
         CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS,
-        clap_audio_port_info, clap_event_header, clap_input_events, clap_note_port_info,
-        clap_output_events, clap_plugin, clap_plugin_audio_ports, clap_plugin_latency,
-        clap_plugin_note_ports, clap_plugin_params,
+        CLAP_EXT_STATE, clap_audio_port_info, clap_event_header, clap_input_events,
+        clap_note_port_info, clap_ostream, clap_output_events, clap_plugin,
+        clap_plugin_audio_ports, clap_plugin_latency, clap_plugin_note_ports, clap_plugin_params,
+        clap_plugin_state,
     },
     id::ClapId,
     plugin::{ClapPlugin, Plugin},
+    stream::IStream,
 };
 
 use crate::shims::host::SHIM_CLAP_HOST;
@@ -35,13 +38,17 @@ trait Test<P: Plugin> {
     fn test(self, bed: &mut TestBed<P>);
 }
 
-#[derive(Default)]
-struct TestConfig<P> {
-    set_plug: Option<Box<dyn Fn(&mut P) + 'static>>,
+#[derive(Default, Clone)]
+struct TestConfig<P, F> {
+    set_plug: Option<F>,
     _marker: PhantomData<P>,
 }
 
-impl<P: Plugin> Debug for TestConfig<P> {
+impl<P, F> Debug for TestConfig<P, F>
+where
+    P: Plugin,
+    F: FnOnce(&mut P),
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TestConfig")
             .field("set_plug", &self.set_plug.is_some())
@@ -49,31 +56,43 @@ impl<P: Plugin> Debug for TestConfig<P> {
     }
 }
 
-impl<P: Plugin + Copy + 'static> TestConfig<P> {
-    fn with_op<F: Fn(&mut P) + 'static>(op: F) -> Self {
+impl<P, F> TestConfig<P, F>
+where
+    P: Plugin + 'static + Clone,
+    F: FnOnce(&mut P) + Clone,
+{
+    fn with_op(op: F) -> Self {
         TestConfig {
-            set_plug: Some(Box::new(op)),
-            ..Default::default()
+            set_plug: Some(op),
+            _marker: PhantomData,
         }
     }
 
-    fn test(self, case: impl Test<P>) {
-        TestBed::new(self).test(case);
+    fn test(self, case: impl Test<P>) -> Self {
+        TestBed::new(self.clone()).test(case);
+        self
     }
 }
 
 #[derive(Debug)]
-pub struct TestBed<P: Plugin> {
+pub struct TestBed<P>
+where
+    P: Plugin,
+{
     clap_plugin: *const clap_plugin,
     pub ext_audio_ports: Option<ExtAudioPorts>,
     pub ext_latency: Option<ExtLatency>,
     pub ext_note_ports: Option<ExtNotePorts>,
     pub ext_params: Option<ExtParams>,
-    _config: TestConfig<P>,
+    pub ext_state: Option<ExtState>,
+    _marker: PhantomData<P>,
 }
 
-impl<P: Plugin + 'static> TestBed<P> {
-    fn new(config: TestConfig<P>) -> Self {
+impl<P> TestBed<P>
+where
+    P: Plugin + 'static + Clone,
+{
+    fn new<F: FnOnce(&mut P)>(config: TestConfig<P, F>) -> Self {
         let factory = Factory::new(vec![Box::new(
             FactoryPluginPrototype::<P>::build().unwrap(),
         )]);
@@ -91,7 +110,7 @@ impl<P: Plugin + 'static> TestBed<P> {
         assert!(!clap_plugin.is_null());
 
         // Set plugin parameters specified by TestConfig
-        if let Some(op) = config.set_plug.as_ref() {
+        if let Some(op) = config.set_plug {
             let mut plugin = unsafe { ClapPlugin::new_unchecked(clap_plugin) };
             op(unsafe { plugin.plugin() })
         }
@@ -100,12 +119,17 @@ impl<P: Plugin + 'static> TestBed<P> {
             Self {
                 clap_plugin,
                 ext_audio_ports: ExtAudioPorts::try_new_unchecked(clap_plugin),
-                ext_note_ports: ExtNotePorts::try_new_unchecked(clap_plugin),
                 ext_latency: ExtLatency::try_new_unchecked(clap_plugin),
+                ext_note_ports: ExtNotePorts::try_new_unchecked(clap_plugin),
                 ext_params: ExtParams::try_new_unchecked(clap_plugin),
-                _config: config,
+                ext_state: ExtState::try_new_unchecked(clap_plugin),
+                _marker: PhantomData,
             }
         }
+    }
+
+    pub fn with_op<F: FnOnce(&mut P) + Clone>(op: F) -> Self {
+        Self::new(TestConfig::with_op(op))
     }
 
     pub const fn plugin(&self) -> ClapPlugin<P> {
@@ -121,6 +145,12 @@ impl<P: Plugin + 'static> TestBed<P> {
     fn test(&mut self, case: impl Test<P>) -> &mut Self {
         case.test(self);
         self
+    }
+}
+
+impl<P: Plugin + 'static + Clone> Default for TestBed<P> {
+    fn default() -> Self {
+        Self::with_op(|_| ())
     }
 }
 
@@ -377,5 +407,63 @@ impl ExtParams {
 
         let params = unsafe { self.clap_plugin_params.as_ref() }.unwrap();
         unsafe { params.flush.unwrap()(self.clap_plugin, &in_events, &out_events) };
+    }
+}
+
+#[derive(Debug)]
+pub struct ExtState {
+    clap_plugin: *const clap_plugin,
+    clap_plugin_state: *const clap_plugin_state,
+}
+
+impl ExtState {
+    /// # Safety
+    ///
+    /// clap_plugin must be non-null.
+    pub unsafe fn try_new_unchecked(clap_plugin: *const clap_plugin) -> Option<Self> {
+        assert!(!clap_plugin.is_null());
+        let extension =
+            unsafe { (*clap_plugin).get_extension.unwrap()(clap_plugin, CLAP_EXT_STATE.as_ptr()) };
+
+        unsafe { extension.as_ref() }.map(|ext| Self {
+            clap_plugin,
+            clap_plugin_state: (&raw const *ext).cast(),
+        })
+    }
+
+    pub fn save(&self, mut buf: Option<&mut Vec<u8>>) -> bool {
+        let state = unsafe { self.clap_plugin_state.as_ref() }.unwrap();
+
+        extern "C-unwind" fn write(
+            stream: *const clap_ostream,
+            buffer: *const c_void,
+            size: u64,
+        ) -> i64 {
+            let b: *mut Vec<u8> = unsafe { stream.as_ref().unwrap().ctx.cast() };
+            if b.is_null() {
+                return -1;
+            };
+            let b = unsafe { b.as_mut().unwrap() };
+            let n = b.len().min(size as usize);
+
+            #[allow(clippy::needless_range_loop)]
+            for i in 0..n {
+                b[i] = unsafe { *(buffer.add(i) as *const u8) }
+            }
+            n as i64
+        }
+
+        let stream = clap_ostream {
+            ctx: (&raw mut buf).cast(),
+            write: Some(write),
+        };
+
+        unsafe { state.save.unwrap()(self.clap_plugin, &raw const stream) }
+    }
+
+    pub fn load(&self, stream: &mut IStream) -> bool {
+        let state = unsafe { self.clap_plugin_state.as_ref() }.unwrap();
+
+        todo!()
     }
 }
