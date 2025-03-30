@@ -64,11 +64,11 @@ impl OStream {
     /// The pointer to `clap_ostream` must be non-null and must point to a valid
     /// input stream handle provided by the host. In particular, the function
     /// pointer clap_ostream.write must be non-null.
-    pub(crate) const unsafe fn new_unchecked(clap_ostream: *const clap_ostream) -> Self {
+    pub const unsafe fn new_unchecked(clap_ostream: *const clap_ostream) -> Self {
         Self(clap_ostream)
     }
 
-    pub(crate) const fn clap_ostream(&self) -> &clap_ostream {
+    const fn clap_ostream(&self) -> &clap_ostream {
         // SAFETY: By construction, the pointer is non-null and points to a valid
         // clap_ostream instance.
         unsafe { self.0.as_ref().unwrap() }

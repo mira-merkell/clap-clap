@@ -165,3 +165,170 @@ mod istream {
         .test(CheckRead { size: 3 });
     }
 }
+
+mod ostream {
+    use std::{ffi::c_void, io::Write, marker::PhantomPinned, pin::Pin, ptr::null_mut};
+
+    use clap_clap::{ffi::clap_ostream, stream::OStream};
+
+    trait Test {
+        fn test(self, bed: Pin<&mut TestBed>);
+    }
+
+    #[derive(Debug, Default, Clone)]
+    struct TestConfig {
+        write_error: bool,
+        write_size: u64,
+    }
+
+    impl TestConfig {
+        fn test(self, case: impl Test) -> Self {
+            TestBed::new(self.clone()).as_mut().test(case);
+            self
+        }
+    }
+
+    #[derive(Debug)]
+    struct TestBed {
+        config: TestConfig,
+        buf: Vec<u8>,
+        clap_ostream: clap_ostream,
+        ostream: Option<OStream>,
+
+        _marker: PhantomPinned,
+    }
+
+    impl TestBed {
+        fn new(config: TestConfig) -> Pin<Box<Self>> {
+            let mut bed = Box::new(Self {
+                buf: vec![0; config.write_size as usize],
+                config,
+                clap_ostream: clap_ostream {
+                    ctx: null_mut(),
+                    write: Some(stream_write),
+                },
+                ostream: None,
+                _marker: PhantomPinned,
+            });
+
+            bed.clap_ostream.ctx = (&raw mut *bed).cast();
+            bed.ostream = Some(unsafe { OStream::new_unchecked(&raw const bed.clap_ostream) });
+
+            Box::into_pin(bed)
+        }
+
+        fn buf_mut(&mut self) -> &mut [u8] {
+            &mut self.buf
+        }
+
+        fn buf(&self) -> &[u8] {
+            &self.buf
+        }
+
+        fn ostream(self: Pin<&mut Self>) -> &mut OStream {
+            unsafe { self.get_unchecked_mut().ostream.as_mut().unwrap() }
+        }
+
+        fn test(mut self: Pin<&mut Self>, case: impl Test) -> Pin<&mut Self> {
+            case.test(self.as_mut());
+            self
+        }
+    }
+
+    extern "C-unwind" fn stream_write(
+        stream: *const clap_ostream,
+        buffer: *const c_void,
+        size: u64,
+    ) -> i64 {
+        assert!(!stream.is_null());
+        let bed: &mut TestBed = unsafe {
+            stream
+                .as_ref()
+                .unwrap()
+                .ctx
+                .cast::<TestBed>()
+                .as_mut()
+                .unwrap()
+        };
+
+        if bed.config.write_error {
+            return -1;
+        };
+
+        let n = bed.buf_mut().len().min(size as usize);
+        unsafe {
+            bed.buf_mut()
+                .as_mut_ptr()
+                .copy_from_nonoverlapping(buffer.cast(), n)
+        };
+        n as i64
+    }
+
+    struct CheckWriteError {
+        buf: Vec<u8>,
+    }
+
+    impl Test for CheckWriteError {
+        fn test(self, bed: Pin<&mut TestBed>) {
+            let err = bed.ostream().write(&self.buf).unwrap_err();
+            assert_eq!(err.kind(), std::io::ErrorKind::Other);
+            assert_eq!(err.to_string(), "write error");
+        }
+    }
+
+    #[test]
+    fn write_error() {
+        TestConfig {
+            write_error: true,
+            ..Default::default()
+        }
+        .test(CheckWriteError { buf: vec![] })
+        .test(CheckWriteError { buf: vec![1] })
+        .test(CheckWriteError { buf: vec![1, 2] });
+    }
+
+    struct CheckWrite {
+        buf: Vec<u8>,
+    }
+
+    impl Test for CheckWrite {
+        fn test(self, mut bed: Pin<&mut TestBed>) {
+            let n = bed.as_mut().ostream().write(&self.buf).unwrap();
+            assert_eq!(n, self.buf.len().min(bed.buf().len()));
+            assert_eq!(self.buf[0..n], bed.buf()[0..n]);
+        }
+    }
+
+    #[test]
+    fn write_0() {
+        TestConfig {
+            write_size: 0,
+            ..Default::default()
+        }
+        .test(CheckWrite { buf: vec![] })
+        .test(CheckWrite { buf: vec![1] })
+        .test(CheckWrite { buf: vec![1, 2] });
+    }
+
+    #[test]
+    fn write_1() {
+        TestConfig {
+            write_size: 1,
+            ..Default::default()
+        }
+        .test(CheckWrite { buf: vec![] })
+        .test(CheckWrite { buf: vec![1] })
+        .test(CheckWrite { buf: vec![1, 2] });
+    }
+
+    #[test]
+    fn write_2() {
+        TestConfig {
+            write_size: 2,
+            ..Default::default()
+        }
+        .test(CheckWrite { buf: vec![] })
+        .test(CheckWrite { buf: vec![1] })
+        .test(CheckWrite { buf: vec![1, 2] });
+    }
+}
