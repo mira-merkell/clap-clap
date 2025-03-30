@@ -161,7 +161,7 @@ impl<'a> HostExtensions<'a> {
 
         let _ = clap_host_latency
             .changed
-            .ok_or(Error::Callback("latency"))?;
+            .ok_or(Error::Callback("changed"))?;
 
         // SAFETY: We just checked if the pointer to clap_host_latency, and all its
         // methods, are non-null.

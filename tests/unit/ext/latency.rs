@@ -91,3 +91,69 @@ mod plugin_latency {
         TestConfig::<TestPlug>::with_op(|p| p.latency = 999).test(CheckLatency);
     }
 }
+
+mod host_latency {
+    use std::{error::Error, pin::Pin};
+
+    use clap_clap::{
+        host,
+        host::Error::{Callback, ExtensionNotFound},
+    };
+
+    use crate::host::{ExtLatencyConfig, Test, TestBed, TestConfig};
+
+    struct CheckLatencyNotImpl<E: Error> {
+        error: E,
+    }
+
+    impl Test for CheckLatencyNotImpl<host::Error> {
+        fn test(self, bed: Pin<&mut TestBed>) {
+            let host = unsafe { bed.host_mut() };
+            let err = host.get_extension().latency().unwrap_err();
+            assert_eq!(err, self.error);
+        }
+    }
+
+    #[test]
+    fn latency_not_impl() {
+        TestConfig::default().test(CheckLatencyNotImpl {
+            error: ExtensionNotFound("latency"),
+        });
+    }
+
+    #[test]
+    fn latency_no_method_changed() {
+        TestConfig {
+            ext_latency: Some(ExtLatencyConfig {
+                null_callback: true,
+            }),
+            ..Default::default()
+        }
+        .test(CheckLatencyNotImpl {
+            error: Callback("changed"),
+        });
+    }
+
+    struct CheckCallChanged;
+
+    impl Test for CheckCallChanged {
+        fn test(self, mut bed: Pin<&mut TestBed>) {
+            let host = unsafe { bed.as_mut().host_mut() };
+            let latency = host.get_extension().latency().unwrap();
+            latency.changed();
+
+            assert!(bed.ext_latency.as_ref().unwrap().call_changed);
+        }
+    }
+
+    #[test]
+    fn latency_call_changed() {
+        TestConfig {
+            ext_latency: Some(ExtLatencyConfig {
+                null_callback: false,
+            }),
+            ..Default::default()
+        }
+        .test(CheckCallChanged);
+    }
+}
