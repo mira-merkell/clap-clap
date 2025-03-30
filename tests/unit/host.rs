@@ -8,9 +8,9 @@ use std::{
 
 use clap_clap::{
     ffi::{
-        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LOG, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS, clap_host,
-        clap_host_audio_ports, clap_host_log, clap_host_note_ports, clap_host_params, clap_id,
-        clap_log_severity,
+        CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY, CLAP_EXT_LOG, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS,
+        clap_host, clap_host_audio_ports, clap_host_latency, clap_host_log, clap_host_note_ports,
+        clap_host_params, clap_id, clap_log_severity,
     },
     host::Host,
     version::CLAP_VERSION,
@@ -28,6 +28,7 @@ pub struct TestConfig<'a> {
     pub version: &'a CStr,
 
     pub ext_audio_ports: Option<ExtAudioPortsConfig>,
+    pub ext_latency: Option<ExtLatencyConfig>,
     pub ext_log: Option<ExtLogConfig>,
     pub ext_note_ports: Option<ExtNotePortsConfig>,
     pub ext_params: Option<ExtParamsConfig>,
@@ -57,6 +58,7 @@ pub struct TestBed<'a> {
 
     pub ext_audio_ports: Option<ExtAudioPorts>,
     pub ext_log: Option<ExtLog>,
+    pub ext_latency: Option<ExtLatency>,
     pub ext_note_ports: Option<ExtNotePorts>,
     pub ext_params: Option<ExtParams>,
 
@@ -82,6 +84,7 @@ impl<'a> TestBed<'a> {
             call_request: CallRequest::default(),
 
             ext_audio_ports: config.ext_audio_ports.map(ExtAudioPorts::new),
+            ext_latency: config.ext_latency.map(ExtLatency::new),
             ext_log: config.ext_log.map(ExtLog::new),
             ext_note_ports: config.ext_note_ports.map(ExtNotePorts::new),
             ext_params: config.ext_params.map(ExtParams::new),
@@ -122,6 +125,11 @@ extern "C-unwind" fn get_extension(
     if extension_id == CLAP_EXT_AUDIO_PORTS {
         if let Some(ext) = &bed.ext_audio_ports {
             return (&raw const ext.clap_host_audio_ports).cast();
+        }
+    }
+    if extension_id == CLAP_EXT_LATENCY {
+        if let Some(ext) = &bed.ext_latency {
+            return (&raw const ext.clap_host_latency).cast();
         }
     }
     if extension_id == CLAP_EXT_LOG {
@@ -207,6 +215,37 @@ extern "C-unwind" fn ext_audio_ports_rescan(host: *const clap_host, flags: u32) 
     let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
     if let Some(ext) = &mut bed.ext_audio_ports {
         ext.call_rescan_flags = flags;
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct ExtLatencyConfig {
+    pub null_callback: bool,
+}
+
+#[derive(Debug)]
+pub struct ExtLatency {
+    clap_host_latency: clap_host_latency,
+    pub call_changed: bool,
+}
+
+impl ExtLatency {
+    fn new(config: ExtLatencyConfig) -> Self {
+        Self {
+            clap_host_latency: clap_host_latency {
+                changed: (!config.null_callback).then_some(ext_latency_changed),
+            },
+            call_changed: false,
+        }
+    }
+}
+
+extern "C-unwind" fn ext_latency_changed(host: *const clap_host) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+
+    if let Some(ext) = &mut bed.ext_latency {
+        ext.call_changed = true;
     }
 }
 
