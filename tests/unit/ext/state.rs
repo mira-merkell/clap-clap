@@ -1,7 +1,6 @@
 mod plugin_state {
     use std::{
         io::Write,
-        marker::PhantomData,
         sync::{Arc, Mutex},
     };
 
@@ -18,23 +17,27 @@ mod plugin_state {
     };
 
     #[derive(Debug, Default)]
-    struct CheckExtImpl<P> {
-        _marker: PhantomData<P>,
+    struct CheckExtImpl {
+        should_implement: bool,
     }
 
-    impl<P: TestPlugin + 'static> Test<P> for CheckExtImpl<P> {
+    impl<P: TestPlugin + 'static> Test<P> for CheckExtImpl {
         fn test(self, bed: &mut TestBed<P>) {
-            if P::state().is_some() {
+            if P::state().is_some() && self.should_implement {
                 assert!(bed.ext_state.is_some());
-            } else {
+            } else if P::state().is_none() && !self.should_implement {
                 assert!(bed.ext_state.is_none());
+            } else {
+                panic!("wrong implementation")
             }
         }
     }
 
     #[test]
     fn ext_impl_shim() {
-        TestConfig::default().test::<ShimPlugin>(CheckExtImpl::default());
+        TestConfig::default().test::<ShimPlugin>(CheckExtImpl {
+            should_implement: false,
+        });
     }
 
     #[derive(Default, Clone)]
@@ -52,7 +55,12 @@ mod plugin_state {
         }
     }
 
-    impl TestPlugin for Plug {}
+    impl TestPlugin for Plug {
+        fn initialize(&mut self, cfg: &TestConfig) {
+            let mut state = self.state.lock().unwrap();
+            *state = cfg.state;
+        }
+    }
 
     impl Extensions<Self> for Plug {
         fn state() -> Option<impl State<Self>> {
@@ -90,6 +98,69 @@ mod plugin_state {
 
     #[test]
     fn ext_impl_state() {
-        TestConfig::default().test::<Plug>(CheckExtImpl::default());
+        TestConfig::default().test::<Plug>(CheckExtImpl {
+            should_implement: true,
+        });
+    }
+
+    struct CheckSaveState {
+        buf: Option<Vec<u8>>,
+        should_fail: bool,
+    }
+
+    impl Test<Plug> for CheckSaveState {
+        fn test(mut self, bed: &mut TestBed<Plug>) {
+            assert_ne!(
+                bed.ext_state.as_mut().unwrap().save(self.buf.as_mut()),
+                self.should_fail
+            );
+
+            if !self.should_fail {
+                let mut wrapper = bed.plugin();
+                let plugin = unsafe { wrapper.plugin() };
+                let state = plugin.state.lock().unwrap();
+
+                let Some(buf) = &self.buf else {
+                    panic!("no buffer to store the state")
+                };
+                assert_eq!(buf[0..state.len()], state[..]);
+            }
+        }
+    }
+
+    #[test]
+    fn save_state_01() {
+        TestConfig {
+            state: [0, 1, 2, 3, 4],
+            ..Default::default()
+        }
+        .test(CheckSaveState {
+            buf: None,
+            should_fail: true,
+        });
+    }
+
+    #[test]
+    fn save_state_02() {
+        TestConfig {
+            state: [0, 1, 2, 3, 4],
+            ..Default::default()
+        }
+        .test(CheckSaveState {
+            buf: Some(vec![]),
+            should_fail: true,
+        });
+    }
+
+    #[test]
+    fn save_state_03() {
+        TestConfig {
+            state: [0, 1, 2, 3, 4],
+            ..Default::default()
+        }
+        .test(CheckSaveState {
+            buf: Some(vec![0; 4]),
+            should_fail: true,
+        });
     }
 }

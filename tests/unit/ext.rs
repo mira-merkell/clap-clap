@@ -45,6 +45,7 @@ trait Test<P: TestPlugin> {
 #[derive(Default)]
 struct TestConfig {
     latency: u32,
+    state: [u8; 5],
 }
 
 impl TestConfig {
@@ -424,8 +425,12 @@ impl ExtState {
             n as i64
         }
 
+        let Some(buf) = buf else {
+            return false;
+        };
+
         let stream = clap_ostream {
-            ctx: (&raw mut buf).cast(),
+            ctx: (&raw mut *buf).cast(),
             write: Some(write),
         };
 
