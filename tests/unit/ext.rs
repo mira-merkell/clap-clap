@@ -403,36 +403,47 @@ impl ExtState {
         })
     }
 
-    pub fn save(&self, mut buf: Option<&mut Vec<u8>>) -> bool {
+    pub fn save(&self, buf: Option<&mut Vec<u8>>, max_per_round: usize) -> bool {
         let state = unsafe { self.clap_plugin_state.as_ref() }.unwrap();
+        let Some(buf) = buf else {
+            return false;
+        };
+
+        struct RawParts {
+            buf: *mut u8,
+            len: usize,
+            max_per_round: usize,
+        }
+        let mut raw_parts = RawParts {
+            buf: buf.as_mut_ptr(),
+            len: buf.len(),
+            max_per_round,
+        };
+        let stream = clap_ostream {
+            ctx: (&raw mut raw_parts).cast(),
+            write: Some(write),
+        };
 
         extern "C-unwind" fn write(
             stream: *const clap_ostream,
             buffer: *const c_void,
             size: u64,
         ) -> i64 {
-            let b: *mut Vec<u8> = unsafe { stream.as_ref().unwrap().ctx.cast() };
-            if b.is_null() {
+            let b: *mut RawParts = unsafe { stream.as_ref().unwrap().ctx.cast() };
+            let Some(b) = (unsafe { b.as_mut() }) else {
                 return -1;
             };
-            let b = unsafe { b.as_mut().unwrap() };
-            let n = b.len().min(size as usize);
+            let n = b.len.min(size as usize).min(b.max_per_round);
 
             #[allow(clippy::needless_range_loop)]
             for i in 0..n {
-                b[i] = unsafe { *(buffer.add(i) as *const u8) }
+                unsafe { *b.buf.add(i) = *(buffer.add(i) as *const u8) }
             }
+            unsafe { b.buf = b.buf.add(n) };
+            b.len -= n;
+
             n as i64
         }
-
-        let Some(buf) = buf else {
-            return false;
-        };
-
-        let stream = clap_ostream {
-            ctx: (&raw mut *buf).cast(),
-            write: Some(write),
-        };
 
         unsafe { state.save.unwrap()(self.clap_plugin, &raw const stream) }
     }

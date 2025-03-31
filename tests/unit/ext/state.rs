@@ -106,12 +106,16 @@ mod plugin_state {
     struct CheckSaveState {
         buf: Option<Vec<u8>>,
         should_fail: bool,
+        max_per_round: usize,
     }
 
     impl Test<Plug> for CheckSaveState {
         fn test(mut self, bed: &mut TestBed<Plug>) {
             assert_ne!(
-                bed.ext_state.as_mut().unwrap().save(self.buf.as_mut()),
+                bed.ext_state
+                    .as_mut()
+                    .unwrap()
+                    .save(self.buf.as_mut(), self.max_per_round),
                 self.should_fail
             );
 
@@ -129,7 +133,7 @@ mod plugin_state {
     }
 
     #[test]
-    fn save_state_01() {
+    fn save_state_00() {
         TestConfig {
             state: [0, 1, 2, 3, 4],
             ..Default::default()
@@ -137,6 +141,20 @@ mod plugin_state {
         .test(CheckSaveState {
             buf: None,
             should_fail: true,
+            max_per_round: 99,
+        });
+    }
+
+    #[test]
+    fn save_state_01() {
+        TestConfig {
+            state: [0, 1, 2, 3, 4],
+            ..Default::default()
+        }
+        .test(CheckSaveState {
+            buf: Some(vec![]),
+            should_fail: true,
+            max_per_round: 99,
         });
     }
 
@@ -147,8 +165,22 @@ mod plugin_state {
             ..Default::default()
         }
         .test(CheckSaveState {
-            buf: Some(vec![]),
+            buf: Some(vec![0; 4]),
             should_fail: true,
+            max_per_round: 99,
+        });
+    }
+
+    #[test]
+    fn save_state_02a() {
+        TestConfig {
+            state: [0, 1, 2, 3, 4],
+            ..Default::default()
+        }
+        .test(CheckSaveState {
+            buf: Some(vec![0; 4]),
+            should_fail: true,
+            max_per_round: 1,
         });
     }
 
@@ -159,8 +191,74 @@ mod plugin_state {
             ..Default::default()
         }
         .test(CheckSaveState {
-            buf: Some(vec![0; 4]),
-            should_fail: true,
+            buf: Some(vec![0; 5]),
+            should_fail: false,
+            max_per_round: 99,
+        });
+    }
+
+    #[test]
+    fn save_state_03a() {
+        TestConfig {
+            state: [0, 1, 2, 3, 4],
+            ..Default::default()
+        }
+        .test(CheckSaveState {
+            buf: Some(vec![0; 5]),
+            should_fail: false,
+            max_per_round: 3,
+        });
+    }
+
+    #[test]
+    fn save_state_03b() {
+        TestConfig {
+            state: [0, 1, 2, 3, 4],
+            ..Default::default()
+        }
+        .test(CheckSaveState {
+            buf: Some(vec![0; 5]),
+            should_fail: false,
+            max_per_round: 1,
+        });
+    }
+
+    #[test]
+    fn save_state_04() {
+        TestConfig {
+            state: [0, 1, 2, 3, 4],
+            ..Default::default()
+        }
+        .test(CheckSaveState {
+            buf: Some(vec![0; 6]),
+            should_fail: false,
+            max_per_round: 99,
+        });
+    }
+
+    #[test]
+    fn save_state_04a() {
+        TestConfig {
+            state: [0, 1, 2, 3, 4],
+            ..Default::default()
+        }
+        .test(CheckSaveState {
+            buf: Some(vec![0; 6]),
+            should_fail: false,
+            max_per_round: 3,
+        });
+    }
+
+    #[test]
+    fn save_state_04b() {
+        TestConfig {
+            state: [0, 1, 2, 3, 4],
+            ..Default::default()
+        }
+        .test(CheckSaveState {
+            buf: Some(vec![0; 6]),
+            should_fail: false,
+            max_per_round: 1,
         });
     }
 }
