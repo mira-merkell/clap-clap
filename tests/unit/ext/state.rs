@@ -13,7 +13,7 @@ mod plugin_state {
     };
 
     use crate::{
-        ext::{Test, TestBed},
+        ext::{Test, TestBed, TestConfig, TestPlugin},
         shims::plugin::ShimPlugin,
     };
 
@@ -22,7 +22,7 @@ mod plugin_state {
         _marker: PhantomData<P>,
     }
 
-    impl<P: Plugin + 'static> Test<P> for CheckExtImpl<P> {
+    impl<P: TestPlugin + 'static> Test<P> for CheckExtImpl<P> {
         fn test(self, bed: &mut TestBed<P>) {
             if P::state().is_some() {
                 assert!(bed.ext_state.is_some());
@@ -34,15 +34,15 @@ mod plugin_state {
 
     #[test]
     fn ext_impl_shim() {
-        TestBed::<ShimPlugin>::default().test(CheckExtImpl::default());
+        TestConfig::default().test::<ShimPlugin>(CheckExtImpl::default());
     }
 
     #[derive(Default, Clone)]
-    struct TestPlug {
+    struct Plug {
         state: Arc<Mutex<[u8; 5]>>,
     }
 
-    impl Plugin for TestPlug {
+    impl Plugin for Plug {
         type AudioThread = ();
         const ID: &'static str = "";
         const NAME: &'static str = "";
@@ -52,17 +52,19 @@ mod plugin_state {
         }
     }
 
-    impl Extensions<Self> for TestPlug {
+    impl TestPlugin for Plug {}
+
+    impl Extensions<Self> for Plug {
         fn state() -> Option<impl State<Self>> {
-            Some(TestState)
+            Some(PlugState)
         }
     }
 
     #[derive(Debug)]
-    struct TestState;
+    struct PlugState;
 
-    impl State<TestPlug> for TestState {
-        fn save(plugin: &TestPlug, stream: &mut OStream) -> Result<(), Error> {
+    impl State<Plug> for PlugState {
+        fn save(plugin: &Plug, stream: &mut OStream) -> Result<(), Error> {
             let state = plugin.state.lock().unwrap();
             let n = state.len();
 
@@ -81,13 +83,13 @@ mod plugin_state {
             Ok(())
         }
 
-        fn load(plugin: &TestPlug, stream: &mut IStream) -> Result<(), Error> {
+        fn load(plugin: &Plug, stream: &mut IStream) -> Result<(), Error> {
             todo!()
         }
     }
 
     #[test]
     fn ext_impl_state() {
-        TestBed::<TestPlug>::default().test(CheckExtImpl::default());
+        TestConfig::default().test::<Plug>(CheckExtImpl::default());
     }
 }

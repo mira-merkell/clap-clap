@@ -7,7 +7,7 @@ mod state;
 
 use std::{
     ffi::{CStr, CString, c_void},
-    fmt::{Debug, Formatter},
+    fmt::Debug,
     marker::PhantomData,
     mem::MaybeUninit,
     ptr::{null, null_mut},
@@ -34,42 +34,25 @@ use clap_clap::{
 
 use crate::shims::host::SHIM_CLAP_HOST;
 
-trait Test<P: Plugin> {
+trait TestPlugin: Plugin {
+    fn initialize(&mut self, _: &TestConfig) {}
+}
+
+trait Test<P: TestPlugin> {
     fn test(self, bed: &mut TestBed<P>);
 }
 
-#[derive(Default, Clone)]
-struct TestConfig<P, F> {
-    set_plug: Option<F>,
-    _marker: PhantomData<P>,
+#[derive(Default)]
+struct TestConfig {
+    latency: u32,
 }
 
-impl<P, F> Debug for TestConfig<P, F>
-where
-    P: Plugin,
-    F: FnOnce(&mut P),
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TestConfig")
-            .field("set_plug", &self.set_plug.is_some())
-            .finish()
-    }
-}
-
-impl<P, F> TestConfig<P, F>
-where
-    P: Plugin + 'static + Clone,
-    F: FnOnce(&mut P) + Clone,
-{
-    fn with_op(op: F) -> Self {
-        TestConfig {
-            set_plug: Some(op),
-            _marker: PhantomData,
-        }
-    }
-
-    fn test(self, case: impl Test<P>) -> Self {
-        TestBed::new(self.clone()).test(case);
+impl TestConfig {
+    fn test<P>(self, case: impl Test<P>) -> Self
+    where
+        P: TestPlugin + 'static,
+    {
+        TestBed::new(&self).test(case);
         self
     }
 }
@@ -77,7 +60,7 @@ where
 #[derive(Debug)]
 pub struct TestBed<P>
 where
-    P: Plugin,
+    P: TestPlugin,
 {
     clap_plugin: *const clap_plugin,
     pub ext_audio_ports: Option<ExtAudioPorts>,
@@ -90,9 +73,9 @@ where
 
 impl<P> TestBed<P>
 where
-    P: Plugin + 'static + Clone,
+    P: TestPlugin + 'static,
 {
-    fn new<F: FnOnce(&mut P)>(config: TestConfig<P, F>) -> Self {
+    fn new(config: &TestConfig) -> Self {
         let factory = Factory::new(vec![Box::new(
             FactoryPluginPrototype::<P>::build().unwrap(),
         )]);
@@ -109,11 +92,9 @@ where
             .unwrap();
         assert!(!clap_plugin.is_null());
 
-        // Set plugin parameters specified by TestConfig
-        if let Some(op) = config.set_plug {
-            let mut plugin = unsafe { ClapPlugin::new_unchecked(clap_plugin) };
-            op(unsafe { plugin.plugin() })
-        }
+        let mut wrapper = unsafe { ClapPlugin::new_unchecked(clap_plugin) };
+        let plugin: &mut P = unsafe { wrapper.plugin() };
+        plugin.initialize(&config);
 
         unsafe {
             Self {
@@ -126,10 +107,6 @@ where
                 _marker: PhantomData,
             }
         }
-    }
-
-    pub fn with_op<F: FnOnce(&mut P) + Clone>(op: F) -> Self {
-        Self::new(TestConfig::with_op(op))
     }
 
     pub const fn plugin(&self) -> ClapPlugin<P> {
@@ -148,13 +125,7 @@ where
     }
 }
 
-impl<P: Plugin + 'static + Clone> Default for TestBed<P> {
-    fn default() -> Self {
-        Self::with_op(|_| ())
-    }
-}
-
-impl<P: Plugin> Drop for TestBed<P> {
+impl<P: TestPlugin> Drop for TestBed<P> {
     fn drop(&mut self) {
         assert!(!self.clap_plugin.is_null());
         let clap_plugin = unsafe { &*self.clap_plugin };

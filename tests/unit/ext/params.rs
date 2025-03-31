@@ -15,20 +15,23 @@ use clap_clap::{
     prelude::{Process, Status, Status::Continue},
 };
 
-use crate::{ext::TestBed, shims::plugin::ShimPlugin};
+use crate::{
+    ext::{TestBed, TestConfig, TestPlugin},
+    shims::plugin::ShimPlugin,
+};
 
 #[test]
 fn no_impl_params() {
-    let bed = TestBed::<ShimPlugin>::default();
+    let bed = TestBed::<ShimPlugin>::new(&TestConfig::default());
     assert!(bed.ext_params.is_none())
 }
 
-struct TestPlugin {
+struct Plug {
     info: Vec<ParamInfo>,
     call_flush: UnsafeCell<bool>,
 }
 
-impl Clone for TestPlugin {
+impl Clone for Plug {
     fn clone(&self) -> Self {
         Self {
             info: self.info.clone(),
@@ -37,7 +40,7 @@ impl Clone for TestPlugin {
     }
 }
 
-impl Default for TestPlugin {
+impl Default for Plug {
     fn default() -> Self {
         Self {
             info: vec![
@@ -65,7 +68,7 @@ impl Default for TestPlugin {
     }
 }
 
-impl Plugin for TestPlugin {
+impl Plugin for Plug {
     type AudioThread = TestAudioThread;
     const ID: &'static str = "";
     const NAME: &'static str = "";
@@ -77,34 +80,36 @@ impl Plugin for TestPlugin {
     }
 }
 
+impl TestPlugin for Plug {}
+
 struct TestAudioThread {
     call_flush: Arc<Mutex<bool>>,
 }
 
-impl AudioThread<TestPlugin> for TestAudioThread {
+impl AudioThread<Plug> for TestAudioThread {
     fn process(&mut self, _: &mut Process) -> Result<Status, Error> {
         Ok(Continue)
     }
 }
 
-impl Extensions<Self> for TestPlugin {
-    fn params() -> Option<impl Params<TestPlugin>> {
-        Some(TestParams {})
+impl Extensions<Self> for Plug {
+    fn params() -> Option<impl Params<Plug>> {
+        Some(PlugParams {})
     }
 }
 
-struct TestParams;
+struct PlugParams;
 
-impl Params<TestPlugin> for TestParams {
-    fn count(plugin: &TestPlugin) -> u32 {
+impl Params<Plug> for PlugParams {
+    fn count(plugin: &Plug) -> u32 {
         plugin.info.len() as u32
     }
 
-    fn get_info(plugin: &TestPlugin, param_index: u32) -> Option<ParamInfo> {
+    fn get_info(plugin: &Plug, param_index: u32) -> Option<ParamInfo> {
         (param_index < plugin.info.len() as u32).then(|| plugin.info[param_index as usize].clone())
     }
 
-    fn get_value(_: &TestPlugin, param_id: ClapId) -> Option<f64> {
+    fn get_value(_: &Plug, param_id: ClapId) -> Option<f64> {
         if param_id == ClapId::from(0) {
             Some(0.0)
         } else if param_id == ClapId::from(1) {
@@ -114,23 +119,14 @@ impl Params<TestPlugin> for TestParams {
         }
     }
 
-    fn value_to_text(
-        _: &TestPlugin,
-        _: ClapId,
-        value: f64,
-        out_buf: &mut [u8],
-    ) -> Result<(), Error> {
+    fn value_to_text(_: &Plug, _: ClapId, value: f64, out_buf: &mut [u8]) -> Result<(), Error> {
         for (d, &s) in out_buf.iter_mut().zip(format!("{value:.3}").as_bytes()) {
             *d = s;
         }
         Ok(())
     }
 
-    fn text_to_value(
-        _: &TestPlugin,
-        param_id: ClapId,
-        param_value_text: &str,
-    ) -> Result<f64, Error> {
+    fn text_to_value(_: &Plug, param_id: ClapId, param_value_text: &str) -> Result<f64, Error> {
         if param_id != ClapId::from(0) {
             return Err(ConvertToValue.into());
         }
@@ -138,17 +134,13 @@ impl Params<TestPlugin> for TestParams {
         param_value_text.parse().map_err(|_| ConvertToValue.into())
     }
 
-    fn flush_inactive(plugin: &TestPlugin, _: &InputEvents, _: &OutputEvents) {
+    fn flush_inactive(plugin: &Plug, _: &InputEvents, _: &OutputEvents) {
         unsafe {
             *plugin.call_flush.get() = true;
         }
     }
 
-    fn flush(
-        audio_thread: &<TestPlugin as Plugin>::AudioThread,
-        _: &InputEvents,
-        _: &OutputEvents,
-    ) {
+    fn flush(audio_thread: &<Plug as Plugin>::AudioThread, _: &InputEvents, _: &OutputEvents) {
         let mut call = audio_thread.call_flush.lock().unwrap();
         *call = true;
     }
@@ -156,27 +148,27 @@ impl Params<TestPlugin> for TestParams {
 
 #[test]
 fn check_params_count() {
-    let bed = TestBed::<TestPlugin>::default();
+    let bed = &mut TestBed::<Plug>::new(&TestConfig::default());
 
     let params = bed.ext_params.as_ref().unwrap();
 
-    assert_eq!(params.count(), TestPlugin::default().info.len() as u32);
+    assert_eq!(params.count(), Plug::default().info.len() as u32);
 }
 
 #[test]
 fn check_params_get_info() {
-    let bed = TestBed::<TestPlugin>::default();
+    let bed = &mut TestBed::<Plug>::new(&TestConfig::default());
 
     let params = bed.ext_params.as_ref().unwrap();
 
     assert_eq!(params.count(), 2);
-    assert_eq!(params.get_info(0).unwrap(), TestPlugin::default().info[0]);
-    assert_eq!(params.get_info(1).unwrap(), TestPlugin::default().info[1]);
+    assert_eq!(params.get_info(0).unwrap(), Plug::default().info[0]);
+    assert_eq!(params.get_info(1).unwrap(), Plug::default().info[1]);
 }
 
 #[test]
 fn check_get_value() {
-    let bed = TestBed::<TestPlugin>::default();
+    let bed = &mut TestBed::<Plug>::new(&TestConfig::default());
 
     let params = bed.ext_params.as_ref().unwrap();
 
@@ -187,7 +179,7 @@ fn check_get_value() {
 
 #[test]
 fn check_value_to_text_01() {
-    let bed = TestBed::<TestPlugin>::default();
+    let bed = &mut TestBed::<Plug>::new(&TestConfig::default());
 
     let params = bed.ext_params.as_ref().unwrap();
 
@@ -200,7 +192,7 @@ fn check_value_to_text_01() {
 
 #[test]
 fn check_value_to_text_02() {
-    let bed = TestBed::<TestPlugin>::default();
+    let bed = &mut TestBed::<Plug>::new(&TestConfig::default());
 
     let params = bed.ext_params.as_ref().unwrap();
 
@@ -213,7 +205,7 @@ fn check_value_to_text_02() {
 
 #[test]
 fn check_value_to_text_03() {
-    let bed = TestBed::<TestPlugin>::default();
+    let bed = &mut TestBed::<Plug>::new(&TestConfig::default());
 
     let params = bed.ext_params.as_ref().unwrap();
 
@@ -226,7 +218,7 @@ fn check_value_to_text_03() {
 
 #[test]
 fn check_text_to_value() {
-    let bed = TestBed::<TestPlugin>::default();
+    let bed = &mut TestBed::<Plug>::new(&TestConfig::default());
 
     let params = bed.ext_params.as_ref().unwrap();
 
@@ -251,7 +243,8 @@ fn check_text_to_value() {
 
 #[test]
 fn check_flush_inactive() {
-    let bed = TestBed::<TestPlugin>::default();
+    let bed = &mut TestBed::<Plug>::new(&TestConfig::default());
+
     let params = bed.ext_params.as_ref().unwrap();
 
     assert!(!bed.plugin().is_active());
@@ -268,7 +261,8 @@ fn check_flush_inactive() {
 
 #[test]
 fn check_flush_active() {
-    let bed = TestBed::<TestPlugin>::default();
+    let bed = &mut TestBed::<Plug>::new(&TestConfig::default());
+
     let params = bed.ext_params.as_ref().unwrap();
 
     bed.activate();

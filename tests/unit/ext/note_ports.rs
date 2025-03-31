@@ -12,7 +12,7 @@ mod plugin_note_ports {
     };
 
     use crate::{
-        ext::{Test, TestBed},
+        ext::{Test, TestBed, TestConfig, TestPlugin},
         shims::plugin::ShimPlugin,
     };
 
@@ -21,7 +21,7 @@ mod plugin_note_ports {
         _marker: PhantomData<P>,
     }
 
-    impl<P: Plugin + 'static> Test<P> for CheckNoPorts<P> {
+    impl<P: TestPlugin + 'static> Test<P> for CheckNoPorts<P> {
         fn test(self, bed: &mut TestBed<P>) {
             if P::note_ports().is_some() {
                 assert!(bed.ext_note_ports.is_some());
@@ -33,7 +33,7 @@ mod plugin_note_ports {
 
     #[test]
     fn no_ports_shim() {
-        TestBed::<ShimPlugin>::default().test(CheckNoPorts::default());
+        TestConfig::default().test::<ShimPlugin>(CheckNoPorts::default());
     }
 
     #[derive(Default, Copy, Clone)]
@@ -48,6 +48,8 @@ mod plugin_note_ports {
             Ok(())
         }
     }
+
+    impl TestPlugin for Ports {}
 
     impl Extensions<Self> for Ports {
         fn note_ports() -> Option<impl NotePorts<Self>> {
@@ -83,12 +85,12 @@ mod plugin_note_ports {
 
     #[test]
     fn no_ports_ports() {
-        TestBed::<Ports>::default().test(CheckNoPorts::default());
+        TestConfig::default().test::<Ports>(CheckNoPorts::default());
     }
 
     #[test]
     fn ports_input_output_count() {
-        let bed = &mut TestBed::<Ports>::default();
+        let bed = &mut TestBed::<Ports>::new(&TestConfig::default());
 
         let note_ports = bed.ext_note_ports.as_ref().unwrap();
 
@@ -100,7 +102,7 @@ mod plugin_note_ports {
 
     #[test]
     fn ports_input_info() {
-        let bed = &mut TestBed::<Ports>::default();
+        let bed = &mut TestBed::<Ports>::new(&TestConfig::default());
 
         let note_ports = bed.ext_note_ports.as_ref().unwrap();
 
@@ -111,7 +113,7 @@ mod plugin_note_ports {
 
     #[test]
     fn ports_output_info() {
-        let bed = &mut TestBed::<Ports>::default();
+        let bed = &mut TestBed::<Ports>::new(&TestConfig::default());
 
         let note_ports = bed.ext_note_ports.as_ref().unwrap();
 

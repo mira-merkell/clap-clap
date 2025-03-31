@@ -8,7 +8,7 @@ mod plugin_latency {
     };
 
     use crate::{
-        ext::{Test, TestBed},
+        ext::{Test, TestBed, TestConfig, TestPlugin},
         shims::plugin::ShimPlugin,
     };
 
@@ -17,7 +17,7 @@ mod plugin_latency {
         _marker: PhantomData<P>,
     }
 
-    impl<P: Plugin + 'static> Test<P> for CheckNoExt<P> {
+    impl<P: TestPlugin + 'static> Test<P> for CheckNoExt<P> {
         fn test(self, bed: &mut TestBed<P>) {
             if P::latency().is_some() {
                 assert!(bed.ext_latency.is_some());
@@ -29,15 +29,15 @@ mod plugin_latency {
 
     #[test]
     fn no_ports_shim() {
-        TestBed::<ShimPlugin>::default().test(CheckNoExt::default());
+        TestConfig::default().test::<ShimPlugin>(CheckNoExt::default());
     }
 
     #[derive(Default, Copy, Clone)]
-    struct TestPlug {
+    struct Plug {
         latency: u32,
     }
 
-    impl Plugin for TestPlug {
+    impl Plugin for Plug {
         type AudioThread = ();
         const ID: &'static str = "";
         const NAME: &'static str = "";
@@ -47,30 +47,36 @@ mod plugin_latency {
         }
     }
 
-    impl Extensions<Self> for TestPlug {
+    impl TestPlugin for Plug {
+        fn initialize(&mut self, cfg: &TestConfig) {
+            self.latency = cfg.latency;
+        }
+    }
+
+    impl Extensions<Self> for Plug {
         fn latency() -> Option<impl Latency<Self>> {
-            Some(TestLatency)
+            Some(PlugLatency)
         }
     }
 
     #[derive(Debug, Copy, Clone)]
-    struct TestLatency;
+    struct PlugLatency;
 
-    impl Latency<TestPlug> for TestLatency {
-        fn get(plugin: &TestPlug) -> u32 {
+    impl Latency<Plug> for PlugLatency {
+        fn get(plugin: &Plug) -> u32 {
             plugin.latency
         }
     }
 
     #[test]
     fn no_ports_ports() {
-        TestBed::<TestPlug>::default().test(CheckNoExt::default());
+        TestConfig::default().test::<Plug>(CheckNoExt::default());
     }
 
     struct CheckLatency;
 
-    impl Test<TestPlug> for CheckLatency {
-        fn test(self, bed: &mut TestBed<TestPlug>) {
+    impl Test<Plug> for CheckLatency {
+        fn test(self, bed: &mut TestBed<Plug>) {
             let latency = bed.ext_latency.as_ref().unwrap().get();
 
             let mut handle = bed.plugin();
@@ -80,15 +86,34 @@ mod plugin_latency {
 
     #[test]
     fn plugin_latency_0() {
-        TestBed::<TestPlug>::default().test(CheckLatency);
+        TestConfig::default().test::<Plug>(CheckLatency);
     }
 
     #[test]
     fn plugin_latency_1() {
-        TestBed::<TestPlug>::with_op(|p| p.latency = 0).test(CheckLatency);
-        TestBed::<TestPlug>::with_op(|p| p.latency = 1).test(CheckLatency);
-        TestBed::<TestPlug>::with_op(|p| p.latency = 10).test(CheckLatency);
-        TestBed::<TestPlug>::with_op(|p| p.latency = 999).test(CheckLatency);
+        TestConfig {
+            latency: 0,
+            ..Default::default()
+        }
+        .test::<Plug>(CheckLatency);
+
+        TestConfig {
+            latency: 1,
+            ..Default::default()
+        }
+        .test::<Plug>(CheckLatency);
+
+        TestConfig {
+            latency: 10,
+            ..Default::default()
+        }
+        .test::<Plug>(CheckLatency);
+
+        TestConfig {
+            latency: 999,
+            ..Default::default()
+        }
+        .test::<Plug>(CheckLatency);
     }
 }
 
