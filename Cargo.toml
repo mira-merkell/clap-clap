@@ -13,6 +13,8 @@ authors = ["⧉⧉⧉"]
 [lib]
 crate-type = ["rlib"]
 
+# Examples
+
 [[example]]
 name = "gain"
 crate-type = ["cdylib"]
@@ -23,4 +25,8 @@ crate-type = ["cdylib"]
 
 [[example]]
 name = "plugin_template"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "state"
 crate-type = ["cdylib"]
