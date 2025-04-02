@@ -23,6 +23,8 @@ pub trait State<P: Plugin> {
 
 pub(crate) use ffi::PluginState;
 
+use crate::{ffi::clap_host_state, host::Host};
+
 mod ffi {
     use std::marker::PhantomData;
 
@@ -113,6 +115,35 @@ impl<P: Plugin> State<P> for () {
 
     fn load(_: &P, _: &mut IStream) -> Result<(), crate::Error> {
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct HostState<'a> {
+    host: &'a Host,
+    clap_host_state: &'a clap_host_state,
+}
+
+impl<'a> HostState<'a> {
+    /// # Safety
+    ///
+    /// All extension interface function pointers must be non-null (Some), and
+    /// the functions must be thread-safe.
+    pub(crate) const unsafe fn new_unchecked(
+        host: &'a Host,
+        clap_host_state: &'a clap_host_state,
+    ) -> Self {
+        Self {
+            host,
+            clap_host_state,
+        }
+    }
+
+    pub fn make_dirty(&self) {
+        // SAFETY: By construction, the callback must be a valid function pointer,
+        // and the call is thread-safe.
+        let callback = self.clap_host_state.mark_dirty.unwrap();
+        unsafe { callback(self.host.clap_host()) }
     }
 }
 

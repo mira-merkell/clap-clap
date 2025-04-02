@@ -455,3 +455,69 @@ mod plugin_state {
         });
     }
 }
+
+mod host_state {
+    use std::{error::Error, pin::Pin};
+
+    use clap_clap::{
+        host,
+        host::Error::{Callback, ExtensionNotFound},
+    };
+
+    use crate::host::{ExtStateConfig, Test, TestBed, TestConfig};
+
+    struct CheckStateNotImpl<E: Error> {
+        error: E,
+    }
+
+    impl Test for CheckStateNotImpl<host::Error> {
+        fn test(self, bed: Pin<&mut TestBed>) {
+            let host = unsafe { bed.host_mut() };
+            let err = host.get_extension().state().unwrap_err();
+            assert_eq!(err, self.error);
+        }
+    }
+
+    #[test]
+    fn state_not_impl() {
+        TestConfig::default().test(CheckStateNotImpl {
+            error: ExtensionNotFound("state"),
+        });
+    }
+
+    #[test]
+    fn state_no_method_make_dirty() {
+        TestConfig {
+            ext_state: Some(ExtStateConfig {
+                null_callback: true,
+            }),
+            ..Default::default()
+        }
+        .test(CheckStateNotImpl {
+            error: Callback("make_dirty"),
+        });
+    }
+
+    struct CheckCallMakeDirty;
+
+    impl Test for CheckCallMakeDirty {
+        fn test(self, mut bed: Pin<&mut TestBed>) {
+            let host = unsafe { bed.as_mut().host_mut() };
+            let latency = host.get_extension().state().unwrap();
+            latency.make_dirty();
+
+            assert!(bed.ext_state.as_ref().unwrap().call_make_dirty);
+        }
+    }
+
+    #[test]
+    fn state_call_make_dirty() {
+        TestConfig {
+            ext_state: Some(ExtStateConfig {
+                null_callback: false,
+            }),
+            ..Default::default()
+        }
+        .test(CheckCallMakeDirty);
+    }
+}
