@@ -74,13 +74,13 @@ macro_rules! impl_flags_u32 {
 
 #[derive(Debug)]
 pub enum Error {
-    Factory(factory::Error),
     Events(events::Error),
     Extension(ext::Error),
+    Factory(factory::Error),
     Host(host::Error),
     Id(id::Error),
+    IO(std::io::Error),
     Plugin(plugin::Error),
-    Stream(stream::Error),
     User(Box<dyn std::error::Error + Send + 'static>),
 }
 
@@ -93,11 +93,17 @@ impl std::fmt::Display for Error {
             Factory(e) => write!(f, "factory: {e}"),
             Host(e) => write!(f, "host: {e}"),
             Id(e) => write!(f, "id : {e}"),
+            IO(e) => write!(f, "I/O: {e}"),
             Plugin(e) => write!(f, "plugin: {e}"),
-            Stream(e) => write!(f, "stream: {e}"),
             User(e) => write!(f, "user: {e}"),
         }
     }
 }
 
 impl std::error::Error for Error {}
+
+impl From<std::io::Error> for Error {
+    fn from(value: std::io::Error) -> Self {
+        Self::IO(value)
+    }
+}

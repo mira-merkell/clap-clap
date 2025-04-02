@@ -12,7 +12,6 @@
 
 use std::{
     ffi::c_void,
-    fmt::{Display, Formatter},
     io::{Read, Write},
 };
 
@@ -37,29 +36,6 @@ impl IStream {
         // SAFETY: By construction, the pointer is non-null and points to a valid
         // clap_istream instance.
         unsafe { self.0.as_ref().unwrap() }
-    }
-
-    /// Attempt to read the content of the stream and fill the provided buffer.
-    ///
-    /// # Return
-    ///
-    /// If the entire buffer was filled with data, return `Ok(n)` where `n` is
-    /// the length or the buffer.
-    /// Return `Error::Eof(n)`, where `n` is the number of bytes read, if the
-    /// stream was drained before the buffer was filled. In case of an IO
-    /// error, return `Error::IO`.
-    pub fn try_read_into(&mut self, buffer: &mut [u8]) -> Result<usize, Error> {
-        let n = buffer.len();
-
-        let mut i = 0;
-        while i < n {
-            let bytes_read = self.read(&mut buffer[i..n])?;
-            if bytes_read == 0 {
-                return Err(Error::Eof(i));
-            }
-            i += bytes_read;
-        }
-        Ok(n)
     }
 }
 
@@ -119,34 +95,5 @@ impl Write for OStream {
 
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
-    }
-}
-
-#[derive(Debug)]
-pub enum Error {
-    IO(std::io::Error),
-    Eof(usize),
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::IO(e) => write!(f, "IO: {e}"),
-            Error::Eof(n) => write!(f, "EOF at byte {n}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
-impl From<std::io::Error> for Error {
-    fn from(value: std::io::Error) -> Self {
-        Self::IO(value)
-    }
-}
-
-impl From<Error> for crate::Error {
-    fn from(value: Error) -> Self {
-        crate::Error::Stream(value)
     }
 }

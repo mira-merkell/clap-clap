@@ -112,32 +112,12 @@ impl clap::State<Example> for ExampleState {
     fn save(plugin: &Example, stream: &mut clap::OStream) -> Result<(), clap::Error> {
         let buf: [u64; 3] = [0, 1, 2].map(|i| plugin.state[i].load(Ordering::Acquire));
         let buf: [u8; 24] = unsafe { mem::transmute(buf) };
-
-        let mut i = 0;
-        while i < 24 {
-            let written = stream
-                .write(&buf[i..24])
-                .map_err(|_| clap::ext::state::Error::Write)?;
-            if written == 0 {
-                return Err(clap::ext::state::Error::Eof.into());
-            }
-            i += written;
-        }
-        Ok(())
+        stream.write_all(&buf).map_err(Into::into)
     }
 
     fn load(plugin: &Example, stream: &mut clap::IStream) -> Result<(), clap::Error> {
         let mut buf: [u8; 24] = [0; 24];
-        let mut i = 0;
-        while i < 24 {
-            let written = stream
-                .read(&mut buf[i..24])
-                .map_err(|_| clap::ext::state::Error::Read)?;
-            if written == 0 {
-                return Err(clap::ext::state::Error::Eof.into());
-            }
-            i += written;
-        }
+        stream.read_exact(&mut buf)?;
 
         let buf: [u64; 3] = unsafe { mem::transmute(buf) };
         for i in 0..3 {
