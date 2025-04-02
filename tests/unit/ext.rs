@@ -58,7 +58,7 @@ impl TestConfig {
 }
 
 #[derive(Debug)]
-pub struct TestBed<P>
+struct TestBed<P>
 where
     P: TestPlugin,
 {
