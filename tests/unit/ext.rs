@@ -22,14 +22,13 @@ use clap_clap::{
     factory::{Factory, FactoryHost, FactoryPluginPrototype},
     ffi::{
         CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS,
-        CLAP_EXT_STATE, clap_audio_port_info, clap_event_header, clap_input_events,
+        CLAP_EXT_STATE, clap_audio_port_info, clap_event_header, clap_input_events, clap_istream,
         clap_note_port_info, clap_ostream, clap_output_events, clap_plugin,
         clap_plugin_audio_ports, clap_plugin_latency, clap_plugin_note_ports, clap_plugin_params,
         clap_plugin_state,
     },
     id::ClapId,
     plugin::{ClapPlugin, Plugin},
-    stream::IStream,
 };
 
 use crate::shims::host::SHIM_CLAP_HOST;
@@ -448,9 +447,48 @@ impl ExtState {
         unsafe { state.save.unwrap()(self.clap_plugin, &raw const stream) }
     }
 
-    pub fn load(&self, stream: &mut IStream) -> bool {
+    pub fn load(&self, buf: Option<&mut Vec<u8>>, max_per_round: usize) -> bool {
         let state = unsafe { self.clap_plugin_state.as_ref() }.unwrap();
+        let Some(buf) = buf else {
+            return false;
+        };
 
-        todo!()
+        struct RawParts {
+            buf: *mut u8,
+            len: usize,
+            max_per_round: usize,
+        }
+        let mut raw_parts = RawParts {
+            buf: buf.as_mut_ptr(),
+            len: buf.len(),
+            max_per_round,
+        };
+        let stream = clap_istream {
+            ctx: (&raw mut raw_parts).cast(),
+            read: Some(read),
+        };
+
+        extern "C-unwind" fn read(
+            stream: *const clap_istream,
+            buffer: *mut c_void,
+            size: u64,
+        ) -> i64 {
+            let b: *mut RawParts = unsafe { stream.as_ref().unwrap().ctx.cast() };
+            let Some(b) = (unsafe { b.as_mut() }) else {
+                return -1;
+            };
+            let n = b.len.min(size as usize).min(b.max_per_round);
+
+            #[allow(clippy::needless_range_loop)]
+            for i in 0..n {
+                unsafe { *(buffer.add(i) as *mut u8) = *b.buf.add(i) }
+            }
+            unsafe { b.buf = b.buf.add(n) };
+            b.len -= n;
+
+            n as i64
+        }
+
+        unsafe { state.load.unwrap()(self.clap_plugin, &raw const stream) }
     }
 }
