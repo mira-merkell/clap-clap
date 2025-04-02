@@ -34,12 +34,14 @@ pub mod prelude {
             log::{self, HostLog, Severity},
             note_ports::{self, HostNotePorts, NoteDialect, NotePortInfo, NotePorts},
             params::{self, HostParams, ParamInfo, Params},
+            state::{self, State},
         },
-        host::Host,
+        host::{self, Host},
         id::ClapId,
-        plugin::{AudioThread, Plugin},
+        plugin::{self, AudioThread, Plugin},
         plugin_features::*,
-        process::{Process, Status},
+        process::{self, Process, Status},
+        stream::{self, IStream, OStream},
     };
 }
 

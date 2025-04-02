@@ -7,12 +7,7 @@ use std::{
     },
 };
 
-use clap_clap::{
-    Error,
-    ext::state::State,
-    prelude as clap,
-    stream::{IStream, OStream},
-};
+use clap_clap::prelude as clap;
 
 // A plugin must implement `Default` trait.  The plugin instance will be created
 // by the host with the call to `State::default()`.
@@ -38,7 +33,7 @@ impl clap::Extensions<Self> for Example {
         Some(ExampleParams)
     }
 
-    fn state() -> Option<impl clap_clap::ext::state::State<Self>> {
+    fn state() -> Option<impl clap::State<Self>> {
         Some(ExampleState)
     }
 }
@@ -58,7 +53,7 @@ impl clap::Params<Example> for ExampleParams {
                     // Some DAWs, e.g. Bitwig, display only automatable parameters.
                     | clap::params::InfoFlags::Automatable as u32,
                 name: format!("Param {param_index}"),
-                module: format!("param"),
+                module: format!("{param_index}/param"),
                 min_value: 0.0,
                 max_value: 1.0,
                 default_value: 0.0,
@@ -113,8 +108,8 @@ impl clap::Params<Example> for ExampleParams {
 
 struct ExampleState;
 
-impl State<Example> for ExampleState {
-    fn save(plugin: &Example, stream: &mut OStream) -> Result<(), Error> {
+impl clap::State<Example> for ExampleState {
+    fn save(plugin: &Example, stream: &mut clap::OStream) -> Result<(), clap::Error> {
         let buf: [u64; 3] = [0, 1, 2].map(|i| plugin.state[i].load(Ordering::Acquire));
         let buf: [u8; 24] = unsafe { mem::transmute(buf) };
 
@@ -131,7 +126,7 @@ impl State<Example> for ExampleState {
         Ok(())
     }
 
-    fn load(plugin: &Example, stream: &mut IStream) -> Result<(), Error> {
+    fn load(plugin: &Example, stream: &mut clap::IStream) -> Result<(), clap::Error> {
         let mut buf: [u8; 24] = [0; 24];
         let mut i = 0;
         while i < 24 {
