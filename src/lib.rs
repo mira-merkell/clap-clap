@@ -80,6 +80,7 @@ pub enum Error {
     Host(host::Error),
     Id(id::Error),
     Plugin(plugin::Error),
+    Stream(stream::Error),
     User(Box<dyn std::error::Error + Send + 'static>),
 }
 
@@ -87,13 +88,14 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use Error::*;
         match self {
-            Factory(e) => write!(f, "factory error: {e}"),
-            Plugin(e) => write!(f, "plugin error: {e}"),
-            Events(e) => write!(f, "events error {e}"),
-            Extension(e) => write!(f, "extension error {e}"),
-            Host(e) => write!(f, "host error: {e}"),
-            Id(e) => write!(f, "id error: {e}"),
-            User(e) => write!(f, "user error: {e}"),
+            Events(e) => write!(f, "events:  {e}"),
+            Extension(e) => write!(f, "extension:  {e}"),
+            Factory(e) => write!(f, "factory: {e}"),
+            Host(e) => write!(f, "host: {e}"),
+            Id(e) => write!(f, "id : {e}"),
+            Plugin(e) => write!(f, "plugin: {e}"),
+            Stream(e) => write!(f, "stream: {e}"),
+            User(e) => write!(f, "user: {e}"),
         }
     }
 }
