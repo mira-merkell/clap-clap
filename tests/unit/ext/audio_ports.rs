@@ -13,7 +13,7 @@ mod plugin_audio_ports {
     };
 
     use crate::{
-        ext::{Test, TestBed, TestConfig},
+        ext::{Test, TestBed, TestConfig, TestPlugin},
         shims::plugin::ShimPlugin,
     };
 
@@ -22,7 +22,7 @@ mod plugin_audio_ports {
         _marker: PhantomData<P>,
     }
 
-    impl<P: Plugin + 'static> Test<P> for CheckNoPorts<P> {
+    impl<P: TestPlugin + 'static> Test<P> for CheckNoPorts<P> {
         fn test(self, bed: &mut TestBed<P>) {
             if P::audio_ports().is_some() {
                 assert!(bed.ext_audio_ports.is_some());
@@ -32,9 +32,11 @@ mod plugin_audio_ports {
         }
     }
 
+    impl TestPlugin for ShimPlugin {}
+
     #[test]
     fn no_ports_shim() {
-        TestConfig::<ShimPlugin>::default().test(CheckNoPorts::default());
+        TestConfig::default().test::<ShimPlugin>(CheckNoPorts::default());
     }
 
     #[derive(Default, Copy, Clone)]
@@ -86,14 +88,16 @@ mod plugin_audio_ports {
         }
     }
 
+    impl TestPlugin for Ports {}
+
     #[test]
     fn no_ports_ports() {
-        TestConfig::<Ports>::default().test(CheckNoPorts::default());
+        TestConfig::default().test::<Ports>(CheckNoPorts::default());
     }
 
     #[test]
     fn ports_input_output_count() {
-        let bed = &mut TestBed::new(TestConfig::<Ports>::default());
+        let bed = &mut TestBed::<Ports>::new(&TestConfig::default());
 
         let audio_ports = bed.ext_audio_ports.as_ref().unwrap();
 
@@ -105,7 +109,7 @@ mod plugin_audio_ports {
 
     #[test]
     fn ports_input_info() {
-        let bed = &mut TestBed::new(TestConfig::<Ports>::default());
+        let bed = &mut TestBed::<Ports>::new(&TestConfig::default());
 
         let audio_ports = bed.ext_audio_ports.as_ref().unwrap();
 
@@ -116,7 +120,7 @@ mod plugin_audio_ports {
 
     #[test]
     fn ports_output_info() {
-        let bed = &mut TestBed::new(TestConfig::<Ports>::default());
+        let bed = &mut TestBed::<Ports>::new(&TestConfig::default());
 
         let audio_ports = bed.ext_audio_ports.as_ref().unwrap();
 

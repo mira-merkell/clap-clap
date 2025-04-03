@@ -6,12 +6,12 @@ use std::{
 use crate::{
     ext::{
         audio_ports::HostAudioPorts, latency::HostLatency, log::HostLog, note_ports::HostNotePorts,
-        params::HostParams,
+        params::HostParams, state::HostState,
     },
     ffi::{
         CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY, CLAP_EXT_LOG, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS,
-        clap_host, clap_host_audio_ports, clap_host_latency, clap_host_log, clap_host_note_ports,
-        clap_host_params,
+        CLAP_EXT_STATE, clap_host, clap_host_audio_ports, clap_host_latency, clap_host_log,
+        clap_host_note_ports, clap_host_params, clap_host_state,
     },
     version::ClapVersion,
 };
@@ -222,6 +222,24 @@ impl<'a> HostExtensions<'a> {
         // SAFETY: We just checked if the pointer to clap_host_params, and all its
         // methods are non-null.
         Ok(unsafe { HostParams::new_unchecked(self.host, clap_host_params) })
+    }
+
+    pub fn state(&self) -> Result<HostState<'a>, Error> {
+        let clap_host_state = self
+            .get_extension_ptr(CLAP_EXT_STATE)
+            .ok_or(Error::ExtensionNotFound("state"))?;
+
+        // SAFETY: We just checked if the pointer to clap_host_state is non-null. We
+        // return a reference to it for the lifetime of Host.
+        let clap_host_state: &clap_host_state = unsafe { &*clap_host_state.cast() };
+
+        let _ = clap_host_state
+            .mark_dirty
+            .ok_or(Error::Callback("make_dirty"))?;
+
+        // SAFETY: We just checked if the pointer to clap_host_state, and all its
+        // methods are non-null.
+        Ok(unsafe { HostState::new_unchecked(self.host, clap_host_state) })
     }
 }
 

@@ -15,6 +15,7 @@ pub mod id;
 pub mod plugin;
 pub mod plugin_features;
 pub mod process;
+pub mod stream;
 pub mod string_sizes;
 pub mod timestamp;
 pub mod version;
@@ -33,12 +34,14 @@ pub mod prelude {
             log::{self, HostLog, Severity},
             note_ports::{self, HostNotePorts, NoteDialect, NotePortInfo, NotePorts},
             params::{self, HostParams, ParamInfo, Params},
+            state::{self, State},
         },
-        host::Host,
+        host::{self, Host},
         id::ClapId,
-        plugin::{AudioThread, Plugin},
+        plugin::{self, AudioThread, Plugin},
         plugin_features::*,
-        process::{Process, Status},
+        process::{self, Process, Status},
+        stream::{self, IStream, OStream},
     };
 }
 
@@ -71,11 +74,12 @@ macro_rules! impl_flags_u32 {
 
 #[derive(Debug)]
 pub enum Error {
-    Factory(factory::Error),
     Events(events::Error),
     Extension(ext::Error),
+    Factory(factory::Error),
     Host(host::Error),
     Id(id::Error),
+    IO(std::io::Error),
     Plugin(plugin::Error),
     User(Box<dyn std::error::Error + Send + 'static>),
 }
@@ -84,15 +88,22 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use Error::*;
         match self {
-            Factory(e) => write!(f, "factory error: {e}"),
-            Plugin(e) => write!(f, "plugin error: {e}"),
-            Events(e) => write!(f, "events error {e}"),
-            Extension(e) => write!(f, "extension error {e}"),
-            Host(e) => write!(f, "host error: {e}"),
-            Id(e) => write!(f, "id error: {e}"),
-            User(e) => write!(f, "user error: {e}"),
+            Events(e) => write!(f, "events:  {e}"),
+            Extension(e) => write!(f, "extension:  {e}"),
+            Factory(e) => write!(f, "factory: {e}"),
+            Host(e) => write!(f, "host: {e}"),
+            Id(e) => write!(f, "id : {e}"),
+            IO(e) => write!(f, "I/O: {e}"),
+            Plugin(e) => write!(f, "plugin: {e}"),
+            User(e) => write!(f, "user: {e}"),
         }
     }
 }
 
 impl std::error::Error for Error {}
+
+impl From<std::io::Error> for Error {
+    fn from(value: std::io::Error) -> Self {
+        Self::IO(value)
+    }
+}

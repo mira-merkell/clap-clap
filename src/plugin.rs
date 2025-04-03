@@ -90,6 +90,7 @@ struct PluginExtensions<P> {
     latency: Option<PluginLatency<P>>,
     note_ports: Option<PluginNotePorts<P>>,
     params: Option<PluginParams<P>>,
+    state: Option<PluginState<P>>,
 }
 
 impl<P: Plugin> PluginExtensions<P> {
@@ -99,6 +100,7 @@ impl<P: Plugin> PluginExtensions<P> {
             latency: <P as Extensions<P>>::latency().map(PluginLatency::new),
             note_ports: <P as Extensions<P>>::note_ports().map(PluginNotePorts::new),
             params: <P as Extensions<P>>::params().map(PluginParams::new),
+            state: <P as Extensions<P>>::state().map(PluginState::new),
         }
     }
 }
@@ -319,7 +321,9 @@ mod desc {
 #[doc(hidden)]
 pub use desc::PluginDescriptor;
 
-use crate::ext::{latency::PluginLatency, note_ports::PluginNotePorts, params::PluginParams};
+use crate::ext::{
+    latency::PluginLatency, note_ports::PluginNotePorts, params::PluginParams, state::PluginState,
+};
 
 mod ffi {
     use std::{
@@ -332,7 +336,7 @@ mod ffi {
     use crate::{
         ffi::{
             CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS,
-            CLAP_PROCESS_ERROR, clap_plugin, clap_process, clap_process_status,
+            CLAP_EXT_STATE, CLAP_PROCESS_ERROR, clap_plugin, clap_process, clap_process_status,
         },
         plugin::{AudioThread, ClapPlugin, Plugin, Runtime},
         process::Process,
@@ -549,6 +553,10 @@ mod ffi {
             }
         } else if id == CLAP_EXT_PARAMS {
             if let Some(ext) = &extensions.params {
+                return (&raw const *ext).cast();
+            }
+        } else if id == CLAP_EXT_STATE {
+            if let Some(ext) = &extensions.state {
                 return (&raw const *ext).cast();
             }
         }
