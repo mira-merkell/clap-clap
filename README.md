@@ -2,9 +2,7 @@
 
 [![CI](https://github.com/mira-merkell/clap-clap/actions/workflows/CI.yml/badge.svg)](https://github.com/mira-merkell/clap-clap/actions/workflows/CI.yml)
 
-A [CLAP] plugin runtime. Very much WIP. 🚧
-
-Documentation is available at [docs.rs][documentation].
+A [CLAP] plugin runtime.  Documentation is available at [docs.rs][documentation].
 
 [CLAP]: https://cleveraudio.org
 
@@ -16,8 +14,12 @@ Documentation is available at [docs.rs][documentation].
 * Follow closely CLAP module structure and terminology.
 * Build a plugin testbed and a debugging platform.
 
-New minor versions, `0.x.0` will be published once a month throughout 2025. The
-stable version: `1.0.0-beta` planned for Sep 2025.
+This library is still very much WIP, 🚧 but the core functionality has already been implemented:
+that includes all event types, audio and note ports, parameters, saving/loading plugin state,
+logging, and reporting latency.  
+
+New minor versions, `0.x.0` will be published once a month throughout 2025.
+The first stable version: `1.0.0-beta` is planned for Sep 2025.
 
 [CLAP API]: https://github.com/free-audio/clap/tree/main/include/clap
 
