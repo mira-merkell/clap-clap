@@ -40,7 +40,7 @@ pub mod prelude {
         host::{self, Host},
         id::ClapId,
         plugin::{self, AudioThread, Plugin},
-        plugin_features::*,
+        plugin_features,
         process::{self, Process, Status, Status::Continue},
         stream::{self, IStream, OStream},
     };
