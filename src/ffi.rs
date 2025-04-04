@@ -1566,7 +1566,7 @@ pub struct clap_plugin_tail {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct clap_hos_tail {
+pub struct clap_host_tail {
     pub changed: Option<unsafe extern "C-unwind" fn(host: *const clap_host)>,
 }
 
