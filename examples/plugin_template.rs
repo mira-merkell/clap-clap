@@ -52,8 +52,8 @@ impl clap::Plugin for MyPlug {
 
     fn features() -> impl Iterator<Item = &'static str> {
         [
-            clap::PLUGIN_FEATURE_AUDIO_EFFECT,
-            clap::PLUGIN_FEATURE_STEREO,
+            clap::plugin_features::AUDIO_EFFECT,
+            clap::plugin_features::STEREO,
         ]
         .into_iter()
     }
