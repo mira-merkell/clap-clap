@@ -19,7 +19,7 @@ use std::fmt::{Display, Formatter};
 use crate::{
     ext::{
         audio_ports::AudioPorts, latency::Latency, note_ports::NotePorts, params::Params,
-        state::State,
+        state::State, tail::Tail,
     },
     plugin::Plugin,
 };
@@ -30,6 +30,7 @@ pub mod log;
 pub mod note_ports;
 pub mod params;
 pub mod state;
+pub mod tail;
 
 /// Plugin extensions.
 pub trait Extensions<P: Plugin> {
@@ -50,6 +51,10 @@ pub trait Extensions<P: Plugin> {
     }
 
     fn state() -> Option<impl State<P>> {
+        None::<()>
+    }
+
+    fn tail() -> Option<impl Tail<P>> {
         None::<()>
     }
 }
