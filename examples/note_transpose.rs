@@ -96,7 +96,7 @@ impl clap::AudioThread<Self> for Transpose {
             }
         }
 
-        Ok(clap::Status::Continue)
+        Ok(clap::Continue)
     }
 }
 

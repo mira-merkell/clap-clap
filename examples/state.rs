@@ -176,7 +176,7 @@ impl clap::AudioThread<Example> for AudioThread {
                 }
             }
         }
-        Ok(clap::Status::Continue)
+        Ok(clap::Continue)
     }
 }
 

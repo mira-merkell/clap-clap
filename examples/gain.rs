@@ -192,7 +192,7 @@ impl clap::AudioThread<Gain> for AudioThread {
 
             i += 1;
         }
-        Ok(clap::Status::Continue)
+        Ok(clap::Continue)
     }
 }
 
