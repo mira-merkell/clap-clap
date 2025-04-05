@@ -31,6 +31,7 @@ pub mod prelude {
                 self, AudioPortFlags, AudioPortInfo, AudioPortType, AudioPorts, MonoPorts,
                 StereoPorts,
             },
+            latency::{self, HostLatency, Latency},
             log::{self, Severity},
             note_ports::{self, NoteDialect, NotePortInfo, NotePorts},
             params::{self, ParamInfo, Params},
