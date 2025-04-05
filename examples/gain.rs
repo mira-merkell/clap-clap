@@ -8,16 +8,13 @@ use clap_clap::prelude as clap;
 // A plugin must implement `Default` trait.  The plugin instance will be created
 // by the host with the call to `MyPlug::default()`.
 struct Gain {
-    gain: Arc<(AtomicU64, AtomicU64)>, // (value, mod amount)
+    gain: Arc<AtomicU64>, // (value, mod amount)
 }
 
 impl Default for Gain {
     fn default() -> Self {
         Self {
-            gain: Arc::new((
-                AtomicU64::new(1.0f64.to_bits()),
-                AtomicU64::new(0.0f64.to_bits()),
-            )),
+            gain: Arc::new(AtomicU64::new(1.0f64.to_bits())),
         }
     }
 }
@@ -44,7 +41,7 @@ impl clap::Params<Gain> for GainParam {
             Some(clap::ParamInfo {
                 id: clap::ClapId::from(0),
                 flags: clap::params::InfoFlags::RequiresProcess as u32
-                    | clap::params::InfoFlags::Modulatable as u32,
+                    | clap::params::InfoFlags::Automatable as u32,
                 name: "Gain".to_string(),
                 module: "gain".to_string(),
                 min_value: 0.0,
@@ -58,9 +55,8 @@ impl clap::Params<Gain> for GainParam {
 
     fn get_value(plugin: &Gain, param_id: clap::ClapId) -> Option<f64> {
         if param_id == clap::ClapId::from(0) {
-            let gain = f64::from_bits(plugin.gain.0.load(Ordering::Relaxed));
-            let gain_mod = f64::from_bits(plugin.gain.1.load(Ordering::Relaxed));
-            Some(gain + gain_mod)
+            let gain = f64::from_bits(plugin.gain.load(Ordering::Relaxed));
+            Some(gain)
         } else {
             None
         }
@@ -122,20 +118,19 @@ impl clap::Plugin for Gain {
     fn activate(&mut self, _: f64, _: u32, _: u32) -> Result<AudioThread, clap::Error> {
         Ok(AudioThread {
             gain: self.gain.clone(),
-            smoothed: (Smooth::default(), Smooth::default()),
+            smoothed: Smooth::default(),
         })
     }
 }
 
 struct AudioThread {
-    gain: Arc<(AtomicU64, AtomicU64)>,
-    smoothed: (Smooth, Smooth),
+    gain: Arc<AtomicU64>,
+    smoothed: Smooth,
 }
 
 impl clap::AudioThread<Gain> for AudioThread {
     fn process(&mut self, process: &mut clap::Process) -> Result<clap::Status, clap::Error> {
-        let mut gain = f64::from_bits(self.gain.0.load(Ordering::Relaxed));
-        let mut gain_mod = f64::from_bits(self.gain.1.load(Ordering::Relaxed));
+        let mut gain = f64::from_bits(self.gain.load(Ordering::Relaxed));
 
         let nframes = process.frames_count();
         let nev = process.in_events().size();
@@ -155,11 +150,7 @@ impl clap::AudioThread<Gain> for AudioThread {
 
                     if let Ok(param_value) = header.param_value() {
                         gain = param_value.value();
-                        self.gain.0.store(gain.to_bits(), Ordering::Release);
-                    }
-                    if let Ok(param_mod) = header.param_mod() {
-                        gain_mod = param_mod.amount();
-                        self.gain.1.store(gain.to_bits(), Ordering::Release);
+                        self.gain.store(gain.to_bits(), Ordering::Release);
                     }
                 }
 
@@ -174,16 +165,14 @@ impl clap::AudioThread<Gain> for AudioThread {
             {
                 let i = i as usize;
                 let gain = gain as f32;
-                let gain_mod = gain_mod as f32;
 
                 // Get the input signal from the main input port.
                 let in_l = process.audio_inputs(0).data32(0)[i];
                 let in_r = process.audio_inputs(0).data32(1)[i];
 
-                // Process samples. Here we simply swap left and right channels.
-                let smoothed = (self.smoothed.0.tick(gain), self.smoothed.1.tick(gain_mod));
-                let out_l = in_r * (smoothed.0 + smoothed.1);
-                let out_r = in_l * (smoothed.0 + smoothed.1);
+                let smoothed = self.smoothed.tick(gain);
+                let out_l = in_l * smoothed;
+                let out_r = in_r * smoothed;
 
                 // Write the audio signal to the main output port.
                 process.audio_outputs(0).data32(0)[i] = out_l;
