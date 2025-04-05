@@ -31,6 +31,7 @@ pub mod prelude {
                 self, AudioPortFlags, AudioPortInfo, AudioPortType, AudioPorts, MonoPorts,
                 StereoPorts,
             },
+            latency::{self, HostLatency, Latency},
             log::{self, Severity},
             note_ports::{self, NoteDialect, NotePortInfo, NotePorts},
             params::{self, ParamInfo, Params},
@@ -40,7 +41,7 @@ pub mod prelude {
         id::ClapId,
         plugin::{self, AudioThread, Plugin},
         plugin_features::*,
-        process::{self, Process, Status},
+        process::{self, Process, Status, Status::Continue},
         stream::{self, IStream, OStream},
     };
 }
