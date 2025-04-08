@@ -116,3 +116,69 @@ mod plugin_tail {
         .test(CheckTail);
     }
 }
+
+mod host_tail {
+    use std::{error::Error, pin::Pin};
+
+    use clap_clap::{
+        host,
+        host::Error::{Callback, ExtensionNotFound},
+    };
+
+    use crate::host::{ExtTailConfig, Test, TestBed, TestConfig};
+
+    struct CheckTailNotImpl<E: Error> {
+        error: E,
+    }
+
+    impl Test for CheckTailNotImpl<host::Error> {
+        fn test(self, bed: Pin<&mut TestBed>) {
+            let host = unsafe { bed.host_mut() };
+            let err = host.get_extension().tail().unwrap_err();
+            assert_eq!(err, self.error);
+        }
+    }
+
+    #[test]
+    fn tail_not_impl() {
+        TestConfig::default().test(CheckTailNotImpl {
+            error: ExtensionNotFound("tail"),
+        });
+    }
+
+    #[test]
+    fn tail_no_method_changed() {
+        TestConfig {
+            ext_tail: Some(ExtTailConfig {
+                null_callback: true,
+            }),
+            ..Default::default()
+        }
+        .test(CheckTailNotImpl {
+            error: Callback("changed"),
+        });
+    }
+
+    struct CheckCallChanged;
+
+    impl Test for CheckCallChanged {
+        fn test(self, mut bed: Pin<&mut TestBed>) {
+            let host = unsafe { bed.as_mut().host_mut() };
+            let latency = host.get_extension().tail().unwrap();
+            latency.changed();
+
+            assert!(bed.ext_tail.as_ref().unwrap().call_changed);
+        }
+    }
+
+    #[test]
+    fn tail_call_make_dirty() {
+        TestConfig {
+            ext_tail: Some(ExtTailConfig {
+                null_callback: false,
+            }),
+            ..Default::default()
+        }
+        .test(CheckCallChanged);
+    }
+}
