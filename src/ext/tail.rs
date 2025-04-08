@@ -9,6 +9,8 @@ pub trait Tail<P: Plugin> {
 
 pub(crate) use ffi::PluginTail;
 
+use crate::{ffi::clap_host_tail, host::Host};
+
 mod ffi {
     use std::marker::PhantomData;
 
@@ -60,5 +62,34 @@ mod ffi {
 impl<P: Plugin> Tail<P> for () {
     fn get(_: &P) -> u32 {
         0
+    }
+}
+
+#[derive(Debug)]
+pub struct HostTail<'a> {
+    host: &'a Host,
+    clap_host_tail: &'a clap_host_tail,
+}
+
+impl<'a> HostTail<'a> {
+    /// # Safety
+    ///
+    /// All extension interface function pointers must be non-null (Some), and
+    /// the functions must be thread-safe.
+    pub(crate) const unsafe fn new_unchecked(
+        host: &'a Host,
+        clap_host_tail: &'a clap_host_tail,
+    ) -> Self {
+        Self {
+            host,
+            clap_host_tail,
+        }
+    }
+
+    pub fn changed(&self) {
+        // SAFETY: By construction, the callback must be a valid function pointer,
+        // and the call is thread-safe.
+        let callback = self.clap_host_tail.changed.unwrap();
+        unsafe { callback(self.host.clap_host()) }
     }
 }
