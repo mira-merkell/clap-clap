@@ -10,51 +10,51 @@
 //!
 //! [`Plugin::features`]: crate::plugin::Plugin::features
 
-pub const PLUGIN_FEATURE_INSTRUMENT: &str = "instrument";
-pub const PLUGIN_FEATURE_AUDIO_EFFECT: &str = "audio-effect";
-pub const PLUGIN_FEATURE_NOTE_EFFECT: &str = "note-effect";
-pub const PLUGIN_FEATURE_NOTE_DETECTOR: &str = "note-detector";
-pub const PLUGIN_FEATURE_ANALYZER: &str = "analyzer";
+pub const INSTRUMENT: &str = "instrument";
+pub const AUDIO_EFFECT: &str = "audio-effect";
+pub const NOTE_EFFECT: &str = "note-effect";
+pub const NOTE_DETECTOR: &str = "note-detector";
+pub const ANALYZER: &str = "analyzer";
 
-pub const PLUGIN_FEATURE_SYNTHESIZER: &str = "synthesizer";
-pub const PLUGIN_FEATURE_SAMPLER: &str = "sampler";
-pub const PLUGIN_FEATURE_DRUM: &str = "drum";
-pub const PLUGIN_FEATURE_DRUM_MACHINE: &str = "drum-machine";
+pub const SYNTHESIZER: &str = "synthesizer";
+pub const SAMPLER: &str = "sampler";
+pub const DRUM: &str = "drum";
+pub const DRUM_MACHINE: &str = "drum-machine";
 
-pub const PLUGIN_FEATURE_FILTER: &str = "filter";
-pub const PLUGIN_FEATURE_PHASER: &str = "phaser";
-pub const PLUGIN_FEATURE_EQUALIZER: &str = "equalizer";
-pub const PLUGIN_FEATURE_DEESSER: &str = "de-esser";
-pub const PLUGIN_FEATURE_PHASE_VOCODER: &str = "phase-vocoder";
-pub const PLUGIN_FEATURE_GRANULAR: &str = "granular";
-pub const PLUGIN_FEATURE_FREQUENCY_SHIFTER: &str = "frequency-shifter";
-pub const PLUGIN_FEATURE_PITCH_SHIFTER: &str = "pitch-shifter";
+pub const FILTER: &str = "filter";
+pub const PHASER: &str = "phaser";
+pub const EQUALIZER: &str = "equalizer";
+pub const DEESSER: &str = "de-esser";
+pub const PHASE_VOCODER: &str = "phase-vocoder";
+pub const GRANULAR: &str = "granular";
+pub const FREQUENCY_SHIFTER: &str = "frequency-shifter";
+pub const PITCH_SHIFTER: &str = "pitch-shifter";
 
-pub const PLUGIN_FEATURE_DISTORTION: &str = "distortion";
-pub const PLUGIN_FEATURE_TRANSIENT_SHAPER: &str = "transient-shaper";
-pub const PLUGIN_FEATURE_COMPRESSOR: &str = "compressor";
-pub const PLUGIN_FEATURE_EXPANDER: &str = "expander";
-pub const PLUGIN_FEATURE_GATE: &str = "gate";
-pub const PLUGIN_FEATURE_LIMITER: &str = "limiter";
+pub const DISTORTION: &str = "distortion";
+pub const TRANSIENT_SHAPER: &str = "transient-shaper";
+pub const COMPRESSOR: &str = "compressor";
+pub const EXPANDER: &str = "expander";
+pub const GATE: &str = "gate";
+pub const LIMITER: &str = "limiter";
 
-pub const PLUGIN_FEATURE_FLANGER: &str = "flanger";
-pub const PLUGIN_FEATURE_CHORUS: &str = "chorus";
-pub const PLUGIN_FEATURE_DELAY: &str = "delay";
-pub const PLUGIN_FEATURE_REVERB: &str = "reverb";
+pub const FLANGER: &str = "flanger";
+pub const CHORUS: &str = "chorus";
+pub const DELAY: &str = "delay";
+pub const REVERB: &str = "reverb";
 
-pub const PLUGIN_FEATURE_TREMOLO: &str = "tremolo";
-pub const PLUGIN_FEATURE_GLITCH: &str = "glitch";
+pub const TREMOLO: &str = "tremolo";
+pub const GLITCH: &str = "glitch";
 
-pub const PLUGIN_FEATURE_UTILITY: &str = "utility";
-pub const PLUGIN_FEATURE_PITCH_CORRECTION: &str = "pitch-correction";
-pub const PLUGIN_FEATURE_RESTORATION: &str = "restoration";
+pub const UTILITY: &str = "utility";
+pub const PITCH_CORRECTION: &str = "pitch-correction";
+pub const RESTORATION: &str = "restoration";
 
-pub const PLUGIN_FEATURE_MULTI_EFFECTS: &str = "multi-effects";
+pub const MULTI_EFFECTS: &str = "multi-effects";
 
-pub const PLUGIN_FEATURE_MIXING: &str = "mixing";
-pub const PLUGIN_FEATURE_MASTERING: &str = "mastering";
+pub const MIXING: &str = "mixing";
+pub const MASTERING: &str = "mastering";
 
-pub const PLUGIN_FEATURE_MONO: &str = "mono";
-pub const PLUGIN_FEATURE_STEREO: &str = "stereo";
-pub const PLUGIN_FEATURE_SURROUND: &str = "surround";
-pub const PLUGIN_FEATURE_AMBISONIC: &str = "ambisonic";
+pub const MONO: &str = "mono";
+pub const STEREO: &str = "stereo";
+pub const SURROUND: &str = "surround";
+pub const AMBISONIC: &str = "ambisonic";
