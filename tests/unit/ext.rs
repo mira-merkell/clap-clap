@@ -4,6 +4,7 @@ mod log;
 mod note_ports;
 mod params;
 mod state;
+mod tail;
 
 use std::{
     ffi::{CStr, CString, c_void},
@@ -22,10 +23,10 @@ use clap_clap::{
     factory::{Factory, FactoryHost, FactoryPluginPrototype},
     ffi::{
         CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS,
-        CLAP_EXT_STATE, clap_audio_port_info, clap_event_header, clap_input_events, clap_istream,
-        clap_note_port_info, clap_ostream, clap_output_events, clap_plugin,
+        CLAP_EXT_STATE, CLAP_EXT_TAIL, clap_audio_port_info, clap_event_header, clap_input_events,
+        clap_istream, clap_note_port_info, clap_ostream, clap_output_events, clap_plugin,
         clap_plugin_audio_ports, clap_plugin_latency, clap_plugin_note_ports, clap_plugin_params,
-        clap_plugin_state,
+        clap_plugin_state, clap_plugin_tail,
     },
     id::ClapId,
     plugin::{ClapPlugin, Plugin},
@@ -45,6 +46,7 @@ trait Test<P: TestPlugin> {
 struct TestConfig {
     latency: u32,
     state: [u8; 5],
+    tail: u32,
 }
 
 impl TestConfig {
@@ -68,6 +70,7 @@ where
     pub ext_note_ports: Option<ExtNotePorts>,
     pub ext_params: Option<ExtParams>,
     pub ext_state: Option<ExtState>,
+    pub ext_tail: Option<ExtTail>,
     _marker: PhantomData<P>,
 }
 
@@ -104,6 +107,7 @@ where
                 ext_note_ports: ExtNotePorts::try_new_unchecked(clap_plugin),
                 ext_params: ExtParams::try_new_unchecked(clap_plugin),
                 ext_state: ExtState::try_new_unchecked(clap_plugin),
+                ext_tail: ExtTail::try_new_unchecked(clap_plugin),
                 _marker: PhantomData,
             }
         }
@@ -490,5 +494,33 @@ impl ExtState {
         }
 
         unsafe { state.load.unwrap()(self.clap_plugin, &raw const stream) }
+    }
+}
+
+#[derive(Debug)]
+pub struct ExtTail {
+    clap_plugin: *const clap_plugin,
+    clap_plugin_tail: *const clap_plugin_tail,
+}
+
+impl ExtTail {
+    /// # Safety
+    ///
+    /// clap_plugin must be non-null.
+    pub unsafe fn try_new_unchecked(clap_plugin: *const clap_plugin) -> Option<Self> {
+        assert!(!clap_plugin.is_null());
+        let extension =
+            unsafe { (*clap_plugin).get_extension.unwrap()(clap_plugin, CLAP_EXT_TAIL.as_ptr()) };
+
+        unsafe { extension.as_ref() }.map(|ext| Self {
+            clap_plugin,
+            clap_plugin_tail: (&raw const *ext).cast(),
+        })
+    }
+
+    pub fn get(&self) -> u32 {
+        let tail = unsafe { self.clap_plugin_tail.as_ref() }.unwrap();
+
+        unsafe { tail.get.unwrap()(self.clap_plugin) }
     }
 }

@@ -9,8 +9,9 @@ use std::{
 use clap_clap::{
     ffi::{
         CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY, CLAP_EXT_LOG, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS,
-        CLAP_EXT_STATE, clap_host, clap_host_audio_ports, clap_host_latency, clap_host_log,
-        clap_host_note_ports, clap_host_params, clap_host_state, clap_id, clap_log_severity,
+        CLAP_EXT_STATE, CLAP_EXT_TAIL, clap_host, clap_host_audio_ports, clap_host_latency,
+        clap_host_log, clap_host_note_ports, clap_host_params, clap_host_state, clap_host_tail,
+        clap_id, clap_log_severity,
     },
     host::Host,
     version::CLAP_VERSION,
@@ -33,6 +34,7 @@ pub struct TestConfig<'a> {
     pub ext_note_ports: Option<ExtNotePortsConfig>,
     pub ext_params: Option<ExtParamsConfig>,
     pub ext_state: Option<ExtStateConfig>,
+    pub ext_tail: Option<ExtTailConfig>,
 }
 
 impl TestConfig<'_> {
@@ -63,6 +65,7 @@ pub struct TestBed<'a> {
     pub ext_note_ports: Option<ExtNotePorts>,
     pub ext_params: Option<ExtParams>,
     pub ext_state: Option<ExtState>,
+    pub ext_tail: Option<ExtTail>,
 
     _marker: PhantomPinned,
 }
@@ -91,6 +94,7 @@ impl<'a> TestBed<'a> {
             ext_note_ports: config.ext_note_ports.map(ExtNotePorts::new),
             ext_params: config.ext_params.map(ExtParams::new),
             ext_state: config.ext_state.map(ExtState::new),
+            ext_tail: config.ext_tail.map(ExtTail::new),
 
             config,
             _marker: PhantomPinned,
@@ -153,6 +157,11 @@ extern "C-unwind" fn get_extension(
     if extension_id == CLAP_EXT_STATE {
         if let Some(ext) = &bed.ext_state {
             return (&raw const ext.clap_host_state).cast();
+        }
+    }
+    if extension_id == CLAP_EXT_TAIL {
+        if let Some(ext) = &bed.ext_tail {
+            return (&raw const ext.clap_host_tail).cast();
         }
     }
 
@@ -421,6 +430,36 @@ extern "C-unwind" fn ext_state_make_dirty(host: *const clap_host) {
     let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
     if let Some(ext) = &mut bed.ext_state {
         ext.call_make_dirty = true;
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+pub struct ExtTailConfig {
+    pub null_callback: bool,
+}
+
+#[derive(Debug)]
+pub struct ExtTail {
+    clap_host_tail: clap_host_tail,
+    pub call_changed: bool,
+}
+
+impl ExtTail {
+    fn new(config: ExtTailConfig) -> Self {
+        Self {
+            clap_host_tail: clap_host_tail {
+                changed: (!config.null_callback).then_some(ext_tail_changed),
+            },
+            call_changed: false,
+        }
+    }
+}
+
+extern "C-unwind" fn ext_tail_changed(host: *const clap_host) {
+    assert!(!host.is_null());
+    let bed: &mut TestBed = unsafe { &mut *(*host).host_data.cast() };
+    if let Some(ext) = &mut bed.ext_tail {
+        ext.call_changed = true;
     }
 }
 

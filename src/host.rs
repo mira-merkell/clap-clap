@@ -6,12 +6,12 @@ use std::{
 use crate::{
     ext::{
         audio_ports::HostAudioPorts, latency::HostLatency, log::HostLog, note_ports::HostNotePorts,
-        params::HostParams, state::HostState,
+        params::HostParams, state::HostState, tail::HostTail,
     },
     ffi::{
         CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY, CLAP_EXT_LOG, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS,
-        CLAP_EXT_STATE, clap_host, clap_host_audio_ports, clap_host_latency, clap_host_log,
-        clap_host_note_ports, clap_host_params, clap_host_state,
+        CLAP_EXT_STATE, CLAP_EXT_TAIL, clap_host, clap_host_audio_ports, clap_host_latency,
+        clap_host_log, clap_host_note_ports, clap_host_params, clap_host_state, clap_host_tail,
     },
     version::ClapVersion,
 };
@@ -240,6 +240,22 @@ impl<'a> HostExtensions<'a> {
         // SAFETY: We just checked if the pointer to clap_host_state, and all its
         // methods are non-null.
         Ok(unsafe { HostState::new_unchecked(self.host, clap_host_state) })
+    }
+
+    pub fn tail(&self) -> Result<HostTail<'a>, Error> {
+        let clap_host_tail = self
+            .get_extension_ptr(CLAP_EXT_TAIL)
+            .ok_or(Error::ExtensionNotFound("tail"))?;
+
+        // SAFETY: We just checked if the pointer to clap_host_tail is non-null. We
+        // return a reference to it for the lifetime of Host.
+        let clap_host_tail: &clap_host_tail = unsafe { &*clap_host_tail.cast() };
+
+        let _ = clap_host_tail.changed.ok_or(Error::Callback("changed"))?;
+
+        // SAFETY: We just checked if the pointer to clap_host_state, and all its
+        // methods are non-null.
+        Ok(unsafe { HostTail::new_unchecked(self.host, clap_host_tail) })
     }
 }
 

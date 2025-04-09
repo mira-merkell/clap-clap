@@ -28,12 +28,12 @@ pub mod prelude {
         ext::{
             self, Extensions,
             audio_ports::{
-                self, AudioPortFlags, AudioPortInfo, AudioPortType, AudioPorts, HostAudioPorts,
-                MonoPorts, StereoPorts,
+                self, AudioPortFlags, AudioPortInfo, AudioPortType, AudioPorts, MonoPorts,
+                StereoPorts,
             },
-            log::{self, HostLog, Severity},
-            note_ports::{self, HostNotePorts, NoteDialect, NotePortInfo, NotePorts},
-            params::{self, HostParams, ParamInfo, Params},
+            log::{self, Severity},
+            note_ports::{self, NoteDialect, NotePortInfo, NotePorts},
+            params::{self, ParamInfo, Params},
             state::{self, State},
         },
         host::{self, Host},
