@@ -1,14 +1,17 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicU64, Ordering},
+use std::{
+    io::Write,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 use clap_clap::prelude as clap;
 
 // A plugin must implement `Default` trait.  The plugin instance will be created
-// by the host with the call to `MyPlug::default()`.
+// by the host with the call to `Gain::default()`.
 struct Gain {
-    gain: Arc<AtomicU64>, // (value, mod amount)
+    gain: Arc<AtomicU64>,
 }
 
 impl Default for Gain {
@@ -37,41 +40,29 @@ impl clap::Params<Gain> for GainParam {
     }
 
     fn get_info(_: &Gain, param_index: u32) -> Option<clap::ParamInfo> {
-        if param_index == 0 {
-            Some(clap::ParamInfo {
-                id: clap::ClapId::from(0),
-                flags: clap::params::InfoFlags::RequiresProcess as u32
-                    | clap::params::InfoFlags::Automatable as u32,
-                name: "Gain".to_string(),
-                module: "gain".to_string(),
-                min_value: 0.0,
-                max_value: 2.0,
-                default_value: 1.0,
-            })
-        } else {
-            None
-        }
+        (param_index == 0).then(|| clap::ParamInfo {
+            id: 0.into(),
+            flags: clap::params::InfoFlags::RequiresProcess as u32
+                | clap::params::InfoFlags::Automatable as u32,
+            name: "Gain".to_string(),
+            module: "gain".to_string(),
+            min_value: 0.0,
+            max_value: 2.0,
+            default_value: 1.0,
+        })
     }
 
     fn get_value(plugin: &Gain, param_id: clap::ClapId) -> Option<f64> {
-        if param_id == clap::ClapId::from(0) {
-            let gain = f64::from_bits(plugin.gain.load(Ordering::Relaxed));
-            Some(gain)
-        } else {
-            None
-        }
+        (param_id == 0.into()).then(|| f64::from_bits(plugin.gain.load(Ordering::Relaxed)))
     }
 
     fn value_to_text(
         _: &Gain,
         _: clap::ClapId,
         value: f64,
-        out_buf: &mut [u8],
+        mut out_buf: &mut [u8],
     ) -> Result<(), clap::Error> {
-        for (out, &c) in out_buf.iter_mut().zip(format!("{value:.2}").as_bytes()) {
-            *out = c;
-        }
-        Ok(())
+        Ok(write!(out_buf, "{value:.2}")?)
     }
 
     fn text_to_value(
@@ -79,9 +70,7 @@ impl clap::Params<Gain> for GainParam {
         _: clap::ClapId,
         param_value_text: &str,
     ) -> Result<f64, clap::Error> {
-        param_value_text
-            .parse()
-            .map_err(|_| clap_clap::ext::params::Error::ConvertToValue.into())
+        Ok(param_value_text.parse()?)
     }
 
     fn flush_inactive(_: &Gain, _: &clap::InputEvents, _: &clap::OutputEvents) {}
