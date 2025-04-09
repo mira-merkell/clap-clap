@@ -46,8 +46,8 @@ impl clap::Params<Example> for ExampleParams {
     }
 
     fn get_info(_: &Example, param_index: u32) -> Option<clap::ParamInfo> {
-        if param_index < 3 {
-            Some(clap::ParamInfo {
+        (param_index < 3).then(|| {
+            clap::ParamInfo {
                 id: clap::ClapId::from(param_index as u16),
                 flags: clap::params::InfoFlags::RequiresProcess as u32
                     // Some DAWs, e.g. Bitwig, display only automatable parameters.
@@ -57,33 +57,22 @@ impl clap::Params<Example> for ExampleParams {
                 min_value: 0.0,
                 max_value: 1.0,
                 default_value: 0.0,
-            })
-        } else {
-            None
-        }
+            }
+        })
     }
 
     fn get_value(plugin: &Example, param_id: clap::ClapId) -> Option<f64> {
         let id: u32 = param_id.into();
-        if id < 3 {
-            Some(f64::from_bits(
-                plugin.state[id as usize].load(Ordering::Relaxed),
-            ))
-        } else {
-            None
-        }
+        (id < 3).then(|| f64::from_bits(plugin.state[id as usize].load(Ordering::Relaxed)))
     }
 
     fn value_to_text(
         _: &Example,
         _: clap::ClapId,
         value: f64,
-        out_buf: &mut [u8],
+        mut out_buf: &mut [u8],
     ) -> Result<(), clap::Error> {
-        for (out, &c) in out_buf.iter_mut().zip(format!("{value:.2}").as_bytes()) {
-            *out = c;
-        }
-        Ok(())
+        Ok(write!(out_buf, "{value:.2}")?)
     }
 
     fn text_to_value(
@@ -91,9 +80,7 @@ impl clap::Params<Example> for ExampleParams {
         _: clap::ClapId,
         param_value_text: &str,
     ) -> Result<f64, clap::Error> {
-        param_value_text
-            .parse()
-            .map_err(|_| clap_clap::ext::params::Error::ConvertToValue.into())
+        Ok(param_value_text.parse()?)
     }
 
     fn flush_inactive(_: &Example, _: &clap::InputEvents, _: &clap::OutputEvents) {}

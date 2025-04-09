@@ -8,7 +8,7 @@ use clap_clap::{
     events::{InputEvents, OutputEvents},
     ext::{
         Extensions,
-        params::{Error::ConvertToValue, ParamInfo, Params},
+        params::{Error::ParseFloat, ParamInfo, Params},
     },
     id::ClapId,
     plugin::{AudioThread, Plugin},
@@ -128,10 +128,10 @@ impl Params<Plug> for PlugParams {
 
     fn text_to_value(_: &Plug, param_id: ClapId, param_value_text: &str) -> Result<f64, Error> {
         if param_id != ClapId::from(0) {
-            return Err(ConvertToValue.into());
+            return Err(ParseFloat(None).into());
         }
 
-        param_value_text.parse().map_err(|_| ConvertToValue.into())
+        Ok(param_value_text.parse()?)
     }
 
     fn flush_inactive(plugin: &Plug, _: &InputEvents, _: &OutputEvents) {
@@ -227,17 +227,17 @@ fn check_text_to_value() {
     assert_eq!(params.text_to_value(ClapId::from(0), "0.1").unwrap(), 0.1);
     assert_eq!(params.text_to_value(ClapId::from(0), "-0.1").unwrap(), -0.1);
     assert_eq!(params.text_to_value(ClapId::from(0), ".1").unwrap(), 0.1);
-    assert_eq!(
+    matches!(
         params.text_to_value(ClapId::from(0), ".l/o.1").unwrap_err(),
-        ConvertToValue
+        ParseFloat(Some(_))
     );
-    assert_eq!(
+    matches!(
         params.text_to_value(ClapId::from(1), "").unwrap_err(),
-        ConvertToValue
+        ParseFloat(Some(_))
     );
-    assert_eq!(
+    matches!(
         params.text_to_value(ClapId::from(2), "").unwrap_err(),
-        ConvertToValue
+        ParseFloat(Some(_))
     );
 }
 

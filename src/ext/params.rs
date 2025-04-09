@@ -193,11 +193,11 @@ impl<P: Plugin> Params<P> for () {
     }
 
     fn value_to_text(_: &P, _: ClapId, value: f64, _: &mut [u8]) -> Result<(), crate::Error> {
-        Err(Error::ConvertToText(value).into())
+        Ok(())
     }
 
     fn text_to_value(_: &P, _: ClapId, _: &str) -> Result<f64, crate::Error> {
-        Err(Error::ConvertToValue.into())
+        Ok(0.0)
     }
 
     fn flush_inactive(_: &P, _: &InputEvents, _: &OutputEvents) {}
@@ -419,7 +419,7 @@ mod ffi {
                 .map(|p| unsafe { CStr::from_ptr(p) }.to_str())
                 .ok_or(Error::Nullptr)??;
             let value = E::text_to_value(plugin, param_id.try_into()?, text)
-                .map_err(|_| Error::ConvertToValue)?;
+                .map_err(|_| Error::ParseFloat(None))?;
             unsafe { out_value.as_mut() }
                 .map(|v| *v = value)
                 .ok_or(Error::Nullptr)
@@ -612,7 +612,7 @@ impl<'a> HostParams<'a> {
 #[derive(Debug, PartialEq)]
 pub enum Error {
     ConvertToText(f64),
-    ConvertToValue,
+    ParseFloat(Option<std::num::ParseFloatError>),
     IdError(id::Error),
     Nullptr,
     Utf8Error(std::str::Utf8Error),
@@ -622,7 +622,7 @@ impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::ConvertToText(val) => write!(f, "conversion from value to text: {val}"),
-            Error::ConvertToValue => write!(f, "conversion from text to value"),
+            Error::ParseFloat(e) => write!(f, "float conversion: {:?}", e),
             Error::IdError(e) => write!(f, "ClapId error: {e}"),
             Error::Nullptr => write!(f, "null pointer"),
             Error::Utf8Error(e) => write!(f, "UTF-8 encoding error: {e}"),
@@ -641,6 +641,12 @@ impl From<std::str::Utf8Error> for Error {
 impl From<id::Error> for Error {
     fn from(value: id::Error) -> Self {
         Self::IdError(value)
+    }
+}
+
+impl From<std::num::ParseFloatError> for Error {
+    fn from(value: std::num::ParseFloatError) -> Self {
+        Self::ParseFloat(Some(value))
     }
 }
 

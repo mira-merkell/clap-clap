@@ -108,3 +108,9 @@ impl From<std::io::Error> for Error {
         Self::IO(value)
     }
 }
+
+impl From<std::num::ParseFloatError> for Error {
+    fn from(value: std::num::ParseFloatError) -> Self {
+        crate::ext::params::Error::from(value).into()
+    }
+}
