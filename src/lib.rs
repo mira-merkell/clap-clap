@@ -41,7 +41,7 @@ pub mod prelude {
         id::ClapId,
         plugin::{self, AudioThread, Plugin},
         plugin_features,
-        process::{self, Process, Status},
+        process::{self, Process, Status, Status::Continue},
         stream::{self, IStream, OStream},
     };
 }
