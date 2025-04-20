@@ -22,24 +22,20 @@ impl clap::NotePorts<Self> for Transpose {
     }
 
     fn get(_: &Self, index: u32, is_input: bool) -> Option<clap::NotePortInfo> {
-        if index < 2 {
-            Some(clap::NotePortInfo {
-                id: if is_input {
-                    clap::ClapId::from(index as u16)
-                } else {
-                    clap::ClapId::from(index as u16 + 2)
-                },
-                supported_dialects: clap::NoteDialect::all(),
-                preferred_dialect: clap::NoteDialect::Clap as u32,
-                name: if is_input {
-                    format!("In {index}")
-                } else {
-                    format!("Out {index}")
-                },
-            })
-        } else {
-            None
-        }
+        (index < 2).then(|| clap::NotePortInfo {
+            id: if is_input {
+                clap::ClapId::from(index as u16)
+            } else {
+                clap::ClapId::from(index as u16 + 2)
+            },
+            supported_dialects: clap::NoteDialect::all(),
+            preferred_dialect: clap::NoteDialect::Clap as u32,
+            name: if is_input {
+                format!("In {index}")
+            } else {
+                format!("Out {index}")
+            },
+        })
     }
 }
 
@@ -96,7 +92,7 @@ impl clap::AudioThread<Self> for Transpose {
             }
         }
 
-        Ok(clap::Status::Continue)
+        Ok(clap::Continue)
     }
 }
 

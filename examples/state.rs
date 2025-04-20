@@ -9,11 +9,14 @@ use std::{
 
 use clap_clap::prelude as clap;
 
+const NUM_PARAMS: usize = 3;
+const NUM_BYTES: usize = NUM_PARAMS * 8; // Parameters have type: f64.
+
 // A plugin must implement `Default` trait.  The plugin instance will be created
 // by the host with the call to `State::default()`.
 struct Example {
     // Three independent parameters to save and load as the plugin's state.
-    state: Arc<[AtomicU64; 3]>,
+    state: Arc<[AtomicU64; NUM_PARAMS]>,
 }
 
 impl Default for Example {
@@ -42,12 +45,12 @@ struct ExampleParams;
 
 impl clap::Params<Example> for ExampleParams {
     fn count(_: &Example) -> u32 {
-        3
+        NUM_PARAMS as u32
     }
 
     fn get_info(_: &Example, param_index: u32) -> Option<clap::ParamInfo> {
-        if param_index < 3 {
-            Some(clap::ParamInfo {
+        (param_index < NUM_PARAMS as u32).then(|| {
+            clap::ParamInfo {
                 id: clap::ClapId::from(param_index as u16),
                 flags: clap::params::InfoFlags::RequiresProcess as u32
                     // Some DAWs, e.g. Bitwig, display only automatable parameters.
@@ -57,33 +60,22 @@ impl clap::Params<Example> for ExampleParams {
                 min_value: 0.0,
                 max_value: 1.0,
                 default_value: 0.0,
-            })
-        } else {
-            None
-        }
+            }
+        })
     }
 
     fn get_value(plugin: &Example, param_id: clap::ClapId) -> Option<f64> {
-        let id: u32 = param_id.into();
-        if id < 3 {
-            Some(f64::from_bits(
-                plugin.state[id as usize].load(Ordering::Relaxed),
-            ))
-        } else {
-            None
-        }
+        let id: usize = param_id.into();
+        (id < NUM_PARAMS).then(|| f64::from_bits(plugin.state[id].load(Ordering::Relaxed)))
     }
 
     fn value_to_text(
         _: &Example,
         _: clap::ClapId,
         value: f64,
-        out_buf: &mut [u8],
+        mut out_buf: &mut [u8],
     ) -> Result<(), clap::Error> {
-        for (out, &c) in out_buf.iter_mut().zip(format!("{value:.2}").as_bytes()) {
-            *out = c;
-        }
-        Ok(())
+        Ok(write!(out_buf, "{value:.2}")?)
     }
 
     fn text_to_value(
@@ -91,9 +83,7 @@ impl clap::Params<Example> for ExampleParams {
         _: clap::ClapId,
         param_value_text: &str,
     ) -> Result<f64, clap::Error> {
-        param_value_text
-            .parse()
-            .map_err(|_| clap_clap::ext::params::Error::ConvertToValue.into())
+        Ok(param_value_text.parse()?)
     }
 
     fn flush_inactive(_: &Example, _: &clap::InputEvents, _: &clap::OutputEvents) {}
@@ -110,17 +100,18 @@ struct ExampleState;
 
 impl clap::State<Example> for ExampleState {
     fn save(plugin: &Example, stream: &mut clap::OStream) -> Result<(), clap::Error> {
-        let buf: [u64; 3] = [0, 1, 2].map(|i| plugin.state[i].load(Ordering::Acquire));
-        let buf: [u8; 24] = unsafe { mem::transmute(buf) };
+        let buf: [u64; NUM_PARAMS] =
+            std::array::from_fn(|i| plugin.state[i].load(Ordering::Acquire));
+        let buf: [u8; NUM_BYTES] = unsafe { mem::transmute(buf) };
         stream.write_all(&buf).map_err(Into::into)
     }
 
     fn load(plugin: &Example, stream: &mut clap::IStream) -> Result<(), clap::Error> {
-        let mut buf: [u8; 24] = [0; 24];
+        let mut buf: [u8; NUM_BYTES] = [0; NUM_BYTES];
         stream.read_exact(&mut buf)?;
 
-        let buf: [u64; 3] = unsafe { mem::transmute(buf) };
-        for i in 0..3 {
+        let buf: [u64; NUM_PARAMS] = unsafe { mem::transmute(buf) };
+        for i in 0..NUM_PARAMS {
             plugin.state[i].store(buf[i], Ordering::Release);
         }
 
@@ -157,7 +148,7 @@ impl clap::Plugin for Example {
 }
 
 struct AudioThread {
-    state: Arc<[AtomicU64; 3]>,
+    state: Arc<[AtomicU64; NUM_PARAMS]>,
 }
 
 impl clap::AudioThread<Example> for AudioThread {
@@ -169,14 +160,14 @@ impl clap::AudioThread<Example> for AudioThread {
 
             if let Ok(param) = header.param_value() {
                 let value = param.value();
-                let id: u32 = param.param_id().into();
+                let id: usize = param.param_id().into();
 
-                if id < 3 {
-                    self.state[id as usize].store(value.to_bits(), Ordering::Release);
+                if id < NUM_PARAMS {
+                    self.state[id].store(value.to_bits(), Ordering::Release);
                 }
             }
         }
-        Ok(clap::Status::Continue)
+        Ok(clap::Continue)
     }
 }
 

@@ -31,6 +31,7 @@ pub mod prelude {
                 self, AudioPortFlags, AudioPortInfo, AudioPortType, AudioPorts, MonoPorts,
                 StereoPorts,
             },
+            latency::{self, HostLatency, Latency},
             log::{self, Severity},
             note_ports::{self, NoteDialect, NotePortInfo, NotePorts},
             params::{self, ParamInfo, Params},
@@ -40,7 +41,7 @@ pub mod prelude {
         id::ClapId,
         plugin::{self, AudioThread, Plugin},
         plugin_features,
-        process::{self, Process, Status},
+        process::{self, Process, Status, Status::Continue},
         stream::{self, IStream, OStream},
     };
 }
@@ -105,5 +106,11 @@ impl std::error::Error for Error {}
 impl From<std::io::Error> for Error {
     fn from(value: std::io::Error) -> Self {
         Self::IO(value)
+    }
+}
+
+impl From<std::num::ParseFloatError> for Error {
+    fn from(value: std::num::ParseFloatError) -> Self {
+        crate::ext::params::Error::from(value).into()
     }
 }

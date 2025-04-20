@@ -102,7 +102,7 @@ impl clap::AudioThread<MyPlug> for AudioThread {
             process.audio_outputs(0).data32(0)[i] = out_l;
             process.audio_outputs(0).data32(1)[i] = out_r;
         }
-        Ok(clap::Status::Continue)
+        Ok(clap::Continue)
     }
 }
 
