@@ -75,6 +75,12 @@ impl From<ClapId> for ffi::clap_id {
     }
 }
 
+impl From<ClapId> for usize {
+    fn from(value: ClapId) -> Self {
+        u32::from(value) as usize
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Error {
     InvalidId,

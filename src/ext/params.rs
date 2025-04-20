@@ -192,7 +192,7 @@ impl<P: Plugin> Params<P> for () {
         None
     }
 
-    fn value_to_text(_: &P, _: ClapId, value: f64, _: &mut [u8]) -> Result<(), crate::Error> {
+    fn value_to_text(_: &P, _: ClapId, _: f64, _: &mut [u8]) -> Result<(), crate::Error> {
         Ok(())
     }
 
