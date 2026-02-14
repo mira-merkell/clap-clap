@@ -18,9 +18,6 @@ This library is still very much WIP, 🚧 but the core functionality has already
 that includes all event types, audio and note ports, parameters, saving/loading plugin state,
 logging, and reporting latency.  
 
-New minor versions, `0.x.0` will be published once a month throughout 2025.
-The first stable version: `1.0.0-beta` is planned for Sep 2025.
-
 [CLAP API]: https://github.com/free-audio/clap/tree/main/include/clap
 
 [extensions]: https://docs.rs/clap-clap/latest/clap_clap/ext/index.html
@@ -98,15 +95,6 @@ can install as a `*.clap` file.
 [`clap_clap::entry!`]: https://docs.rs/clap-clap/latest/clap_clap/macro.entry.html
 
 [`Plugin`]: https://docs.rs/clap-clap/latest/clap_clap/plugin/trait.Plugin.html
-
-## Contributing
-
-All contributions are welcome!
-
-Help with writing documentation and examples will be much needed in the summer.
-Alternatively, if you could set aside a few hours in late 2025 to help with
-testing sample plugins before the stable release, that would be greatly
-appreciated. 🎈
 
 ## Credits and License
 
