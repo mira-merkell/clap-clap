@@ -91,6 +91,7 @@ struct PluginExtensions<P> {
     note_ports: Option<PluginNotePorts<P>>,
     params: Option<PluginParams<P>>,
     state: Option<PluginState<P>>,
+    resource_directory: Option<PluginResourceDirectory<P>>,
     tail: Option<PluginTail<P>>,
 }
 
@@ -102,6 +103,8 @@ impl<P: Plugin> PluginExtensions<P> {
             note_ports: <P as Extensions<P>>::note_ports().map(PluginNotePorts::new),
             params: <P as Extensions<P>>::params().map(PluginParams::new),
             state: <P as Extensions<P>>::state().map(PluginState::new),
+            resource_directory: <P as Extensions<P>>::resource_directory()
+                .map(PluginResourceDirectory::new),
             tail: <P as Extensions<P>>::tail().map(PluginTail::new),
         }
     }
@@ -324,8 +327,8 @@ mod desc {
 pub use desc::PluginDescriptor;
 
 use crate::ext::{
-    latency::PluginLatency, note_ports::PluginNotePorts, params::PluginParams, state::PluginState,
-    tail::PluginTail,
+    latency::PluginLatency, note_ports::PluginNotePorts, params::PluginParams,
+    resource_directory::PluginResourceDirectory, state::PluginState, tail::PluginTail,
 };
 
 mod ffi {
@@ -338,9 +341,9 @@ mod ffi {
 
     use crate::{
         ffi::{
-            CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY, CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS,
-            CLAP_EXT_STATE, CLAP_EXT_TAIL, CLAP_PROCESS_ERROR, clap_plugin, clap_process,
-            clap_process_status,
+            CLAP_EXT_AUDIO_PORTS, CLAP_EXT_LATENCY,
+            CLAP_EXT_NOTE_PORTS, CLAP_EXT_PARAMS, CLAP_EXT_RESOURCE_DIRECTORY, CLAP_EXT_STATE,
+            CLAP_EXT_TAIL, CLAP_PROCESS_ERROR, clap_plugin, clap_process, clap_process_status,
         },
         plugin::{AudioThread, ClapPlugin, Plugin, Runtime},
         process::Process,
@@ -561,6 +564,10 @@ mod ffi {
             }
         } else if id == CLAP_EXT_STATE {
             if let Some(ext) = &extensions.state {
+                return (&raw const *ext).cast();
+            }
+        } else if id == CLAP_EXT_RESOURCE_DIRECTORY {
+            if let Some(ext) = &extensions.resource_directory {
                 return (&raw const *ext).cast();
             }
         } else if id == CLAP_EXT_TAIL {

@@ -19,7 +19,7 @@ use std::fmt::{Display, Formatter};
 use crate::{
     ext::{
         audio_ports::AudioPorts, latency::Latency, note_ports::NotePorts, params::Params,
-        state::State, tail::Tail,
+        resource_directory::ResourceDirectory, state::State, tail::Tail,
     },
     plugin::Plugin,
 };
@@ -29,6 +29,7 @@ pub mod latency;
 pub mod log;
 pub mod note_ports;
 pub mod params;
+pub mod resource_directory;
 pub mod state;
 pub mod tail;
 
@@ -54,6 +55,10 @@ pub trait Extensions<P: Plugin> {
         None::<()>
     }
 
+    fn resource_directory() -> Option<impl ResourceDirectory<P>> {
+        None::<()>
+    }
+
     fn tail() -> Option<impl Tail<P>> {
         None::<()>
     }
@@ -66,6 +71,7 @@ pub enum Error {
     NotePorts(note_ports::Error),
     Params(params::Error),
     State(state::Error),
+    ResourceDirectory(resource_directory::Error),
 }
 
 impl Display for Error {
@@ -76,6 +82,7 @@ impl Display for Error {
             Error::NotePorts(e) => write!(f, "note_ports: {e}"),
             Error::Params(e) => write!(f, "params: {e}"),
             Error::State(e) => write!(f, "state: {e}"),
+            Error::ResourceDirectory(e) => write!(f, "resource_directory: {e}"),
         }
     }
 }
