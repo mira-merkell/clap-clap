@@ -1484,6 +1484,41 @@ pub struct clap_plugin_state_context {
 }
 
 #[doc = " @page State\n @brief state management\n\n Plugins can implement this extension to save and restore both parameter\n values and non-parameter state. This is used to persist a plugin's state\n between project reloads, when duplicating and copying plugin instances, and\n for host-side preset management.\n\n If you need to know if the save/load operation is meant for duplicating a plugin\n instance, for saving/loading a plugin preset or while saving/loading the project\n then consider implementing CLAP_EXT_STATE_CONTEXT in addition to CLAP_EXT_STATE."]
+/// Draft extension: lets the plugin store its resources in a host-provided
+/// resource directory. See https://github.com/free-audio/clap/blob/main/include/clap/ext/draft/resource-directory.h
+pub const CLAP_EXT_RESOURCE_DIRECTORY: &CStr = c"clap.resource-directory/1";
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct clap_plugin_resource_directory {
+    pub set_directory: Option<
+        unsafe extern "C-unwind" fn(
+            plugin: *const clap_plugin,
+            path: *const c_char,
+            is_shared: bool,
+        ),
+    >,
+    pub collect: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin, all: bool)>,
+    pub get_files_count: Option<unsafe extern "C-unwind" fn(plugin: *const clap_plugin) -> u32>,
+    pub get_file_path: Option<
+        unsafe extern "C-unwind" fn(
+            plugin: *const clap_plugin,
+            index: u32,
+            path: *mut c_char,
+            path_size: u32,
+        ) -> i32,
+    >,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct clap_host_resource_directory {
+    pub request_directory:
+        Option<unsafe extern "C-unwind" fn(host: *const clap_host, is_shared: bool) -> bool>,
+    pub release_directory:
+        Option<unsafe extern "C-unwind" fn(host: *const clap_host, is_shared: bool)>,
+}
+
 pub const CLAP_EXT_STATE: &CStr = c"clap.state";
 
 #[repr(C)]
